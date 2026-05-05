@@ -105,8 +105,22 @@ app.use(async (req, res, next) => {
   }
 });
 
+// Debug request logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 app.get('/api/test', (req, res) => {
   res.json({ status: 'ok', message: 'API is working' });
+});
+
+app.get('/api/debug-env', (req, res) => {
+  res.json({ 
+    nodeEnv: process.env.NODE_ENV, 
+    port: process.env.PORT,
+    cwd: process.cwd()
+  });
 });
 
 app.use('/api/auth', authRoutes);
@@ -129,9 +143,9 @@ if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const buildPath = path.join(__dirname, '../../pharmacy-inventory/build');
   app.use(express.static(buildPath));
   
-  app.get('*', (req, res) => {
+  app.all('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: 'Not found' });
+      return res.status(404).json({ error: `API route ${req.method} ${req.path} not found` });
     }
     res.sendFile(path.join(buildPath, 'index.html'));
   });
