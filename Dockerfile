@@ -21,6 +21,10 @@ RUN npm run build
 FROM node:18-alpine
 WORKDIR /app
 
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=3000
+
 # Install backend production dependencies
 COPY pharmacy-backend/server/package*.json ./pharmacy-backend/server/
 RUN cd pharmacy-backend/server && npm ci --only=production && npm cache clean --force
@@ -51,8 +55,8 @@ RUN chown -R nodejs:nodejs /app
 # Switch to non-root user
 USER nodejs
 
-# Expose backend port
-EXPOSE 5001
+# Expose port
+EXPOSE 3000
 
 # Start server
 CMD ["/bin/sh", "/app/start.sh"]
