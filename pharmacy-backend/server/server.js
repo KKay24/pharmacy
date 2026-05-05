@@ -138,15 +138,22 @@ app.get(
 app.use('/api/expenses', authenticateToken, requireRole(['admin', 'manager']), expenseRoutes);
 app.use('/api/suppliers', authenticateToken, requireRole(['admin', 'manager']), supplierRoutes);
 
+// Catch-all for API routes (unmatched)
+app.use('/api/*', (req, res) => {
+  console.log(`[404] API Route Not Found: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ 
+    error: 'API route not found',
+    method: req.method,
+    url: req.originalUrl 
+  });
+});
+
 // Serve React frontend in production
 if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const buildPath = path.join(__dirname, '../../pharmacy-inventory/build');
   app.use(express.static(buildPath));
   
-  app.all('*', (req, res) => {
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: `API route ${req.method} ${req.path} not found` });
-    }
+  app.get('*', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }
