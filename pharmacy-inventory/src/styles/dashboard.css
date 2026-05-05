@@ -1,0 +1,484 @@
+/* Dashboard Master Layout */
+.dashboard-grid {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1600px;
+  gap: 1.25rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.charts-row, .lists-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 600px) {
+  .charts-row, .lists-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.alert-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 0.5rem;
+}
+
+/* Premium Card Styles */
+.dash-card, .metric-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-width: 0;
+}
+
+.dash-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.dash-card-header {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.dash-card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.025em;
+}
+
+.header-filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dash-select {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  background: #f8fafc;
+  outline: none;
+  cursor: pointer;
+}
+
+.dash-card-body {
+  padding: 1.5rem;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.action-link {
+  color: #2563eb;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Metric Cards */
+.metric-card {
+  padding: 1rem 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card.border-orange {
+  border-bottom: 4px solid #f97316;
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.metric-title {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.metric-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.1;
+}
+
+.color-blue { color: #2563eb; }
+.color-orange { color: #f97316; }
+.color-red { color: #ef4444; }
+.color-slate { color: #475569; }
+
+.metric-chart-spark {
+  width: 60px;
+  height: 30px;
+  opacity: 0.8;
+}
+
+/* Tables */
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mini-table th {
+  text-align: left;
+  padding: 1rem 1.5rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 700;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mini-table td {
+  padding: 1.1rem 1.5rem;
+  font-size: 0.95rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.reorder-btn {
+  background: #22c55e;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.reorder-btn:hover {
+  background: #16a34a;
+}
+
+.status-badge {
+  padding: 0.35rem 0.85rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.status-badge.received { background: #dcfce7; color: #15803d; }
+.status-badge.pending { background: #fef3c7; color: #b45309; }
+.status-badge.shipped { background: #dbeafe; color: #1d4ed8; }
+
+.forecast-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.forecast-subvalue {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.trend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.trend-chip.up {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.trend-chip.down {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.trend-chip.stable {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.seasonality-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.seasonality-cell strong {
+  color: #0f172a;
+}
+
+.seasonality-cell span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.seasonality-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.seasonality-chip.high {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.seasonality-chip.moderate {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.seasonality-chip.steady,
+.seasonality-chip.insufficient-data {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+/* Stock Alerts Panel */
+.stock-alerts-panel {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.stock-alerts-header {
+  background: #2563eb;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: inline-block;
+  border-radius: 0 0 12px 0;
+}
+
+.stock-alerts-content {
+  background: white;
+  padding: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  position: relative;
+}
+
+.alert-card {
+  flex: 1;
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.alert-icon-blue, .alert-icon-red, .alert-icon-green {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: white;
+  flex-shrink: 0;
+}
+
+.alert-icon-blue { background: #3b82f6; }
+.alert-icon-red { background: #ef4444; }
+.alert-icon-green { background: #22c55e; }
+
+.alert-text h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.alert-text p {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.alert-box-decorative {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 120px;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(37, 99, 235, 0.1) 100%);
+  clip-path: polygon(20% 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+.predictive-panels-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.risk-panel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.risk-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.risk-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #1e293b;
+}
+
+.risk-panel__title h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.risk-panel__count {
+  min-width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.85rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.risk-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.risk-list-item__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.risk-list-item__copy strong {
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.risk-list-item__copy span,
+.risk-list-item__meta span {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.risk-list-item__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.risk-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.risk-chip--orange {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.risk-chip--red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.risk-chip--slate {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.risk-chip--blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.risk-empty {
+  padding: 1rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .risk-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .risk-list-item__meta {
+    align-items: flex-start;
+  }
+}

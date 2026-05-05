@@ -1,0 +1,46 @@
+.receiptContainer {
+  width: 300px; /* Thermal printer width */
+  padding: 10px;
+  background: white;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.divider {
+  border-bottom: 1px dashed black;
+  margin: 5px 0;
+}
+
+.items table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.items th {
+  text-align: left;
+  border-bottom: 1px solid black;
+}
+
+.totals {
+  margin-top: 5px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.bold {
+  font-weight: bold;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 10px;
+  font-size: 10px;
+}

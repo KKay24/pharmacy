@@ -1,0 +1,136 @@
+/* Supplier Management - Modern Design System */
+.sup-container {
+    padding: 1.5rem 2rem;
+    background-color: #f8fafc;
+    min-height: calc(100vh - 72px);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Supplier Stats Header */
+.sup-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+}
+
+.sup-stat-card {
+    background: white;
+    padding: 1.25rem;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.sup-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sup-stat-copy {
+    display: flex;
+    flex-direction: column;
+}
+
+.sup-stat-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.sup-stat-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #1e293b;
+}
+
+/* Partner Cards Grid */
+.sup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.5rem;
+}
+
+.sup-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.sup-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+}
+
+.sup-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.sup-avatar {
+    width: 48px;
+    height: 48px;
+    background: #f1f5f9;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: #4474BF;
+    font-size: 1.2rem;
+}
+
+.sup-rating {
+    display: flex;
+    gap: 2px;
+}
+
+.sup-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.sup-info-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.sup-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: auto;
+}
+
+.badge-finance {
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.finance-paid { background: #dcfce7; color: #166534; }
+.finance-pending { background: #fee2e2; color: #b91c1c; }

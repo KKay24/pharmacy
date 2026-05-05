@@ -1,0 +1,34 @@
+const sequelize = require('../config/db');
+const Medicine = require('./Medicine');
+const Batch = require('./Batch');
+const Sales = require('./Sales');
+const User = require('./User');
+const Customer = require('./Customer');
+const Prescription = require('./Prescription');
+
+// Associations
+Medicine.hasMany(Batch, { foreignKey: 'medicineId', onDelete: 'CASCADE' });
+Batch.belongsTo(Medicine, { foreignKey: 'medicineId' });
+
+Batch.hasMany(Sales, { foreignKey: 'batchId' });
+Sales.belongsTo(Batch, { foreignKey: 'batchId' });
+
+Medicine.hasMany(Sales, { foreignKey: 'medicineId' });
+Sales.belongsTo(Medicine, { foreignKey: 'medicineId' });
+
+// Customer Associations
+Customer.hasMany(Sales, { foreignKey: 'customerId' });
+Sales.belongsTo(Customer, { foreignKey: 'customerId' });
+
+Customer.hasMany(Prescription, { foreignKey: 'customerId' });
+Prescription.belongsTo(Customer, { foreignKey: 'customerId' });
+
+module.exports = {
+  sequelize,
+  Medicine,
+  Batch,
+  Sales,
+  User,
+  Customer,
+  Prescription
+};

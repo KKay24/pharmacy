@@ -1,0 +1,163 @@
+/* Expenses Management Layout */
+.exp-container {
+  padding: 1.5rem 2rem;
+  background-color: #f8fafc;
+  min-height: calc(100vh - 72px);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.exp-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+.exp-stat-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.exp-stat-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.exp-stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+/* Category Badges */
+.badge-cat {
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cat-payroll { background: #dbeafe; color: #1e40af; }
+.cat-rent { background: #fee2e2; color: #b91c1c; }
+.cat-utilities { background: #fef3c7; color: #92400e; }
+.cat-operating { background: #dcfce7; color: #166534; }
+.cat-other { background: #f1f5f9; color: #475569; }
+
+/* History Table Overlay */
+.exp-table-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.exp-table-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.exp-table-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.exp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.exp-table th {
+  text-align: left;
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748b;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.exp-table td {
+  padding: 1.1rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.expense-amount {
+  font-weight: 700;
+  color: #ef4444;
+}
+
+/* Form Styles */
+.exp-form-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.exp-input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.exp-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.exp-input-group label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.exp-input {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.exp-input:focus {
+  border-color: #4474BF;
+  box-shadow: 0 0 0 3px rgba(68, 116, 191, 0.1);
+}
+
+.exp-submit-btn {
+  background: #4474BF;
+  color: white;
+  padding: 0.8rem 2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 1rem;
+}
+
+.exp-submit-btn:hover {
+  background: #3b66aa;
+  transform: translateY(-1px);
+}

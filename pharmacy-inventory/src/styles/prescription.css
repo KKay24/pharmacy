@@ -1,0 +1,251 @@
+/* Prescription Management Design System */
+.pm-container {
+  padding: 1.5rem 2rem;
+  background-color: #f8fafc;
+  min-height: calc(100vh - 72px);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.pm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.pm-header-copy h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.pm-header-copy p {
+  color: #64748b;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.95rem;
+}
+
+.pm-btn-primary {
+  background: #4474BF;
+  color: white;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pm-btn-primary:hover {
+  background: #365da1;
+}
+
+/* Tabs & Controls */
+.pm-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pm-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.4rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.pm-tab {
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pm-tab.active {
+  background: #4474BF;
+  color: white;
+}
+
+.pm-search-group {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.pm-search-input {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  width: 280px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+/* Master Table Panel */
+.pm-table-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.pm-table-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pm-table-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.pm-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pm-table th {
+  text-align: left;
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748b;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.pm-table td {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.95rem;
+  color: #334155;
+  vertical-align: middle;
+}
+
+/* Patient Avatar Style */
+.patient-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.patient-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #4474BF;
+  overflow: hidden;
+}
+
+.patient-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Status Badges */
+.badge-pm {
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-ready { background: #dcfce7; color: #166534; }
+.status-filled { background: #dbeafe; color: #1e40af; }
+.status-hold { background: #ffedd5; color: #c2410c; }
+
+/* Dashboard Cards (Bottom) */
+.pm-stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 0.8fr;
+  gap: 1.5rem;
+}
+
+.pm-stat-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 1.25rem;
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pm-stat-card-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.pm-stat-card-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Micro Stats Helper */
+.pm-quick-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pm-qstat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 0.75rem;
+}
+
+.pm-qstat-label {
+    font-size: 0.9rem;
+    color: #475569;
+}
+
+.pm-qstat-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.pm-pagination {
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+}

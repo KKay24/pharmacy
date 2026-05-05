@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: pharmacy-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pharmacy
+      POSTGRES_USER: pharmacyuser
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pharmacyuser -d pharmacy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pharmacy-network
+
+  # Application (Frontend + Backend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pharmacy-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - POSTGRES_URL=postgresql://pharmacyuser:${POSTGRES_PASSWORD:-changeme123}@db:5432/pharmacy
+    ports:
+      - "3000:3000"
+      - "5001:5001"
+    networks:
+      - pharmacy-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  pharmacy-network:
+    driver: bridge

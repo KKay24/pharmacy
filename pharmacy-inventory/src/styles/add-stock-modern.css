@@ -1,0 +1,237 @@
+/* Add New Stock - Modern Design System */
+.asm-container {
+    padding: 1.5rem 2rem;
+    background-color: #f8fafc;
+    min-height: calc(100vh - 72px);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.asm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.asm-header-copy h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #1e293b;
+    font-weight: 700;
+}
+
+.asm-header-copy p {
+    color: #64748b;
+    margin: 0.25rem 0 0 0;
+    font-size: 0.95rem;
+}
+
+/* Tabs Navigation */
+.asm-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0px;
+}
+
+.asm-tab {
+    padding: 0.8rem 1.5rem;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.asm-tab.active {
+    color: #4474BF;
+}
+
+.asm-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #4474BF;
+}
+
+/* Form Settings Row */
+.asm-settings-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    padding: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.asm-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.asm-field label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.asm-input {
+    padding: 0.7rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-size: 0.95rem;
+    outline: none;
+    background: #ffffff;
+}
+
+.asm-input:focus {
+    border-color: #4474BF;
+    box-shadow: 0 0 0 3px rgba(68,116,191,0.1);
+}
+
+/* Product List Grid */
+.asm-grid-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.asm-grid-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.asm-grid-table th {
+    text-align: left;
+    padding: 1rem 1.25rem;
+    background: #f8fafc;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #64748b;
+    border-bottom: 2px solid #f1f5f9;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.asm-grid-table td {
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.asm-row-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    font-size: 0.9rem;
+    outline: none;
+}
+
+.asm-row-input:focus {
+    border-color: #4474BF;
+}
+
+/* Totals Footer */
+.asm-totals-panel {
+    padding: 1.5rem;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.asm-total-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+    gap: 2rem;
+}
+
+.asm-total-label {
+    font-size: 0.95rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.asm-total-value {
+    width: 140px;
+    text-align: right;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.asm-total-grand {
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    border-top: 2px solid #e2e8f0;
+    color: #4474BF;
+    font-size: 1.4rem;
+}
+
+/* Footer Actions */
+.asm-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.asm-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+}
+
+.asm-btn-secondary {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.asm-btn-secondary:hover {
+    background: #e2e8f0;
+}
+
+.asm-btn-primary {
+    background: #4474BF;
+    color: white;
+}
+
+.asm-btn-primary:hover {
+    background: #365da1;
+}
+
+/* OCR Section Overlay style */
+.asm-ocr-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #eff6ff;
+    color: #4474BF;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}

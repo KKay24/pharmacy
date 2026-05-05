@@ -1,0 +1,6 @@
+Database Configuration: Using SQLite (isVercel: false)
+Firebase Admin SDK initialization error: Service account object must contain a string "project_id" property.
+Firebase auth middleware disabled (using public API routes).
+Initiating database sync...
+Database connected and synced successfully
+Server running on http://localhost:5001

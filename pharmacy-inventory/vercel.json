@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "create-react-app",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
+}

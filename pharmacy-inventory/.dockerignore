@@ -1,0 +1,60 @@
+# Node modules
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Build output
+build
+.next
+dist
+out
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Testing
+coverage
+.nyc_output
+
+# Documentation (not needed in container)
+*.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Vercel
+.vercel
+vercel.json
+
+# Misc
+.cache
+tmp
+temp
+*.log
+
+# Database files (will use PostgreSQL)
+*.sqlite
+*.db
+
+# OS files
+Thumbs.db

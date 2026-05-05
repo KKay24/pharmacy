@@ -1,0 +1,273 @@
+.pl-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background-color: #f8fafc;
+}
+
+@media (max-width: 768px) {
+  .pl-container {
+    padding: 1rem;
+    gap: 1rem;
+  }
+}
+
+/* Filter Bar */
+.pl-filter-bar {
+  background: white;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.pl-filters-group {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.pl-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pl-filter-item label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.pl-select {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #f8fafc;
+  outline: none;
+  cursor: pointer;
+}
+
+.btn-export {
+  background: #4474BF;
+  color: white;
+  padding: 0.6rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-export:hover {
+  background: #365e9d;
+}
+
+/* Metrics Grid */
+.pl-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+.pl-metric-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  min-width: 0;
+}
+
+.pl-metric-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pl-metric-title {
+  font-size: 0.95rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.pl-metric-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.025em;
+}
+
+.pl-metric-change {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.pl-change-up { color: #10b981; }
+.pl-change-down { color: #ef4444; }
+
+.pl-metric-spark {
+  width: 80px;
+  height: 40px;
+}
+
+/* Red-themed card for COGS */
+.pl-metric-card.loss {
+  background: #fffcfc;
+  border-left: 4px solid #ef4444;
+}
+.pl-metric-card.loss .pl-metric-value {
+  color: #b91c1c;
+}
+
+/* Charts */
+.pl-main-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.pl-card-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.pl-card-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pl-card-body {
+  padding: 2rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Details Table Styling */
+.pl-details-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pl-details-table th {
+  background: #f1f5f9;
+  text-align: left;
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.pl-details-table td {
+  padding: 1rem 1.5rem;
+  font-size: 0.95rem;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.pl-row-category {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.pl-row-sub {
+  padding-left: 2.5rem !important;
+  color: #64748b;
+}
+
+.pl-row-highlight {
+  background: #f0fdf4;
+}
+
+.pl-value-primary {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pl-value-success {
+  font-weight: 800;
+  color: #10b981;
+}
+
+.pl-percentage {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Progress indicator inside table */
+.pl-progress-box {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pl-progress-bg {
+  flex: 1;
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pl-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.fill-orange { background: #f97316; }
+.fill-green { background: #10b981; }
+.fill-teal { background: #0ea5e9; }
+.fill-slate { background: #94a3b8; }
+
+@media (max-width: 1024px) {
+  .pl-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .pl-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .pl-filters-group {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .pl-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .pl-card-body {
+    padding: 1rem;
+  }
+  .pl-details-wrapper {
+    overflow-x: auto;
+    width: 100%;
+  }
+  .pl-details-table {
+    min-width: 700px; /* Ensure table remains readable via scroll */
+  }
+}

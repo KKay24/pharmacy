@@ -1,0 +1,216 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 2rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+}
+
+.header {
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.header h2 {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 1.5rem;
+}
+
+.header p {
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  margin-top: 0;
+}
+
+.inputGroup {
+  margin-bottom: 1.25rem;
+}
+
+.inputGroup label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputWrapper input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  padding-left: 2.25rem; /* Space for icon */
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  color: var(--text-main);
+}
+
+/* Adjust padding if no icon or if currency */
+.inputWrapper input:not([type="date"]):not([placeholder="0.00"]):not([placeholder="Scan or enter code"]):not([placeholder="e.g. PharmaCorp"]) {
+  padding-left: 0.75rem;
+}
+
+/* Specific left padding for inputs with icons helper classes would be cleaner but this works for now based on the component code */
+/* The component uses inputIcon class for icons, let's target siblings */
+
+.inputIcon {
+  position: absolute;
+  left: 0.75rem;
+  color: #94a3b8;
+  pointer-events: none;
+  z-index: 10;
+}
+
+ /* fix padding for inputs with icon */
+.inputWrapper:has(.inputIcon) input {
+  padding-left: 2.25rem;
+}
+
+.currencyPrefix {
+  position: absolute;
+  left: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.inputWrapper:has(.currencyPrefix) input {
+  padding-left: 2rem;
+}
+
+.inputWrapper input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+
+.suggestionsList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: 50;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.suggestionItem {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.suggestionItem:hover {
+  background-color: #f1f5f9;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.btnPrimary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btnPrimary:hover {
+  background-color: var(--primary-hover);
+  box-shadow: 0 2px 4px rgba(14, 165, 233, 0.3);
+}
+
+.btnSecondary {
+  background-color: white;
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+
+/* OCR Scan Styles */
+.btnScan {
+  background-color: var(--warning);
+  color: white;
+  border-color: var(--warning);
+}
+
+.btnScan:hover {
+  background-color: #d97706; /* Amber 600 */
+}
+
+.disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

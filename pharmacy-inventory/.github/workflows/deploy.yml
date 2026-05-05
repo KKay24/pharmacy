@@ -1,0 +1,137 @@
+name: Deploy to Production
+
+# This workflow automates deployment when code is pushed to main branch
+# Uncomment and configure for your needs
+
+on:
+  push:
+    branches:
+      - main
+  # Uncomment to enable manual deployment
+  # workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test -- --passWithNoTests --watchAll=false
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Check build output
+        run: |
+          if [ ! -d "build" ]; then
+            echo "Build folder not found"
+            exit 1
+          fi
+          echo "Build successful"
+
+  # Uncomment to enable automatic Vercel deployment
+  # deploy-vercel:
+  #   name: Deploy to Vercel
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #   if: github.ref == 'refs/heads/main'
+  #   
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+  #     
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: '18'
+  #     
+  #     - name: Install Vercel CLI
+  #       run: npm install -g vercel
+  #     
+  #     - name: Pull Vercel Environment
+  #       run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+  #     
+  #     - name: Build Project
+  #       run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+  #     
+  #     - name: Deploy to Vercel
+  #       run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+  #   
+  #   # Required secrets (add in GitHub repository settings):
+  #   # - VERCEL_TOKEN: Get from https://vercel.com/account/tokens
+  #   # - VERCEL_ORG_ID: Get from .vercel/project.json after running `vercel link`
+  #   # - VERCEL_PROJECT_ID: Get from .vercel/project.json after running `vercel link`
+
+  # Uncomment to enable Docker image build
+  # build-docker:
+  #   name: Build Docker Image
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #   
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+  #     
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v2
+  #     
+  #     - name: Login to Docker Hub
+  #       uses: docker/login-action@v2
+  #       with:
+  #         username: ${{ secrets.DOCKER_USERNAME }}
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
+  #     
+  #     - name: Build and push Docker image
+  #       uses: docker/build-push-action@v4
+  #       with:
+  #         context: .
+  #         push: true
+  #         tags: |
+  #           yourusername/pharmacy-inventory:latest
+  #           yourusername/pharmacy-inventory:${{ github.sha }}
+  #         cache-from: type=registry,ref=yourusername/pharmacy-inventory:buildcache
+  #         cache-to: type=registry,ref=yourusername/pharmacy-inventory:buildcache,mode=max
+  #   
+  #   # Required secrets (add in GitHub repository settings):
+  #   # - DOCKER_USERNAME: Your Docker Hub username
+  #   # - DOCKER_PASSWORD: Your Docker Hub password or access token
+
+  # Security scanning
+  security-scan:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run security audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+      
+      - name: Check for vulnerabilities
+        run: |
+          AUDIT_RESULT=$(npm audit --json)
+          echo "$AUDIT_RESULT"
+          # Add custom vulnerability checks here if needed
