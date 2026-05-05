@@ -1,0 +1,9 @@
+**/node_modules
+**/build
+**/.env
+**/.git
+**/.DS_Store
+*.sqlite
+*.sqlite-journal
+*.sqlite.backup*
+nohup.out
