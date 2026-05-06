@@ -108,15 +108,21 @@ function createFallbackServer(loadErrors) {
   if (fs.existsSync(buildIndexPath)) {
     app.use(express.static(buildPath));
 
-    app.get('/*', (req, res) => {
-      res.sendFile(buildIndexPath);
+    app.use((req, res, next) => {
+      if (req.method === 'GET') {
+        return res.sendFile(buildIndexPath);
+      }
+      next();
     });
   } else {
-    app.get('/*', (req, res) => {
-      res.status(503).json({
-        error: 'Frontend build not found',
-        message: 'Run the frontend build before starting the standalone Render proxy service.',
-      });
+    app.use((req, res, next) => {
+      if (req.method === 'GET') {
+        return res.status(503).json({
+          error: 'Frontend build not found',
+          message: 'Run the frontend build before starting the standalone Render proxy service.',
+        });
+      }
+      next();
     });
   }
 
