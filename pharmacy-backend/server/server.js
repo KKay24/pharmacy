@@ -139,7 +139,7 @@ app.use('/api/expenses', authenticateToken, requireRole(['admin', 'manager']), e
 app.use('/api/suppliers', authenticateToken, requireRole(['admin', 'manager']), supplierRoutes);
 
 // Catch-all for API routes (unmatched)
-app.use('/api/*', (req, res) => {
+app.use('/api', (req, res) => {
   console.log(`[404] API Route Not Found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ 
     error: 'API route not found',
