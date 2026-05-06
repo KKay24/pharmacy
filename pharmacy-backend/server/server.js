@@ -123,6 +123,16 @@ app.get('/api/debug-env', (req, res) => {
   });
 });
 
+app.get('/api/debug-db', async (req, res) => {
+  try {
+    const { User } = require('./models');
+    const count = await User.count();
+    res.json({ status: 'connected', userCount: count });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/inventory', authenticateToken, requireRole(['admin', 'manager', 'user']), inventoryRoutes);
 app.use('/api/sales', authenticateToken, requireRole(['admin', 'manager', 'user']), salesRoutes);
