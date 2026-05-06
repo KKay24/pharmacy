@@ -21,8 +21,11 @@ RUN npm run build
 # Stage 2: Production image
 FROM node:18-alpine
 
-# Set working directory
 WORKDIR /app
+
+# Render expects the web process to bind to a single port.
+ENV NODE_ENV=production
+ENV PORT=3000
 
 # Install production dependencies
 COPY package*.json ./
@@ -35,9 +38,6 @@ COPY api ./api
 # Copy built frontend from previous stage
 COPY --from=frontend-builder /app/build ./build
 
-# Install serve to host the React build
-RUN npm install -g serve
-
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
@@ -48,24 +48,22 @@ RUN chown -R nodejs:nodejs /app
 # Switch to non-root user
 USER nodejs
 
-# Expose ports
-# 3000 for frontend, 5001 for backend API
-EXPOSE 3000 5001
+# Expose the single web port used by the fallback proxy server
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:5001/api/test', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "require('http').get('http://localhost:3000/api/test', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Create startup script
 COPY --chown=nodejs:nodejs <<'EOF' /app/start.sh
 #!/bin/sh
-# Start backend server in background
-node server/server.js &
-# Start frontend server in foreground
-serve -s build -l 3000
+# Start the hybrid server, which either boots the canonical backend
+# or serves the built frontend and proxies /api traffic.
+node server/server.js
 EOF
 
 RUN chmod +x /app/start.sh
 
-# Start both frontend and backend
+# Start the web service
 CMD ["/bin/sh", "/app/start.sh"]
