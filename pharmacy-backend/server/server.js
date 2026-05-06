@@ -133,6 +133,16 @@ app.get('/api/debug-db', async (req, res) => {
   }
 });
 
+app.get('/api/force-seed', async (req, res) => {
+  try {
+    const { seedDemoData } = require('./lib/seed');
+    await seedDemoData();
+    res.json({ status: 'success', message: 'Database seeded successfully' });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/inventory', authenticateToken, requireRole(['admin', 'manager', 'user']), inventoryRoutes);
 app.use('/api/sales', authenticateToken, requireRole(['admin', 'manager', 'user']), salesRoutes);
