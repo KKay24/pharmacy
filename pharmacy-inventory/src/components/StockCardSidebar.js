@@ -12,7 +12,6 @@ import {
     Edit,
     Save,
     ImagePlus,
-    Upload,
     Trash2
 } from "lucide-react";
 import { useRef } from "react";

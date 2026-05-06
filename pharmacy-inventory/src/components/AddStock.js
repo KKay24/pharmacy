@@ -4,10 +4,8 @@ import {
     Trash2, 
     ScanLine, 
     ChevronRight, 
-    Printer, 
     Package, 
     Loader,
-    Camera,
     FileText
 } from "lucide-react";
 import Tesseract from "tesseract.js";
@@ -192,6 +190,13 @@ export default function AddStock({
                     onClick={() => document.getElementById('invoice-up').click()}
                     style={{border: isScanning ? 'none' : ''}}
                 >
+                    <input 
+                        type="file" 
+                        id="invoice-up" 
+                        style={{ display: 'none' }} 
+                        onChange={handleFileUpload} 
+                        accept="image/*,application/pdf"
+                    />
                     {isScanning ? (
                         <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'0.75rem'}}>
                             <Loader className="spin" size={32} color="#4474BF" />
