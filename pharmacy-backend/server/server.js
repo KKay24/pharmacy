@@ -135,11 +135,14 @@ app.get('/api/debug-db', async (req, res) => {
 
 app.get('/api/force-seed', async (req, res) => {
   try {
+    console.log('[SEED] Manual force-seed triggered...');
     const { seedDemoData } = require('./lib/seed');
     await seedDemoData();
+    console.log('[SEED] Manual force-seed completed successfully.');
     res.json({ status: 'success', message: 'Database seeded successfully' });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    console.error('[SEED] Manual force-seed FAILED:', error);
+    res.status(500).json({ status: 'error', message: error.message, stack: error.stack });
   }
 });
 
