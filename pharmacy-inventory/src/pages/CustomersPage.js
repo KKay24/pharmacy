@@ -231,7 +231,7 @@ export default function CustomersPage() {
                                                 <div style={{fontWeight:700, fontSize:'0.9rem'}}>K{sale.totalAmount.toLocaleString()} Transaction</div>
                                                 <div style={{fontSize:'0.75rem', color:'#64748b'}}>{new Date(sale.createdAt).toLocaleDateString()}</div>
                                             </div>
-                                            <button style={{border:'none', background:'none', color:'#4474BF'}} onClick={() => toast('Opening Transaction details...')}><ExternalLink size={16}/></button>
+                                            <button style={{border:'none', background:'none', color:'var(--primary)'}} onClick={() => toast('Opening Transaction details...')}><ExternalLink size={16}/></button>
                                         </div>
                                     ))
                                 ) : (

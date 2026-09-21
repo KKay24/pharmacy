@@ -141,12 +141,12 @@
 }
 
 .exp-input:focus {
-  border-color: #4474BF;
+  border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(68, 116, 191, 0.1);
 }
 
 .exp-submit-btn {
-  background: #4474BF;
+  background: var(--primary);
   color: white;
   padding: 0.8rem 2rem;
   border-radius: 8px;
@@ -158,6 +158,6 @@
 }
 
 .exp-submit-btn:hover {
-  background: #3b66aa;
+  background: var(--primary-hover);
   transform: translateY(-1px);
 }

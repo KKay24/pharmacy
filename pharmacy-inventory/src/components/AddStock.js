@@ -199,12 +199,12 @@ export default function AddStock({
                     />
                     {isScanning ? (
                         <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'0.75rem'}}>
-                            <Loader className="spin" size={32} color="#4474BF" />
+                            <Loader className="spin" size={32} color="var(--primary)" />
                             <span style={{fontWeight:600}}>{scanProgress}</span>
                         </div>
                     ) : (
                         <>
-                            <ScanLine size={32} color="#4474BF" />
+                            <ScanLine size={32} color="var(--primary)" />
                             <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
                                 <span style={{fontWeight:600}}>Upload Invoice (PDF/Img)</span>
                                 <span style={{fontSize:'0.8rem', color:'#64748B'}}>Auto-extract products and batches</span>
@@ -216,14 +216,14 @@ export default function AddStock({
                 {rawText && (
                     <button 
                         onClick={() => setShowDebug(true)}
-                        style={{marginTop:'0.5rem', background:'none', border:'none', color:'#4474BF', cursor:'pointer', fontSize:'0.85rem', textDecoration:'underline', display:'flex', alignItems:'center', gap:'4px', margin:'0 auto'}}
+                        style={{marginTop:'0.5rem', background:'none', border:'none', color:'var(--primary)', cursor:'pointer', fontSize:'0.85rem', textDecoration:'underline', display:'flex', alignItems:'center', gap:'4px', margin:'0 auto'}}
                     >
                         <FileText size={14} /> View Raw Scan Log
                     </button>
                 )}
                 <div className="asm-header-copy">
                     <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
-                        <Package size={24} color="#4474BF" />
+                        <Package size={24} color="var(--primary)" />
                         <h1>Add New Stock</h1>
                     </div>
                     <p>Enter details or scan invoice to add products.</p>
@@ -369,7 +369,7 @@ export default function AddStock({
                         </tbody>
                     </table>
                     <div style={{padding:'1rem 1.25rem', borderBottom:'1px solid #f1f5f9'}}>
-                        <button className="asm-tab" style={{color:'#4474BF', padding:0}} onClick={addRow}>
+                        <button className="asm-tab" style={{color:'var(--primary)', padding:0}} onClick={addRow}>
                             <Plus size={16} /> Add Product
                         </button>
                     </div>
@@ -441,7 +441,7 @@ export default function AddStock({
                             Review Batch <ChevronRight size={18} />
                         </button>
                     ) : (
-                        <button className="asm-btn asm-btn-primary" onClick={onNext} style={{background: '#4474BF'}}>
+                        <button className="asm-btn asm-btn-primary" onClick={onNext} style={{background: 'var(--primary)'}}>
                             Confirm & Save Stock
                         </button>
                     )}

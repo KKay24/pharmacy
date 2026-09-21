@@ -208,7 +208,7 @@ export default function TeamHubPage() {
                 {/* Permissions Matrix */}
                 <div className="matrix-card">
                     <div style={{display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1rem'}}>
-                        <Key size={20} color="#4474BF" />
+                        <Key size={20} color="var(--primary)" />
                         <h2 style={{margin:0, fontSize:'1.1rem', fontWeight:800}}>Access Permissions Matrix</h2>
                     </div>
                     <div className="matrix-grid">
@@ -231,7 +231,7 @@ export default function TeamHubPage() {
                 {/* Security Audit Log (Simplified) */}
                 <div className="matrix-card">
                     <div style={{display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem'}}>
-                        <Activity size={20} color="#4474BF" />
+                        <Activity size={20} color="var(--primary)" />
                         <h2 style={{margin:0, fontSize:'1.1rem', fontWeight:800}}>Security Audit Log</h2>
                     </div>
                     <div style={{display:'flex', flexDirection:'column'}}>

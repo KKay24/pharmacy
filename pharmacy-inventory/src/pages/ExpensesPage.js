@@ -129,7 +129,7 @@ export default function ExpensesPage() {
                 </div>
                 <div className="exp-stat-card">
                     <span className="exp-stat-label">Top Expense Category</span>
-                    <span className="exp-stat-value" style={{fontSize:'1.1rem', color:'#4474BF'}}>{stats.topCat}</span>
+                    <span className="exp-stat-value" style={{fontSize:'1.1rem', color:'var(--primary)'}}>{stats.topCat}</span>
                 </div>
                 <div className="exp-stat-card">
                     <span className="exp-stat-label">Monthly Change</span>

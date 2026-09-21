@@ -280,7 +280,7 @@ export default function PrescriptionPage() {
                                             <span style={{fontWeight: 600}}>{script.patientName}</span>
                                         </div>
                                     </td>
-                                    <td style={{color: '#4474BF', fontWeight: 500}}>{script.medications}</td>
+                                    <td style={{color: 'var(--primary)', fontWeight: 500}}>{script.medications}</td>
                                     <td>
                                         <span className={`badge-pm ${getStatusClass(script.status)}`}>
                                             {script.status}

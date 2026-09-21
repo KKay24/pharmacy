@@ -28,7 +28,7 @@
 }
 
 .pm-btn-primary {
-  background: #4474BF;
+  background: var(--primary);
   color: white;
   padding: 0.6rem 1.25rem;
   border-radius: 8px;
@@ -42,7 +42,7 @@
 }
 
 .pm-btn-primary:hover {
-  background: #365da1;
+  background: var(--primary-hover);
 }
 
 /* Tabs & Controls */
@@ -76,7 +76,7 @@
 }
 
 .pm-tab.active {
-  background: #4474BF;
+  background: var(--primary);
   color: white;
 }
 
@@ -159,7 +159,7 @@
   justify-content: center;
   font-weight: 700;
   font-size: 0.8rem;
-  color: #4474BF;
+  color: var(--primary);
   overflow: hidden;
 }
 

@@ -247,7 +247,7 @@ function Pos({
         </div>
         <div className="pos-toolbar-group">
           <button className="pos-tool-btn"><Pause size={16} /> Hold Order</button>
-          <button className="pos-tool-btn" style={{background:'#4474BF'}}><ArrowRight size={16} /> Checkout All</button>
+          <button className="pos-tool-btn" style={{background:'var(--primary)'}}><ArrowRight size={16} /> Checkout All</button>
         </div>
       </div>
     </div>

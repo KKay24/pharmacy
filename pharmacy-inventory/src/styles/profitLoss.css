@@ -56,7 +56,7 @@
 }
 
 .btn-export {
-  background: #4474BF;
+  background: var(--primary);
   color: white;
   padding: 0.6rem 1.5rem;
   border-radius: 8px;
@@ -68,7 +68,7 @@
 }
 
 .btn-export:hover {
-  background: #365e9d;
+  background: var(--primary-hover);
 }
 
 /* Metrics Grid */
@@ -238,7 +238,7 @@
 
 .fill-orange { background: #f97316; }
 .fill-green { background: #10b981; }
-.fill-teal { background: #0ea5e9; }
+.fill-teal { background: var(--primary); }
 .fill-slate { background: #94a3b8; }
 
 @media (max-width: 1024px) {

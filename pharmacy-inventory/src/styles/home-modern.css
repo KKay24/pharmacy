@@ -18,7 +18,7 @@
 .hero-eyebrow {
     font-size: 0.85rem;
     font-weight: 700;
-    color: #4474BF;
+    color: var(--primary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -60,7 +60,7 @@
 .command-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    border-color: #4474BF;
+    border-color: var(--primary);
 }
 
 .command-icon-box {

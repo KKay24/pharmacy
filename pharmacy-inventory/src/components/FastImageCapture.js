@@ -186,7 +186,7 @@ export default function FastImageCapture({ onSave, onClose }) {
                                 <Upload size={18} /> Upload Image File
                             </label>
                             
-                            <button onClick={() => setViewMode('confirm')} style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: '#4474BF', cursor: 'pointer', fontWeight: 600 }}>
+                            <button onClick={() => setViewMode('confirm')} style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}>
                                 Skip to Manual Entry
                             </button>
                         </div>
@@ -194,7 +194,7 @@ export default function FastImageCapture({ onSave, onClose }) {
 
                     {viewMode === 'processing' && (
                         <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-                            <Loader className="spin" size={48} color="#4474BF" />
+                            <Loader className="spin" size={48} color="var(--primary)" />
                             <h3 style={{ margin: 0, color: '#1e293b' }}>{scanProgress}</h3>
                             <p style={{ color: '#64748B', fontSize: '0.85rem' }}>Extracting metadata...</p>
                         </div>

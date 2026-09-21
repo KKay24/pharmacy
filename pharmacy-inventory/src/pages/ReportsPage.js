@@ -21,7 +21,7 @@ import { DataContext } from '../context/DataContext';
 import toast from 'react-hot-toast';
 import "../styles/reports-modern.css";
 
-const COLORS = ['#4474BF', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const COLORS = ['#039d83', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export default function ReportsPage() {
   const { sales, expenses } = useContext(DataContext);
@@ -164,8 +164,8 @@ export default function ReportsPage() {
               <AreaChart data={timelineData}>
                 <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#4474BF" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#4474BF" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#039d83" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#039d83" stopOpacity={0}/>
                     </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -174,7 +174,7 @@ export default function ReportsPage() {
                 <Tooltip 
                     contentStyle={{borderRadius:'8px', border:'none', boxShadow:'0 4px 12px rgba(0,0,0,0.1)'}}
                 />
-                <Area type="monotone" dataKey="revenue" stroke="#4474BF" fillOpacity={1} fill="url(#colorRev)" strokeWidth={3} />
+                <Area type="monotone" dataKey="revenue" stroke="#039d83" fillOpacity={1} fill="url(#colorRev)" strokeWidth={3} />
                 <Area type="monotone" dataKey="expense" stroke="#ef4444" fillOpacity={0} strokeDasharray="5 5" />
               </AreaChart>
             </ResponsiveContainer>
@@ -226,7 +226,7 @@ export default function ReportsPage() {
         <div className="ri-chart-card">
             <div className="ri-chart-header">
                 <h3 className="ri-chart-title">Top Product Performance</h3>
-                <button style={{border:'none', background:'none', color:'#4474BF', fontWeight:700, fontSize:'0.75rem', cursor:'pointer'}} onClick={() => toast('Loading full logs...')}>VIEW ALL</button>
+                <button style={{border:'none', background:'none', color:'var(--primary)', fontWeight:700, fontSize:'0.75rem', cursor:'pointer'}} onClick={() => toast('Loading full logs...')}>VIEW ALL</button>
             </div>
             <table className="ri-table">
                 <thead>

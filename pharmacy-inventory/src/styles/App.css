@@ -13,7 +13,7 @@
 }
 
 .sidebar {
-  background: linear-gradient(180deg, #2A4269 0%, #1A2841 100%);
+  background: linear-gradient(180deg, var(--primary) 0%, var(--bg-sidebar) 100%);
   color: var(--text-light);
   display: flex;
   flex-direction: column;
@@ -93,7 +93,7 @@
 }
 
 .nav-item.active {
-  background-color: #4474BF;
+  background-color: var(--primary);
   color: white;
   border-left: 3px solid white;
   border-radius: 0 0.5rem 0.5rem 0;
@@ -196,7 +196,7 @@
 }
 
 .shell-topbar__icon {
-  background: #f0f9ff;
+  background: var(--primary-soft);
   color: var(--primary);
   padding: 0.6rem;
   border-radius: 0.5rem;

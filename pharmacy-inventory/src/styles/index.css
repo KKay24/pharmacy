@@ -2,8 +2,9 @@
 
 :root {
   /* Colors - Medical Teal/Blue Theme */
-  --primary: #0ea5e9; /* Sky 500 */
-  --primary-hover: #0284c7; /* Sky 600 */
+  --primary: #039d83; /* MediQuick teal */
+  --primary-hover: #007d72; /* MediQuick teal dark */
+  --primary-soft: #eff8f9;
   --secondary: #64748b; /* Slate 500 */
   --success: #10b981; /* Emerald 500 */
   --danger: #ef4444; /* Red 500 */
@@ -12,7 +13,7 @@
   /* Backgrounds */
   --bg-body: #f1f5f9; /* Slate 100 */
   --bg-card: #ffffff;
-  --bg-sidebar: #0f172a; /* Slate 900 */
+  --bg-sidebar: #0b3156; /* MediQuick ink */
   
   /* Text */
   --text-main: #1e293b; /* Slate 800 */

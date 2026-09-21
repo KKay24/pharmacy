@@ -100,7 +100,7 @@
 }
 
 .inv-tab.active {
-  background: #4474BF;
+  background: var(--primary);
   color: white;
 }
 
@@ -191,7 +191,7 @@
 
 .warehouse-tag {
   background: #f1f5f9;
-  color: #4474BF;
+  color: var(--primary);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   font-size: 0.7rem;

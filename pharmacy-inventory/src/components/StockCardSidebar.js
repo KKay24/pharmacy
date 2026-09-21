@@ -117,7 +117,7 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
                 <div className="inv-sidebar-content">
                     {/* Overview Stats */}
                     <div className="inv-sidebar-section">
-                        <h3><BarChart3 size={16} color="#4474BF" /> Inventory Overview</h3>
+                        <h3><BarChart3 size={16} color="var(--primary)" /> Inventory Overview</h3>
                         <div className="inv-detail-grid" style={{background:'#f8fafc', padding:'1rem', borderRadius:'12px'}}>
                             {/* Product Image Section */}
                             <div className="inv-product-image-container">
@@ -159,7 +159,7 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
                                         style={{height:'24px', padding:'2px 8px', width: '80px', fontSize: '1.1rem'}}
                                     />
                                 ) : (
-                                    <span className="inv-detail-value" style={{fontSize:'1.2rem', color:'#4474BF'}}>{totalQty} Units</span>
+                                    <span className="inv-detail-value" style={{fontSize:'1.2rem', color:'var(--primary)'}}>{totalQty} Units</span>
                                 )}
                             </div>
                             <div className="inv-detail-item">
@@ -218,7 +218,7 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
 
                     {/* Metadata */}
                      <div className="inv-sidebar-section">
-                        <h3><Info size={16} color="#4474BF" /> Product Metadata</h3>
+                        <h3><Info size={16} color="var(--primary)" /> Product Metadata</h3>
                         <div className="inv-detail-grid">
                             <div className="inv-detail-item">
                                 <span className="inv-detail-label">Category</span>
@@ -284,7 +284,7 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
 
                     {/* Batch Log */}
                     <div className="inv-sidebar-section">
-                        <h3><History size={16} color="#4474BF" /> Batch Logs & Provenance</h3>
+                        <h3><History size={16} color="var(--primary)" /> Batch Logs & Provenance</h3>
                         <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
                             {(editedData.Batches || []).map((batch, index) => (
                                 <div key={batch.id} style={{padding:'0.85rem', border:'1px solid #f1f5f9', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -341,7 +341,7 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
                                         </div>
                                     </div>
                                     <div style={{textAlign:'right'}}>
-                                        <div style={{fontWeight:800, color:'#4474BF'}}>{batch.quantity} Units</div>
+                                        <div style={{fontWeight:800, color:'var(--primary)'}}>{batch.quantity} Units</div>
                                         <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>K{batch.costPrice} / unit</div>
                                     </div>
                                 </div>

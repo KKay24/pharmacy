@@ -47,7 +47,7 @@
     align-items: center;
     justify-content: center;
     font-weight: 800;
-    color: #4474BF;
+    color: var(--primary);
     font-size: 1.25rem;
 }
 

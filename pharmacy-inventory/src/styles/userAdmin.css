@@ -29,7 +29,7 @@
 }
 
 .ua-btn-primary {
-  background: #4474BF;
+  background: var(--primary);
   color: white;
   padding: 0.6rem 1.25rem;
   border-radius: 8px;
@@ -43,7 +43,7 @@
 }
 
 .ua-btn-primary:hover {
-  background: #365da1;
+  background: var(--primary-hover);
   transform: translateY(-1px);
 }
 
@@ -79,7 +79,7 @@
 }
 
 .ua-tab.active {
-  background: #4474BF;
+  background: var(--primary);
   color: white;
 }
 
@@ -101,7 +101,7 @@
 }
 
 .ua-search-input:focus {
-  border-color: #4474BF;
+  border-color: var(--primary);
 }
 
 /* Master User Table */
@@ -248,7 +248,7 @@
 }
 
 .ua-page-btn.active {
-  background: #4474BF;
+  background: var(--primary);
   color: white;
-  border-color: #4474BF;
+  border-color: var(--primary);
 }

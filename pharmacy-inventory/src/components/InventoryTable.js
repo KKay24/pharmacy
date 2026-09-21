@@ -111,7 +111,7 @@ export default function InventoryTable({
                                     <div style={{display:'flex', gap:'0.5rem'}}>
                                         <button 
                                             className="asm-btn" 
-                                            style={{padding:6, background:'#f1f5f9', color:'#4474BF', border:'none'}} 
+                                            style={{padding:6, background:'var(--primary-soft)', color:'var(--primary)', border:'none'}}
                                             title="View Details"
                                             onClick={(e) => { e.stopPropagation(); onOpenCard(med); }}
                                         >
@@ -164,7 +164,7 @@ export default function InventoryTable({
                                                             </div>
                                                             <div style={{textAlign:'right'}}>
                                                                 <label style={{fontSize:'0.65rem', color:'#94a3b8', display:'block'}}>LANDING</label>
-                                                                <span style={{fontSize:'0.85rem', fontWeight:600, color:'#4474BF'}}>K{((batch.costPrice || 0) * (batch.quantity || 0)).toLocaleString()}</span>
+                                                                <span style={{fontSize:'0.85rem', fontWeight:600, color:'var(--primary)'}}>K{((batch.costPrice || 0) * (batch.quantity || 0)).toLocaleString()}</span>
                                                             </div>
                                                         </div>
                                                     </div>

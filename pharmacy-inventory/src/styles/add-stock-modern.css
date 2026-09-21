@@ -48,7 +48,7 @@
 }
 
 .asm-tab.active {
-    color: #4474BF;
+    color: var(--primary);
 }
 
 .asm-tab.active::after {
@@ -58,7 +58,7 @@
     left: 0;
     width: 100%;
     height: 2px;
-    background: #4474BF;
+    background: var(--primary);
 }
 
 /* Form Settings Row */
@@ -95,7 +95,7 @@
 }
 
 .asm-input:focus {
-    border-color: #4474BF;
+    border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(68,116,191,0.1);
 }
 
@@ -141,7 +141,7 @@
 }
 
 .asm-row-input:focus {
-    border-color: #4474BF;
+    border-color: var(--primary);
 }
 
 /* Totals Footer */
@@ -181,7 +181,7 @@
     margin-top: 0.5rem;
     padding-top: 1rem;
     border-top: 2px solid #e2e8f0;
-    color: #4474BF;
+    color: var(--primary);
     font-size: 1.4rem;
 }
 
@@ -215,12 +215,12 @@
 }
 
 .asm-btn-primary {
-    background: #4474BF;
+    background: var(--primary);
     color: white;
 }
 
 .asm-btn-primary:hover {
-    background: #365da1;
+    background: var(--primary-hover);
 }
 
 /* OCR Section Overlay style */
@@ -230,7 +230,7 @@
     gap: 0.5rem;
     padding: 0.5rem 1rem;
     background: #eff6ff;
-    color: #4474BF;
+    color: var(--primary);
     border-radius: 20px;
     font-size: 0.85rem;
     font-weight: 600;
