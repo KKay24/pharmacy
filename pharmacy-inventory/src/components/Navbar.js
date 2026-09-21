@@ -38,13 +38,13 @@ function Navbar() {
       label: "Dashboard",
     },
     {
-      show: true,
+      show: userRole === "admin" || userRole === "manager" || userRole === "user",
       path: "/pos",
       icon: ShoppingCart,
       label: "New Sale",
     },
     {
-      show: true,
+      show: userRole === "admin" || userRole === "manager",
       path: "/inventory",
       icon: Boxes,
       label: "Inventory",
@@ -59,13 +59,13 @@ function Navbar() {
       label: "Add Stock",
     },
     {
-      show: userRole === "admin" || userRole === "manager",
+      show: userRole === "admin",
       path: "/profit-loss",
       icon: TrendingUp,
       label: "Profit & Loss",
     },
     {
-      show: userRole === "admin" || userRole === "manager",
+      show: userRole === "admin",
       path: "/reports",
       icon: PieChart,
       label: "Reports",
