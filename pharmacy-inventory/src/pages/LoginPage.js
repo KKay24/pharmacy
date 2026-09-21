@@ -84,7 +84,7 @@ export default function LoginPage() {
   return (
     <div className="hp-page">
       <header className="hp-header">
-        <a href="#top" className="hp-brand" aria-label="MediQuick Pharmacy home"><span className="hp-brand-mark"><HeartPulse size={26} strokeWidth={2.8} /></span><span><strong>MediQuick <em>Pharmacy</em></strong><small>Better health. Delivered.</small></span></a>
+        <a href="#top" className="hp-brand" aria-label="MediQuick Pharmacy home"><span className="hp-brand-mark" style={{ overflow: "hidden" }}><img src="/logo512.png" alt="" style={{ width: "84px", maxWidth: "none", transform: "translate(-22px, -5px)" }} /></span><span><strong>MediQuick <em>Pharmacy</em></strong><small>Better health. Delivered.</small></span></a>
         <nav className="hp-nav" aria-label="Main navigation"><a className="active" href="#top">Home</a><a href="#categories">Shop</a><a href="#services">Prescriptions</a><a href="#services">Health &amp; Wellness</a><a href="#about">About Us</a></nav>
         <div className="hp-header-actions"><button type="button" className="hp-icon-button" aria-label="Search"><Search size={19} /></button><button type="button" className="hp-signin-link" aria-label="Sign in or register" onClick={() => setIsModalOpen(true)}><User size={18} /> <span>Sign In / Register</span></button><button type="button" className="hp-cart-button" aria-label="Shopping cart"><ShoppingCart size={21} /><b>0</b></button></div>
         <button type="button" className="hp-menu-button" aria-label="Open menu"><Menu size={23} /></button>

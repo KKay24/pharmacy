@@ -294,6 +294,7 @@ export default function AddStock({
                                 <th>Status</th>
                                 <th>SKU</th>
                                 <th>Purchase Cost</th>
+                                <th>Current Price</th>
                                 <th style={{width:'120px'}}>Quantity</th>
                                 <th>Total Cost</th>
                                 <th style={{width:'40px'}}></th>
@@ -341,6 +342,17 @@ export default function AddStock({
                                                     type="number"
                                                     value={item.costPrice}
                                                     onChange={e => updateItem(item.id, "costPrice", e.target.value)}
+                                                />
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{position:'relative'}}>
+                                                <span style={{position:'absolute', left:'8px', top:'50%', transform:'translateY(-50%)', color:'#94a3b8'}}>K</span>
+                                                <input
+                                                    className="asm-row-input" style={{paddingLeft:'20px'}}
+                                                    type="number"
+                                                    value={item.sellingPrice}
+                                                    onChange={e => updateItem(item.id, "sellingPrice", e.target.value)}
                                                 />
                                             </div>
                                         </td>
