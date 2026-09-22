@@ -4,6 +4,7 @@ const { mkdtempSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { spawn } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
 const net = require('node:net');
 
 let childProcess;
@@ -27,8 +28,8 @@ async function waitForServer(url, timeoutMs = 15000) {
 
   while (Date.now() - start < timeoutMs) {
     try {
-      const response = await fetch(`${url}/api/test`);
-      if (response.ok) {
+      const response = await fetch(`${url}/api/auth/me`);
+      if (response.status === 401) {
         return;
       }
     } catch (error) {
@@ -48,7 +49,27 @@ before(async () => {
 
   baseUrl = `http://127.0.0.1:${port}`;
 
-  childProcess = spawn('node', ['server.js'], {
+  const seedEnvironment = {
+    ...process.env,
+    NODE_ENV: 'test',
+    SQLITE_STORAGE_PATH: sqlitePath,
+    JWT_SECRET: 'integration-test-secret',
+    SEED_ADMIN_EMAIL: 'admin@example.test',
+    SEED_ADMIN_PASSWORD: 'bootstrap-password-for-tests',
+  };
+
+  execFileSync(process.execPath, ['scripts/seed-admin.js'], {
+    cwd: join(__dirname, '..'),
+    env: seedEnvironment,
+    stdio: 'pipe',
+  });
+  execFileSync(process.execPath, ['scripts/seed-admin.js'], {
+    cwd: join(__dirname, '..'),
+    env: seedEnvironment,
+    stdio: 'pipe',
+  });
+
+  childProcess = spawn('node', ['src/main.js'], {
     cwd: join(__dirname, '..'),
     env: {
       ...process.env,
@@ -78,8 +99,8 @@ test('login returns a bearer token', async () => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      username: 'admin',
-      password: 'admin1234',
+      username: 'admin@example.test',
+      password: 'bootstrap-password-for-tests',
     }),
   });
 
@@ -88,9 +109,73 @@ test('login returns a bearer token', async () => {
   const payload = await response.json();
   assert.equal(payload.success, true);
   assert.equal(payload.user.role, 'admin');
+  assert.equal(payload.user.mustChangePassword, true);
   assert.ok(payload.token);
 
-  authToken = payload.token;
+  const changePasswordResponse = await fetch(`${baseUrl}/api/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${payload.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      currentPassword: 'bootstrap-password-for-tests',
+      newPassword: 'normal-password-for-tests',
+    }),
+  });
+
+  assert.equal(changePasswordResponse.status, 200);
+  const changedPasswordPayload = await changePasswordResponse.json();
+  assert.equal(changedPasswordPayload.user.mustChangePassword, false);
+
+  authToken = changedPasswordPayload.token || payload.token;
+
+  const normalLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      username: 'admin@example.test',
+      password: 'normal-password-for-tests',
+    }),
+  });
+  assert.equal(normalLoginResponse.status, 200);
+  const normalLoginPayload = await normalLoginResponse.json();
+  assert.equal(normalLoginPayload.user.mustChangePassword, false);
+  authToken = normalLoginPayload.token;
+});
+
+test('removed seed and debug endpoints are not available', async () => {
+  for (const endpoint of ['/api/force-seed', '/api/debug-env', '/api/debug-db', '/api/test']) {
+    const response = await fetch(`${baseUrl}${endpoint}`);
+    assert.equal(response.status, 404, endpoint);
+  }
+});
+
+test('admins cannot be created through the API', async () => {
+  const response = await fetch(`${baseUrl}/api/auth/users`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      username: 'second-admin',
+      email: 'second-admin@example.test',
+      password: 'another-password-for-tests',
+      role: 'admin',
+    }),
+  });
+
+  assert.equal(response.status, 403);
+
+  const usersResponse = await fetch(`${baseUrl}/api/auth/users`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  assert.equal(usersResponse.status, 200);
+  const users = await usersResponse.json();
+  assert.equal(users.filter((user) => user.role === 'admin').length, 1);
 });
 
 test('inventory can be fetched with the issued token', async () => {

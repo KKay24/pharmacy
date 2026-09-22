@@ -1,57 +1,4 @@
-const { Batch, Customer, Expense, Medicine, Prescription, Sales, Supplier, User } = require('../models');
-const { adminSeedPassword, managerSeedPassword, userSeedPassword } = require('./config');
-const { hashPassword, isHashedPassword } = require('./auth/passwords');
-const { findUserByUsername } = require('./users');
-
-async function upsertUser(userData) {
-  const existingUser = await findUserByUsername(userData.username);
-  const password = isHashedPassword(userData.password)
-    ? userData.password
-    : hashPassword(userData.password);
-
-  if (!existingUser) {
-    await User.create({ ...userData, password });
-    return;
-  }
-
-  await existingUser.update({
-    ...userData,
-    password,
-  });
-}
-
-async function seedUsers() {
-  const usersToSeed = [
-    {
-      username: 'admin',
-      email: 'admin@mediquick.local',
-      role: 'admin',
-      locations: ['Main Pharmacy'],
-      status: 'active',
-      password: adminSeedPassword,
-    },
-    {
-      username: 'manager',
-      email: 'manager@mediquick.local',
-      role: 'manager',
-      locations: ['Main Pharmacy', 'Uptown Pharmacy'],
-      status: 'active',
-      password: managerSeedPassword,
-    },
-    {
-      username: 'staff',
-      email: 'staff@mediquick.local',
-      role: 'user',
-      locations: ['Main Pharmacy'],
-      status: 'active',
-      password: userSeedPassword,
-    },
-  ];
-
-  for (const userData of usersToSeed) {
-    await upsertUser(userData);
-  }
-}
+const { Batch, Customer, Expense, Medicine, Prescription, Sales, Supplier } = require('../models');
 
 async function seedSuppliers() {
   const count = await Supplier.count();
@@ -289,7 +236,6 @@ async function seedSales() {
 }
 
 async function seedDemoData() {
-  await seedUsers();
   await seedSuppliers();
   await seedInventory();
   await seedExpenses();

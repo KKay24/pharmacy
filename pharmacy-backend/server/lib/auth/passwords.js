@@ -19,7 +19,7 @@ function verifyPassword(password, storedPassword) {
   }
 
   if (!isHashedPassword(storedPassword)) {
-    return storedPassword === password;
+    return false;
   }
 
   const [, salt, expectedKey] = storedPassword.split('$');

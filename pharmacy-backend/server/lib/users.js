@@ -27,6 +27,7 @@ function serializeUser(user) {
     email: user.email || null,
     locations: Array.isArray(user.locations) ? user.locations : [],
     status: user.status,
+    mustChangePassword: Boolean(user.mustChangePassword),
     lastLogin: user.lastLogin || null,
     createdAt: user.createdAt || null,
   };

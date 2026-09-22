@@ -20,6 +20,12 @@ const authenticateToken = async (req, res, next) => {
         return res.status(403).json({ error: 'Account is suspended. Please contact administrator.' });
       }
 
+      const isPasswordChangeRequest =
+        req.method === 'POST' && req.path.endsWith('/change-password');
+      if (user.mustChangePassword && !isPasswordChangeRequest) {
+        return res.status(403).json({ error: 'Password change required', code: 'MUST_CHANGE_PASSWORD' });
+      }
+
       req.auth = payload;
       req.user = user;
       return next();

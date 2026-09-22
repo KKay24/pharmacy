@@ -39,6 +39,11 @@ const User = sequelize.define('User', {
     validate: {
       isIn: [['active', 'suspended']]
     }
+  },
+  mustChangePassword: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false
   }
 });
 

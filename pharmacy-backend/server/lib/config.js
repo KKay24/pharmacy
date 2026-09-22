@@ -13,13 +13,9 @@ const jwtSecret = process.env.JWT_SECRET || (isProduction ? '' : 'mediquick-dev-
 const jwtExpiresInHours = Math.max(1, Number(process.env.JWT_EXPIRES_IN_HOURS || 12));
 const enableDemoSeeding = process.env.ENABLE_DEMO_SEEDING === 'true';
 const allowLegacyDevAuth = !isProduction && process.env.ALLOW_LEGACY_DEV_AUTH === 'true';
-const adminSeedPassword = process.env.ADMIN_SEED_PASSWORD || 'admin1234';
-const managerSeedPassword = process.env.MANAGER_SEED_PASSWORD || 'manager1234';
-const userSeedPassword = process.env.USER_SEED_PASSWORD || 'user1234';
 const port = Number(process.env.PORT || 5001);
 
 module.exports = {
-  adminSeedPassword,
   allowLegacyDevAuth,
   databaseUrl,
   enableDemoSeeding,
@@ -28,8 +24,6 @@ module.exports = {
   isVercel,
   jwtExpiresInHours,
   jwtSecret,
-  managerSeedPassword,
   port,
   sqliteStoragePath,
-  userSeedPassword,
 };
