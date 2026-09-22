@@ -187,7 +187,8 @@ test('inventory can be fetched with the issued token', async () => {
 
   assert.equal(response.status, 200);
 
-  const inventory = await response.json();
+    const inventoryPayload = await response.json();
+    const inventory = inventoryPayload.data;
   assert.ok(Array.isArray(inventory));
   assert.ok(inventory.length >= 1);
   assert.ok(inventory[0].name);
@@ -199,7 +200,8 @@ test('a sale can be created through the API', async () => {
       Authorization: `Bearer ${authToken}`,
     },
   });
-  const inventory = await inventoryResponse.json();
+    const inventoryPayload = await inventoryResponse.json();
+    const inventory = inventoryPayload.data;
   const firstItem = inventory[0];
 
   const response = await fetch(`${baseUrl}/api/sales`, {
@@ -236,8 +238,10 @@ test('analytics include profit and loss data after a sale', async () => {
 
   assert.equal(response.status, 200);
 
-  const analytics = await response.json();
+  const analyticsPayload = await response.json();
+  const analytics = analyticsPayload.data;
   assert.ok(Array.isArray(analytics));
+  assert.equal(analyticsPayload.pagination.page, 1);
   assert.ok(analytics.length >= 1);
   assert.ok(typeof analytics[analytics.length - 1].netProfit === 'number');
 });
@@ -250,7 +254,8 @@ test('predictive analytics expose forecasts, reorder suggestions, and risk signa
   });
   assert.equal(inventoryResponse.status, 200);
 
-  const inventory = await inventoryResponse.json();
+    const inventoryPayload = await inventoryResponse.json();
+    const inventory = inventoryPayload.data;
   const firstItem =
     inventory.find((item) => item.name === 'Paracetamol') ||
     inventory.find((item) =>

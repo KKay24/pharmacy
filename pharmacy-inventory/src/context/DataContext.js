@@ -3,6 +3,8 @@ import React, { createContext, useState, useEffect } from "react";
 import { apiFetch } from "../utils/api";
 import { clearAuthSession, loadAuthSession, saveAuthSession } from "../utils/authStorage";
 
+const responseRows = (payload) => Array.isArray(payload) ? payload : (payload?.data || []);
+
 export const DataContext = createContext();
 
 export const DataProvider = ({ children }) => {
@@ -69,7 +71,7 @@ export const DataProvider = ({ children }) => {
       const res = await apiFetch("/api/inventory");
       if (res.ok) {
         const data = await res.json();
-        setInventory(data);
+        setInventory(responseRows(data));
       }
     } catch (err) {
       console.error("Failed to fetch inventory", err);
@@ -81,7 +83,7 @@ export const DataProvider = ({ children }) => {
       const res = await apiFetch("/api/sales");
       if (res.ok) {
         const data = await res.json();
-        setSales(data);
+        setSales(responseRows(data));
       }
     } catch (err) {
       console.error("Failed to fetch sales", err);
@@ -93,7 +95,7 @@ export const DataProvider = ({ children }) => {
       const res = await apiFetch("/api/customers");
       if (res.ok) {
         const data = await res.json();
-        setCustomers(data);
+        setCustomers(responseRows(data));
       }
     } catch (err) {
       console.error("Failed to fetch customers", err);
@@ -129,7 +131,7 @@ export const DataProvider = ({ children }) => {
       const res = await apiFetch("/api/analytics/profit-loss");
       if (res.ok) {
         const data = await res.json();
-        setAnalyticsData(data);
+        setAnalyticsData(responseRows(data));
       }
     } catch (err) {
       console.error("Failed to fetch analytics", err);

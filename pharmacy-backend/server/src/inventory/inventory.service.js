@@ -1,9 +1,18 @@
 const { Injectable, InternalServerErrorException } = require('@nestjs/common');
 const { Medicine, Batch, sequelize } = require('../../models');
+const { paginatedResponse, parsePagination } = require('../common/pagination');
 
 class InventoryService {
-  async list() {
-    return Medicine.findAll({ order: [['name', 'ASC']], include: [{ model: Batch }] });
+  async list(query) {
+    const pagination = parsePagination(query);
+    const result = await Medicine.findAndCountAll({
+      order: [['name', 'ASC']],
+      include: [{ model: Batch }],
+      distinct: true,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+    return paginatedResponse(result.rows, result.count, pagination);
   }
 
   async lowStock() {

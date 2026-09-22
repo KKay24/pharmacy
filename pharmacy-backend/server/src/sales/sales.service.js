@@ -1,8 +1,17 @@
 const { Injectable, InternalServerErrorException } = require('@nestjs/common');
 const { Sales, Medicine, Batch, sequelize } = require('../../models');
+const { paginatedResponse, parsePagination } = require('../common/pagination');
 
 class SalesService {
-  list() { return Sales.findAll({ order: [['date', 'DESC']], limit: 100 }); }
+  async list(query) {
+    const pagination = parsePagination(query);
+    const result = await Sales.findAndCountAll({
+      order: [['date', 'DESC']],
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+    return paginatedResponse(result.rows, result.count, pagination);
+  }
 
   async create(payload) {
     const transaction = await sequelize.transaction();

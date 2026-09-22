@@ -63,8 +63,9 @@ export default function PrescriptionPage() {
             const res = await apiFetch('/api/prescriptions');
             if (res.ok) {
                 const data = await res.json();
-                setPrescriptions(data);
-                setFilteredScripts(data);
+                const rows = Array.isArray(data) ? data : (data?.data || []);
+                setPrescriptions(rows);
+                setFilteredScripts(rows);
             }
         } catch (err) {
             console.error("Error fetching prescriptions");

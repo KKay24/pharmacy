@@ -4,7 +4,6 @@ import * as SecureStore from 'expo-secure-store';
 import { NativeModules, Platform } from 'react-native';
 
 const API_PORT = '5001';
-const PRODUCTION_API_URL = 'https://pharmacy-inventory-backend-4.onrender.com';
 const LOCALHOST_NAMES = new Set(['localhost', '127.0.0.1']);
 const TOKEN_KEY = 'mediquick.token';
 
@@ -97,7 +96,7 @@ export const getBaseUrl = () => {
     return getDevBaseUrl();
   }
 
-  return PRODUCTION_API_URL;
+  throw new Error('EXPO_PUBLIC_API_URL is required outside development.');
 };
 
 export const API_URL = getBaseUrl();

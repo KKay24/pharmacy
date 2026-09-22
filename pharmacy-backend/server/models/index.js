@@ -7,6 +7,7 @@ const Customer = require('./Customer');
 const Prescription = require('./Prescription');
 const Expense = require('./Expense');
 const Supplier = require('./Supplier');
+const AuditLog = require('./AuditLog');
 
 // Associations
 Medicine.hasMany(Batch, { foreignKey: 'medicineId', onDelete: 'CASCADE' });
@@ -39,4 +40,5 @@ module.exports = {
   Prescription,
   Expense,
   Supplier
+  ,AuditLog
 };

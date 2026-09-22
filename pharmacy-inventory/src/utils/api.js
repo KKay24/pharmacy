@@ -12,7 +12,7 @@ const resolveApiBaseUrl = () => {
     return 'http://localhost:5001';
   }
 
-  return '';
+  throw new Error('REACT_APP_API_BASE_URL is required outside local development.');
 };
 
 const API_BASE_URL = resolveApiBaseUrl();

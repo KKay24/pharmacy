@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "buildCommand": "npm install && npm run migrate",
   "builds": [
     {
       "src": "src/main.js",

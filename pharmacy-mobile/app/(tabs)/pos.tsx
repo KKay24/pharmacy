@@ -29,7 +29,8 @@ export default function PosScreen() {
   const fetchInventory = async () => {
     try {
       const response = await apiClient.get('/api/inventory');
-      const data = Array.isArray(response.data) ? response.data.map((med: any) => {
+      const rows = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      const data = rows.map((med: any) => {
         const batches = getMedicineBatches(med.Batches);
 
         return {
@@ -39,7 +40,7 @@ export default function PosScreen() {
           totalQuantity: getMedicineTotalQuantity(batches),
           price: getMedicineCurrentPrice(batches),
         };
-      }) : [];
+      });
       setMedicines(data);
       setFilteredMedicines(data);
     } catch (err) {

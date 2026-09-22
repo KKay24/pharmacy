@@ -1,6 +1,7 @@
 const path = require('path');
 const express = require('express');
 const { Module } = require('@nestjs/common');
+const { APP_INTERCEPTOR } = require('@nestjs/core');
 const { sequelize } = require('../models');
 const authenticateToken = require('../middleware/auth');
 const requireRole = require('../middleware/roleMiddleware');
@@ -10,6 +11,10 @@ const AuthController = require('./auth/auth.controller');
 const AuthService = require('./auth/auth.service');
 const AuthGuard = require('./auth/auth.guard');
 const { RolesGuard } = require('./auth/roles.guard');
+const PermissionsGuard = require('./auth/permissions.guard');
+const AuditService = require('./audit/audit.service');
+const AuditInterceptor = require('./audit/audit.interceptor');
+const RequestValidationMiddleware = require('./common/validation');
 const InventoryController = require('./inventory/inventory.controller');
 const InventoryService = require('./inventory/inventory.service');
 const SalesController = require('./sales/sales.controller');
@@ -82,7 +87,9 @@ function ensureApplicationReady() {
   if (!readyPromise) {
     readyPromise = (async () => {
       await sequelize.authenticate();
-      await runMigrations();
+      if (!isProduction) {
+        await runMigrations();
+      }
 
       if (enableDemoSeeding && !isProduction) {
         const { seedDemoData } = require('../lib/seed');
@@ -96,6 +103,8 @@ function ensureApplicationReady() {
 
 function mountLegacyApi(expressApp, { deferFallback = false } = {}) {
   expressApp.use(express.json({ limit: '50mb' }));
+  const validationMiddleware = new RequestValidationMiddleware();
+  expressApp.use(validationMiddleware.use.bind(validationMiddleware));
 
   expressApp.use(async (req, res, next) => {
     try {
@@ -176,6 +185,12 @@ Module({
     AnalyticsService,
     AuthGuard,
     RolesGuard,
+    PermissionsGuard,
+    AuditService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
+    },
   ],
 })(AppModule);
 

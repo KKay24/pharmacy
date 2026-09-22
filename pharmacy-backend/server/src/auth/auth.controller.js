@@ -17,6 +17,9 @@ const AuthService = require('./auth.service');
 const AuthGuard = require('./auth.guard');
 const Roles = require('./roles.decorator');
 const { RolesGuard } = require('./roles.guard');
+const RequirePermissions = require('./permissions.decorator');
+const { Permissions } = require('./permissions');
+const PermissionsGuard = require('./permissions.guard');
 
 class AuthController {
   constructor(authService) {
@@ -62,16 +65,14 @@ Req()(AuthController.prototype, 'deleteUser', 1);
 
 UseGuards(AuthGuard)(AuthController.prototype, 'changePassword', Object.getOwnPropertyDescriptor(AuthController.prototype, 'changePassword'));
 UseGuards(AuthGuard)(AuthController.prototype, 'me', Object.getOwnPropertyDescriptor(AuthController.prototype, 'me'));
-UseGuards(AuthGuard, RolesGuard)(AuthController.prototype, 'listUsers', Object.getOwnPropertyDescriptor(AuthController.prototype, 'listUsers'));
-UseGuards(AuthGuard, RolesGuard)(AuthController.prototype, 'createUser', Object.getOwnPropertyDescriptor(AuthController.prototype, 'createUser'));
-UseGuards(AuthGuard, RolesGuard)(AuthController.prototype, 'updateStatus', Object.getOwnPropertyDescriptor(AuthController.prototype, 'updateStatus'));
-UseGuards(AuthGuard, RolesGuard)(AuthController.prototype, 'updateUser', Object.getOwnPropertyDescriptor(AuthController.prototype, 'updateUser'));
-UseGuards(AuthGuard, RolesGuard)(AuthController.prototype, 'deleteUser', Object.getOwnPropertyDescriptor(AuthController.prototype, 'deleteUser'));
+for (const method of ['listUsers', 'createUser', 'updateStatus', 'updateUser', 'deleteUser']) UseGuards(AuthGuard, RolesGuard, PermissionsGuard)(AuthController.prototype, method, Object.getOwnPropertyDescriptor(AuthController.prototype, method));
 
 Roles('admin')(AuthController.prototype, 'listUsers');
 Roles('admin')(AuthController.prototype, 'createUser');
 Roles('admin')(AuthController.prototype, 'updateStatus');
 Roles('admin')(AuthController.prototype, 'updateUser');
 Roles('admin')(AuthController.prototype, 'deleteUser');
+RequirePermissions(Permissions.USERS_READ)(AuthController.prototype, 'listUsers');
+for (const method of ['createUser', 'updateStatus', 'updateUser', 'deleteUser']) RequirePermissions(Permissions.USERS_WRITE)(AuthController.prototype, method);
 
 module.exports = AuthController;

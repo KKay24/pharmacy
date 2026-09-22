@@ -4,6 +4,9 @@ const AuthGuard = require('../auth/auth.guard');
 const Roles = require('../auth/roles.decorator');
 const { RolesGuard } = require('../auth/roles.guard');
 const { applyClassDecorator, applyMethodDecorator, applyParameterDecorator } = require('../common/decorate');
+const RequirePermissions = require('../auth/permissions.decorator');
+const { Permissions } = require('../auth/permissions');
+const PermissionsGuard = require('../auth/permissions.guard');
 
 class SuppliersController {
   constructor(service) { this.service = service; }
@@ -19,7 +22,9 @@ applyMethodDecorator(Get, SuppliersController.prototype, 'list');
 applyMethodDecorator(Post, SuppliersController.prototype, 'create');
 applyMethodDecorator(Put, SuppliersController.prototype, 'update', ':id');
 applyMethodDecorator(Delete, SuppliersController.prototype, 'remove', ':id');
-for (const method of ['list', 'create', 'update', 'remove']) { applyMethodDecorator(UseGuards, SuppliersController.prototype, method, AuthGuard, RolesGuard); Roles('admin', 'manager')(SuppliersController.prototype, method); }
+for (const method of ['list', 'create', 'update', 'remove']) { applyMethodDecorator(UseGuards, SuppliersController.prototype, method, AuthGuard, RolesGuard, PermissionsGuard); Roles('admin', 'manager')(SuppliersController.prototype, method); }
+RequirePermissions(Permissions.SUPPLIERS_READ)(SuppliersController.prototype, 'list');
+for (const method of ['create', 'update', 'remove']) RequirePermissions(Permissions.SUPPLIERS_WRITE)(SuppliersController.prototype, method);
 applyParameterDecorator(Body, SuppliersController.prototype, 'create', 0);
 applyParameterDecorator(Param, SuppliersController.prototype, 'update', 0);
 applyParameterDecorator(Body, SuppliersController.prototype, 'update', 1);

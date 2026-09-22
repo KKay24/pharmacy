@@ -60,6 +60,15 @@ first admin account.
 Production backups must not be committed to Git. Store them in encrypted,
 access-controlled storage with retention and restore procedures documented by
 your deployment platform.
+
+Production deployment order:
+
+1. Install dependencies.
+2. Run `npm run migrate` as the deployment step.
+3. Start the application with `npm start`.
+
+Production startup does not run migrations automatically. This avoids migration
+work on every process restart and keeps schema changes explicit and observable.
 - `NODE_ENV=production`
 - `FRONTEND_URL`: primary deployed frontend URL
 

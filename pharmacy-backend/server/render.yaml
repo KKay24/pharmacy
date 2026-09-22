@@ -3,7 +3,7 @@ services:
     name: pharmacy-backend
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && npm run migrate
     startCommand: npm start
     healthCheckPath: /health
     envVars:

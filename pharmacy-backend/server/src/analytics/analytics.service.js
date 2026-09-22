@@ -3,6 +3,7 @@ const { Expense, Sales } = require('../../models');
 const { buildForecastDataset, parseAnalyticsOptions, roundNumber } = require('../../services/analytics/forecast');
 const { buildStockInsights } = require('../../services/analytics/stockout');
 const { buildExpiryRiskReport } = require('../../services/analytics/expiry');
+const { paginatedResponse, parsePagination } = require('../common/pagination');
 
 function monthKey(value) { return new Date(value).toISOString().slice(0, 7); }
 
@@ -13,7 +14,7 @@ function serializePrediction(prediction) {
 }
 
 class AnalyticsService {
-  async profitLoss() {
+  async profitLoss(query) {
     try {
       const [sales, expenses] = await Promise.all([Sales.findAll({ order: [['date', 'ASC']] }), Expense.findAll({ order: [['date', 'ASC']] })]);
       const monthlyData = new Map();
@@ -23,7 +24,9 @@ class AnalyticsService {
       };
       for (const sale of sales) { const current = ensureMonth(monthKey(sale.date)); current.revenue += Number(sale.totalPrice || 0); current.cogs += Number(sale.totalCost || 0); }
       for (const expense of expenses) { const current = ensureMonth(monthKey(expense.date)); current.operatingExpenses += Number(expense.amount || 0); }
-      return Array.from(monthlyData.values()).sort((a, b) => a.month.localeCompare(b.month)).map((entry) => ({ ...entry, grossProfit: entry.revenue - entry.cogs, netProfit: entry.revenue - entry.cogs - entry.operatingExpenses }));
+      const rows = Array.from(monthlyData.values()).sort((a, b) => a.month.localeCompare(b.month)).map((entry) => ({ ...entry, grossProfit: entry.revenue - entry.cogs, netProfit: entry.revenue - entry.cogs - entry.operatingExpenses }));
+      const pagination = parsePagination(query);
+      return paginatedResponse(rows.slice(pagination.offset, pagination.offset + pagination.limit), rows.length, pagination);
     } catch { throw new InternalServerErrorException('Failed to fetch analytics'); }
   }
 

@@ -1,9 +1,14 @@
 const { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } = require('@nestjs/common');
 const { Op } = require('sequelize');
 const { Customer, Sales } = require('../../models');
+const { paginatedResponse, parsePagination } = require('../common/pagination');
 
 class CustomersService {
-  async list() { return Customer.findAll(); }
+  async list(query) {
+    const pagination = parsePagination(query);
+    const result = await Customer.findAndCountAll({ limit: pagination.limit, offset: pagination.offset, order: [['name', 'ASC']] });
+    return paginatedResponse(result.rows, result.count, pagination);
+  }
   async search(query) { return Customer.findAll({ where: { [Op.or]: [{ name: { [Op.like]: `%${query}%` } }, { phone: { [Op.like]: `%${query}%` } }] } }); }
   async create(body) { try { return await Customer.create(body); } catch (error) { throw new BadRequestException('Failed to add customer'); } }
   async get(id) {

@@ -5,6 +5,8 @@ const migrationDefinitions = [
   require('../migrations/002-sync-customer-schema'),
   require('../migrations/003-sync-prescription-sales'),
   require('../migrations/006-add-password-bootstrap-flag'),
+  require('../migrations/007-add-audit-logs'),
+  require('../migrations/008-add-query-performance-indexes'),
 ];
 
 function normalizeTableName(table) {
