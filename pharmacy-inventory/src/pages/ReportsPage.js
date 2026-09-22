@@ -18,7 +18,6 @@ import {
     Activity
 } from 'lucide-react';
 import { DataContext } from '../context/DataContext';
-import toast from 'react-hot-toast';
 import "../styles/reports-modern.css";
 
 const COLORS = ['#039d83', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -121,8 +120,8 @@ export default function ReportsPage() {
                  </button>
              ))}
           </div>
-          <button className="ri-export-btn" style={{marginLeft:'1rem'}} onClick={() => toast.success('Exporting Reports PDF...')}>
-             <Download size={16} /> Export Reports
+           <button className="ri-export-btn" style={{marginLeft:'1rem'}} disabled title="Export Reports is unavailable">
+             <Download size={16} /> Export Reports (Unavailable)
           </button>
         </div>
       </div>
@@ -226,7 +225,7 @@ export default function ReportsPage() {
         <div className="ri-chart-card">
             <div className="ri-chart-header">
                 <h3 className="ri-chart-title">Top Product Performance</h3>
-                <button style={{border:'none', background:'none', color:'var(--primary)', fontWeight:700, fontSize:'0.75rem', cursor:'pointer'}} onClick={() => toast('Loading full logs...')}>VIEW ALL</button>
+                <button style={{border:'none', background:'none', color:'#94a3b8', fontWeight:700, fontSize:'0.75rem', cursor:'not-allowed'}} disabled title="Audit logs are unavailable">VIEW ALL (Unavailable)</button>
             </div>
             <table className="ri-table">
                 <thead>

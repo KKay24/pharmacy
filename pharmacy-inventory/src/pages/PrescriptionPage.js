@@ -250,8 +250,8 @@ export default function PrescriptionPage() {
                          <select className="pm-search-input" style={{width: 'auto'}}>
                             <option>All Insurance</option>
                          </select>
-                         <button className="pm-search-input" style={{width: '40px', padding: 0, display:'flex', alignItems:'center', justifyContent:'center'}} onClick={() => toast.success('Exporting Queue as CSV...')}>
-                            <Download size={18} />
+                                 <button className="pm-search-input" style={{padding: '0 0.5rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.25rem'}} disabled title="Prescription export is unavailable">
+                                     <Download size={18} /> Unavailable
                          </button>
                     </div>
                 </div>

@@ -155,7 +155,7 @@ export default function SuppliersPage() {
                                     ))}
                                 </div>
                             </div>
-                            <button style={{border:'none', background:'none', color:'#94a3b8', cursor:'pointer'}} onClick={() => toast('Options menu coming soon.')}><MoreVertical size={18}/></button>
+                            <button style={{border:'none', background:'none', color:'#94a3b8', cursor:'not-allowed'}} disabled title="Supplier options are unavailable"><MoreVertical size={18}/></button>
                         </div>
 
                         <div className="sup-details">
@@ -177,11 +177,11 @@ export default function SuppliersPage() {
                         </div>
 
                         <div className="sup-actions">
-                            <button className="asm-btn asm-btn-secondary" style={{flex:1}} onClick={() => toast('Loading History logs...')}>
-                                <ExternalLink size={16} /> History
+                            <button className="asm-btn asm-btn-secondary" style={{flex:1}} disabled title="Supplier history is unavailable">
+                                <ExternalLink size={16} /> History (Unavailable)
                             </button>
-                            <button className="asm-btn asm-btn-primary" style={{flex:1}} onClick={() => toast.success('Opening Contact module...')}>
-                                Contact Partner
+                            <button className="asm-btn asm-btn-primary" style={{flex:1}} disabled title="Supplier contact is unavailable">
+                                Contact Partner (Unavailable)
                             </button>
                         </div>
                     </div>

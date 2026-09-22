@@ -104,7 +104,7 @@ function Pos({
   const subTotal = selectedItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
   const totalToPay = subTotal;
 
-  const handlePayment = (method) => {
+  const handlePayment = async (method) => {
     if (selectedItems.length === 0) return;
     const saleData = {
       items: selectedItems,
@@ -114,9 +114,11 @@ function Pos({
       customerId: selectedCustomer?.id || null,
       customerName: selectedCustomer?.name || "Walk-in Customer"
     };
-    handleSale(saleData);
-    setSelectedItems([]);
-    setSelectedCustomer(null);
+    const result = await handleSale(saleData);
+    if (result?.success) {
+      setSelectedItems([]);
+      setSelectedCustomer(null);
+    }
   };
 
   return (
@@ -228,11 +230,11 @@ function Pos({
               </button>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem'}}>
-                <button className="pos-category-tab" style={{width:'100%', padding:'0.75rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem'}}>
-                    <Split size={16} /> Split Payment
+                <button className="pos-category-tab" style={{width:'100%', padding:'0.75rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem'}} disabled title="Split payments are unavailable">
+                  <Split size={16} /> Split Payment (Unavailable)
                 </button>
-                <button className="pos-category-tab" style={{width:'100%', padding:'0.75rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem'}}>
-                    <Layers size={16} /> More Methods
+                <button className="pos-category-tab" style={{width:'100%', padding:'0.75rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem'}} disabled title="Additional payment methods are unavailable">
+                  <Layers size={16} /> More Methods (Unavailable)
                 </button>
             </div>
           </div>
@@ -242,12 +244,12 @@ function Pos({
       {/* BOTTOM TOOLBAR */}
       <div className="pos-bottom-bar">
         <div className="pos-toolbar-group">
-          <button className="pos-tool-btn"><Tag size={16} /> Apply Discount</button>
+          <button className="pos-tool-btn" disabled title="Discounts are unavailable"><Tag size={16} /> Apply Discount (Unavailable)</button>
           <button className="pos-tool-btn"><Plus size={16} /> New Item</button>
         </div>
         <div className="pos-toolbar-group">
-          <button className="pos-tool-btn"><Pause size={16} /> Hold Order</button>
-          <button className="pos-tool-btn" style={{background:'var(--primary)'}}><ArrowRight size={16} /> Checkout All</button>
+          <button className="pos-tool-btn" disabled title="Held orders are unavailable"><Pause size={16} /> Hold Order (Unavailable)</button>
+          <button className="pos-tool-btn" style={{background:'var(--primary)'}} disabled title="Checkout all is unavailable"><ArrowRight size={16} /> Checkout All (Unavailable)</button>
         </div>
       </div>
     </div>

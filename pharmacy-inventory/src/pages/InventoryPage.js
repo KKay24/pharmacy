@@ -81,7 +81,7 @@ export default function InventoryPage() {
       {/* Header Row */}
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
         <div style={{display:'flex', gap:'1rem'}}>
-          <button className="asm-btn asm-btn-secondary" onClick={() => toast.success('Exporting Data as CSV...')}><Download size={18} /> Export Data</button>
+          <button className="asm-btn asm-btn-secondary" disabled title="Export data is unavailable"><Download size={18} /> Export Data (Unavailable)</button>
           <button className="asm-btn asm-btn-primary" onClick={() => navigate('/add-stock')}>
             <Plus size={18} /> Add New Stock
           </button>

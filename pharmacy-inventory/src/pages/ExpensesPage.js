@@ -206,8 +206,8 @@ export default function ExpensesPage() {
                                 onChange={e => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <button className="exp-input" style={{fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'0.5rem'}} onClick={() => toast.success('Exporting Expense History as CSV...')}>
-                            <Download size={16} /> Export
+                        <button className="exp-input" style={{fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'0.5rem'}} disabled title="Expense export is unavailable">
+                            <Download size={16} /> Export (Unavailable)
                         </button>
                     </div>
                 </div>

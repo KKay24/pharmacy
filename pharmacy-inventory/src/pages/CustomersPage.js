@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { DataContext } from "../context/DataContext";
 import { apiFetch } from "../utils/api";
-import toast from "react-hot-toast";
 import "../styles/customers-modern.css";
 
 export default function CustomersPage() {
@@ -66,8 +65,8 @@ export default function CustomersPage() {
                     <h1 style={{margin:0, fontSize:'1.5rem', fontWeight:800}}>Patient & Customer Hub</h1>
                     <p style={{margin:'0.25rem 0 0 0', color:'#64748b'}}>Manage medical history, allergy alerts, and transaction history.</p>
                 </div>
-                <button className="asm-btn asm-btn-primary" onClick={() => toast.success('New Patient Module opening...')}>
-                    <UserPlus size={18} /> New Patient Registration
+                <button className="asm-btn asm-btn-primary" disabled title="Patient registration is unavailable">
+                    <UserPlus size={18} /> New Patient Registration (Unavailable)
                 </button>
             </div>
 
@@ -162,7 +161,7 @@ export default function CustomersPage() {
                                     <div className="loyalty-pill">{p.loyaltyPoints} Points</div>
                                 </td>
                                 <td>
-                                    <button style={{border:'none', background:'none', color:'#94a3b8'}} onClick={(e) => { e.stopPropagation(); toast('Options menu coming soon.'); }}><MoreVertical size={18}/></button>
+                                    <button style={{border:'none', background:'none', color:'#94a3b8', cursor:'not-allowed'}} disabled title="Customer options are unavailable"><MoreVertical size={18}/></button>
                                 </td>
                             </tr>
                         ))}
@@ -231,7 +230,7 @@ export default function CustomersPage() {
                                                 <div style={{fontWeight:700, fontSize:'0.9rem'}}>K{sale.totalAmount.toLocaleString()} Transaction</div>
                                                 <div style={{fontSize:'0.75rem', color:'#64748b'}}>{new Date(sale.createdAt).toLocaleDateString()}</div>
                                             </div>
-                                            <button style={{border:'none', background:'none', color:'var(--primary)'}} onClick={() => toast('Opening Transaction details...')}><ExternalLink size={16}/></button>
+                                            <button style={{border:'none', background:'none', color:'#94a3b8', cursor:'not-allowed'}} disabled title="Transaction details are unavailable"><ExternalLink size={16}/></button>
                                         </div>
                                     ))
                                 ) : (
@@ -244,11 +243,11 @@ export default function CustomersPage() {
                         </div>
 
                         <div className="crm-side-footer" style={{padding:'1.5rem', borderTop:'1px solid #e2e8f0', display:'flex', gap:'1rem'}}>
-                            <button className="asm-btn asm-btn-secondary" style={{flex:1}} onClick={() => toast('Loading Medical Notes...', { icon: '📝' })}>
-                                <Clipboard size={18} /> Medical Notes
+                            <button className="asm-btn asm-btn-secondary" style={{flex:1}} disabled title="Medical notes are unavailable">
+                                <Clipboard size={18} /> Medical Notes (Unavailable)
                             </button>
-                            <button className="asm-btn asm-btn-primary" style={{flex:1}} onClick={() => toast('Edit module coming soon.', { icon: '⚙️' })}>
-                                Edit Profile
+                            <button className="asm-btn asm-btn-primary" style={{flex:1}} disabled title="Customer editing is unavailable">
+                                Edit Profile (Unavailable)
                             </button>
                         </div>
                     </div>
