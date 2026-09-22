@@ -7,7 +7,7 @@
 ## Authentication
 
 - `POST /api/auth/login`
-  - Request: `{ "username": "admin", "password": "admin1234" }`
+  - Request: `{ "username": "admin@example.com", "password": "<bootstrap-password>" }`
   - Response: `{ "token": "...", "user": { ... } }`
 - `GET /api/auth/me`
   - Requires `Authorization: Bearer <token>`

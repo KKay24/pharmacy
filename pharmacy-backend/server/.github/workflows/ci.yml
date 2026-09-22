@@ -17,6 +17,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run check:sensitive
       - run: npm test
         env:
           JWT_SECRET: ci-test-secret

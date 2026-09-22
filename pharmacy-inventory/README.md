@@ -110,7 +110,7 @@ The application will open at [http://localhost:3000](http://localhost:3000)
 ### Default Credentials
 
 - **Username**: admin
-- **Password**: admin1234
+- **Password**: Set through the controlled admin seed process.
 
 > ⚠️ **Security Note**: Change the default credentials immediately in production!
 

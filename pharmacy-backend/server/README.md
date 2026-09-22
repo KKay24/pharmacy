@@ -50,6 +50,16 @@ If you prefer configuring Render in the dashboard instead of using the Blueprint
 
 - `DATABASE_URL`: Render Postgres connection string
 - `JWT_SECRET`: long random secret
+
+Production startup requires both `DATABASE_URL` and `JWT_SECRET`. SQLite is
+supported only for local development and tests; production startup rejects
+SQLite configuration. Run `npm run seed` locally or through a controlled
+deployment job with `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` to create the
+first admin account.
+
+Production backups must not be committed to Git. Store them in encrypted,
+access-controlled storage with retention and restore procedures documented by
+your deployment platform.
 - `NODE_ENV=production`
 - `FRONTEND_URL`: primary deployed frontend URL
 

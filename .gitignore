@@ -1,1 +1,12 @@
 .DS_Store
+
+# Local environment and data files must never be committed.
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.db
+*.backup
+*.bak
+*.log

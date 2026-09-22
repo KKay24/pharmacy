@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: pharmacy
       POSTGRES_USER: pharmacyuser
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -35,7 +35,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5001
-      - POSTGRES_URL=postgresql://pharmacyuser:${POSTGRES_PASSWORD:-changeme123}@db:5432/pharmacy
+      - DATABASE_URL=postgresql://pharmacyuser:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/pharmacy
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
     ports:
       - "3000:3000"
       - "5001:5001"
