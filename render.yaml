@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: pharmacy-backend
+    runtime: node
+    plan: free
+    rootDir: pharmacy-backend/server
+    buildCommand: npm install && npm run migrate
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pharmacy-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN_HOURS
+        value: "12"
+      - key: ENABLE_DEMO_SEEDING
+        value: "false"
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: "true"
+      - key: FRONTEND_URL
+        sync: false
+      - key: FRONTEND_URLS
+        sync: false
+
+databases:
+  - name: pharmacy-db
+    plan: free
+    databaseName: pharmacy
+    user: pharmacy

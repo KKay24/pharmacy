@@ -12,7 +12,8 @@ const resolveApiBaseUrl = () => {
     return 'http://localhost:5001';
   }
 
-  throw new Error('REACT_APP_API_BASE_URL is required outside local development.');
+  // In production without an explicit backend base URL, fall back to relative URLs (e.g. Vercel /api proxy)
+  return '';
 };
 
 const API_BASE_URL = resolveApiBaseUrl();
