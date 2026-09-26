@@ -158,3 +158,220 @@
 .ri-export-btn:hover {
     opacity: 0.9;
 }
+
+/* Tab Bar */
+.ri-tab-bar {
+    display: flex;
+    gap: 0.5rem;
+    background: #e2e8f0;
+    padding: 0.35rem;
+    border-radius: 10px;
+    width: fit-content;
+}
+
+.ri-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
+    border: none;
+    background: transparent;
+    color: #475569;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ri-tab-btn.active {
+    background: white;
+    color: var(--primary, #039d83);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* Ledger Container */
+.ri-ledger-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    overflow: hidden;
+}
+
+.ri-ledger-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.ri-ledger-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ri-ledger-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ri-select-input {
+    padding: 0.5rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    background: white;
+    cursor: pointer;
+}
+
+.ri-select-input:focus {
+    outline: none;
+    border-color: #039d83;
+}
+
+/* Spreadsheet Ledger Table */
+.ri-ledger-table-wrap {
+    overflow-x: auto;
+}
+
+.ri-ledger-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+
+.ri-ledger-table thead tr {
+    background: #1e5631; /* Green header matching user spreadsheet */
+    color: #ffffff;
+}
+
+.ri-ledger-table th {
+    padding: 0.85rem 1.25rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-align: right;
+    border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+.ri-ledger-table th:first-child {
+    text-align: left;
+}
+
+.ri-ledger-table td {
+    padding: 0.85rem 1.25rem;
+    font-size: 0.9rem;
+    text-align: right;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+}
+
+.ri-ledger-table td:first-child {
+    text-align: left;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.ri-ledger-row:hover td {
+    background: #f8fafc;
+}
+
+/* Red Highlighted Subtotal Row */
+.ri-ledger-subtotal-row td {
+    background: #dc2626 !important; /* Bright red from screenshot */
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 0.95rem !important;
+    border-top: 2px solid #b91c1c;
+    border-bottom: 2px solid #b91c1c;
+}
+
+/* Grand Total Row */
+.ri-ledger-grand-row td {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    font-size: 1rem !important;
+}
+
+/* Shortage Clickable Input/Badge */
+.ri-shortage-btn {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-weight: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    text-decoration: underline dotted #cbd5e1;
+    text-underline-offset: 3px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.ri-shortage-btn:hover {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.ri-shortage-has-value {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+/* Modal for Shortage Input */
+.ri-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.ri-modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 1.75rem;
+    width: 360px;
+    max-width: 90vw;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+}
+
+.ri-modal-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin: 0 0 0.5rem 0;
+    color: #0f172a;
+}
+
+.ri-modal-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0 0 1.25rem 0;
+}
+
+.ri-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+

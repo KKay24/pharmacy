@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { 
   Search, ShoppingCart, Trash2, CreditCard, Plus, Minus, 
-  ArrowRight, Pause, Tag, Layers, Banknote, Split
+  ArrowRight, Pause, Tag, Layers, Banknote, Split, Smartphone
 } from "lucide-react";
 import "../styles/posStyles.css";
 
@@ -224,17 +224,25 @@ function Pos({
                 <Banknote size={20} />
                 Cash
               </button>
+              <button className="pos-pay-btn airtel" onClick={() => handlePayment('Airtel')}>
+                <Smartphone size={20} />
+                Airtel
+              </button>
+              <button className="pos-pay-btn mtn" onClick={() => handlePayment('MTN')}>
+                <Smartphone size={20} />
+                MTN
+              </button>
               <button className="pos-pay-btn card" onClick={() => handlePayment('Card')}>
                 <CreditCard size={20} />
-                Credit Card
+                Card
               </button>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem'}}>
-                <button className="pos-category-tab" style={{width:'100%', padding:'0.75rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem'}} disabled title="Split payments are unavailable">
-                  <Split size={16} /> Split Payment (Unavailable)
+                <button className="pos-category-tab" style={{width:'100%', padding:'0.6rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', fontSize:'0.8rem'}} disabled title="Split payments are unavailable">
+                  <Split size={14} /> Split (Unavailable)
                 </button>
-                <button className="pos-category-tab" style={{width:'100%', padding:'0.75rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem'}} disabled title="Additional payment methods are unavailable">
-                  <Layers size={16} /> More Methods (Unavailable)
+                <button className="pos-category-tab" style={{width:'100%', padding:'0.6rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', fontSize:'0.8rem'}} disabled title="Additional payment methods are unavailable">
+                  <Layers size={14} /> Other (Unavailable)
                 </button>
             </div>
           </div>
