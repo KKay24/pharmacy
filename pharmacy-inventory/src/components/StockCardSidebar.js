@@ -15,6 +15,7 @@ import {
     Trash2
 } from "lucide-react";
 import { useRef } from "react";
+import toast from "react-hot-toast";
 
 // Safe date formatter to prevent RangeError: 'Invalid time value' on bad data
 const safeFormatDate = (dateString) => {
@@ -51,8 +52,13 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
 
     const handleSave = async () => {
         if (onUpdate) {
-            await onUpdate(medicine.id, editedData);
-            setIsEditing(false);
+            const result = await onUpdate(medicine.id, editedData);
+            if (result?.success) {
+                toast.success("Inventory changes saved.");
+                setIsEditing(false);
+            } else {
+                toast.error(result?.error || "Failed to save inventory changes.");
+            }
         }
     };
 

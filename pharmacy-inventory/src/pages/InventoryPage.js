@@ -165,8 +165,9 @@ export default function InventoryPage() {
           updateMedicine={updateInventoryItem}
           deleteMedicine={async (id) => { 
             if(window.confirm("Are you sure you want to completely delete this item from inventory?")) { 
-                await deleteInventoryItem(id);
-                toast.success('Item deleted successfully.');
+                const result = await deleteInventoryItem(id);
+                if (result.success) toast.success('Item deleted successfully.');
+                else toast.error(result.error || 'Failed to delete item.');
             } 
           }}
           onOpenCard={setSelectedMedicine}

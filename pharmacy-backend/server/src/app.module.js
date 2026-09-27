@@ -30,6 +30,8 @@ const SuppliersService = require('./suppliers/suppliers.service');
 const AnalyticsController = require('./analytics/analytics.controller');
 const ReportsController = require('./analytics/reports.controller');
 const AnalyticsService = require('./analytics/analytics.service');
+const SyncController = require('./sync/sync.controller');
+const SyncService = require('./sync/sync.service');
 
 const localhostOrigins = [
   'http://localhost:3000',
@@ -173,6 +175,7 @@ Module({
     SuppliersController,
     AnalyticsController,
     ReportsController,
+    SyncController,
   ],
   providers: [
     AuthService,
@@ -183,6 +186,7 @@ Module({
     PrescriptionsService,
     SuppliersService,
     AnalyticsService,
+    SyncService,
     AuthGuard,
     RolesGuard,
     PermissionsGuard,

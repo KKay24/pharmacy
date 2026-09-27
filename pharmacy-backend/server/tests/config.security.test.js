@@ -32,6 +32,14 @@ test('production rejects configured SQLite', () => {
   }), /SQLite/);
 });
 
+test('production requires a PostgreSQL DATABASE_URL', () => {
+  assert.throws(runConfig({
+    NODE_ENV: 'production',
+    DATABASE_URL: 'mysql://db.example.test/pharmacy',
+    JWT_SECRET: 'test-secret',
+  }), /PostgreSQL/);
+});
+
 test('development still supports SQLite', () => {
   const databasePath = join(mkdtempSync(join(tmpdir(), 'pharmacy-config-')), 'test.sqlite');
   try {

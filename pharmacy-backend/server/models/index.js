@@ -8,6 +8,7 @@ const Prescription = require('./Prescription');
 const Expense = require('./Expense');
 const Supplier = require('./Supplier');
 const AuditLog = require('./AuditLog');
+const InventoryMovement = require('./InventoryMovement');
 
 // Associations
 Medicine.hasMany(Batch, { foreignKey: 'medicineId', onDelete: 'CASCADE' });
@@ -30,6 +31,11 @@ Prescription.belongsTo(Customer, { foreignKey: 'customerId' });
 Supplier.hasMany(Batch, { foreignKey: 'supplierId' });
 Batch.belongsTo(Supplier, { foreignKey: 'supplierId' });
 
+Medicine.hasMany(InventoryMovement, { foreignKey: 'medicineId', onDelete: 'SET NULL' });
+InventoryMovement.belongsTo(Medicine, { foreignKey: 'medicineId' });
+Batch.hasMany(InventoryMovement, { foreignKey: 'batchId', onDelete: 'SET NULL' });
+InventoryMovement.belongsTo(Batch, { foreignKey: 'batchId' });
+
 module.exports = {
   sequelize,
   Medicine,
@@ -41,4 +47,5 @@ module.exports = {
   Expense,
   Supplier
   ,AuditLog
+  ,InventoryMovement
 };

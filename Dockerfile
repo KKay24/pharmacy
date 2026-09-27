@@ -40,7 +40,7 @@ COPY <<'EOF' /app/start.sh
 #!/bin/sh
 # Navigate to backend directory and start the server
 cd /app/pharmacy-backend/server
-node server.js
+node src/main.js
 EOF
 
 RUN chmod +x /app/start.sh

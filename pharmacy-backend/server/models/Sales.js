@@ -53,6 +53,10 @@ const Sales = sequelize.define('Sales', {
   date: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
+  },
+  clientTransactionId: {
+    type: DataTypes.STRING(128),
+    allowNull: true,
   }
 });
 

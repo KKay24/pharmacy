@@ -21,6 +21,7 @@ ENABLE_DEMO_SEEDING=true npm start
 ## Useful scripts
 
 - `npm run migrate`
+- `npm run audit:inventory-duplicates` (read-only; exits non-zero when review is needed)
 - `npm test`
 
 ## Render deployment
@@ -42,9 +43,9 @@ This repo is ready to deploy to Render with the checked-in [`render.yaml`](./ren
 
 If you prefer configuring Render in the dashboard instead of using the Blueprint, use:
 
-- Build command: `npm install`
+- Build command: `npm install && npm run migrate`
 - Start command: `npm start`
-- Health check path: `/api/test`
+- Health check path: `/health`
 
 ### Required production environment variables
 
@@ -69,6 +70,19 @@ Production deployment order:
 
 Production startup does not run migrations automatically. This avoids migration
 work on every process restart and keeps schema changes explicit and observable.
+
+## PostgreSQL backups and restore
+
+Production data belongs in the managed PostgreSQL instance referenced by the
+backend service's `DATABASE_URL` (the Render Blueprint names it `pharmacy-db`).
+The filesystem and SQLite files are never a production source of truth.
+
+Enable managed PostgreSQL backups and point-in-time recovery in the database
+provider account, with encrypted off-provider exports only where your retention
+policy requires them. Test restores into an isolated PostgreSQL database, run
+`npm run migrate`, validate inventory and sales counts, and only then schedule a
+controlled production restore. Do not restore by copying SQLite files or by
+using `sync`, `--replace`, truncation, or schema reset commands.
 - `NODE_ENV=production`
 - `FRONTEND_URL`: primary deployed frontend URL
 

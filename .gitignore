@@ -5,8 +5,12 @@
 .env.*
 !.env.example
 *.sqlite
+*.sqlite.*
 *.sqlite3
 *.db
+*.db.*
 *.backup
 *.bak
 *.log
+logs/
+**/logs/

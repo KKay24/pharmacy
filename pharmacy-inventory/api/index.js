@@ -15,7 +15,26 @@ async function readRequestBody(req) {
   return chunks.length ? Buffer.concat(chunks) : undefined;
 }
 
-module.exports = async (req, res) => {
+function targetPathFromRequest(req) {
+  const incomingUrl = new URL(req.url, 'http://vercel.local');
+  const routedPath = req.query?.path ?? incomingUrl.searchParams.get('path');
+  incomingUrl.searchParams.delete('path');
+
+  const normalizedPath = Array.isArray(routedPath)
+    ? routedPath.join('/')
+    : typeof routedPath === 'string'
+      ? routedPath.replace(/^\/+/, '')
+      : incomingUrl.pathname.replace(/^\/+/, '');
+  const apiPath = normalizedPath === 'api' || normalizedPath === ''
+    ? '/api'
+    : normalizedPath.startsWith('api/')
+      ? `/${normalizedPath}`
+      : `/api/${normalizedPath}`;
+  const query = incomingUrl.searchParams.toString();
+  return `${apiPath}${query ? `?${query}` : ''}`;
+}
+
+const proxyHandler = async (req, res) => {
   const backendBaseUrl = process.env.BACKEND_API_URL || process.env.REACT_APP_API_BASE_URL;
 
   if (!backendBaseUrl) {
@@ -27,7 +46,7 @@ module.exports = async (req, res) => {
 
   try {
     const normalizedBackendBaseUrl = `${backendBaseUrl.replace(/\/$/, '')}/`;
-    const targetUrl = new URL(req.url, normalizedBackendBaseUrl);
+    const targetUrl = new URL(targetPathFromRequest(req), normalizedBackendBaseUrl);
     const requestHeaders = new Headers();
 
     Object.entries(req.headers).forEach(([key, value]) => {
@@ -54,9 +73,14 @@ module.exports = async (req, res) => {
     const payload = Buffer.from(await response.arrayBuffer());
     res.end(payload);
   } catch (error) {
-    console.error('Vercel API proxy error:', error);
+    // Do not log backend URLs or request headers; they can contain credentials.
+    console.error('Vercel API proxy error:', error?.name || 'UnknownError');
     res.statusCode = 502;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: 'Unable to reach the backend API' }));
   }
 };
+
+module.exports = proxyHandler;
+// Exported for lightweight route verification; Vercel still receives the handler.
+module.exports.targetPathFromRequest = targetPathFromRequest;

@@ -11,6 +11,12 @@ const Medicine = sequelize.define('Medicine', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  // SHA-256 of the normalized product identity. The database migration owns the
+  // unique index; keeping this nullable preserves ambiguous legacy rows safely.
+  productKey: {
+    type: DataTypes.STRING(64),
+    allowNull: true,
+  },
   genericName: {
     type: DataTypes.STRING
   },

@@ -9,6 +9,7 @@ The web client now targets the shared backend in `../pharmacy-backend/server`.
 - Local web development should use `REACT_APP_API_BASE_URL=http://localhost:5001`
 - Production Vercel API traffic is proxied to the canonical backend from `api/index.js`
 - The legacy `server/` folder in this repo is no longer the source of truth for API development
+- PWA and offline synchronization operations are documented in [`docs/PWA-OFFLINE-OPERATIONS.md`](./docs/PWA-OFFLINE-OPERATIONS.md)
 
 ## Vercel deployment
 
@@ -51,7 +52,7 @@ Deploy this repo to Vercel and keep the API on Render.
 - Tesseract.js for OCR functionality
 
 ### Backend
-- Express.js
+- NestJS 12 with Express adapter
 - Sequelize ORM
 - PostgreSQL (production) / SQLite (development)
 - CORS enabled

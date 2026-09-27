@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { DataProvider, DataContext } from "./context/DataContext";
 import Navbar from "./components/Navbar";
+import SyncStatusIndicator from "./components/SyncStatusIndicator";
+import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import { Toaster } from "react-hot-toast";
 
 import LoginPage from "./pages/LoginPage";
@@ -150,6 +152,8 @@ function ShellLayout() {
         </div>
 
         <div className="shell-topbar__actions">
+          <PwaInstallPrompt />
+          <SyncStatusIndicator />
           <button type="button" className="shell-icon-btn" aria-label="Notifications">
             <Bell size={19} />
           </button>

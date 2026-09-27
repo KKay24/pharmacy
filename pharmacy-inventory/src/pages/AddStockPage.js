@@ -2,14 +2,14 @@ import React, { useState, useContext } from "react";
 import { DataContext } from "../context/DataContext";
 import AddStock from "../components/AddStock";
 import FastImageCapture from "../components/FastImageCapture";
-import { apiFetch } from "../utils/api";
+import { apiFetch, getApiErrorMessage } from "../utils/api";
 import toast from "react-hot-toast";
 
 export default function AddStockPage() {
   const { fetchInventory, suppliers, inventory } = useContext(DataContext);
   
   const [items, setItems] = useState([
-    { id: Date.now(), name: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }
+    { id: Date.now(), name: "", genericName: "", strength: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }
   ]);
   
   const [metadata, setMetadata] = useState({
@@ -20,8 +20,11 @@ export default function AddStockPage() {
   });
 
   const [showCapture, setShowCapture] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFastSave = async (extractedData) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const payload = {
         metadata: {
@@ -49,25 +52,37 @@ export default function AddStockPage() {
       });
 
       if (res.ok) {
-        toast.success("Rapid stock capture added successfully!");
-        fetchInventory();
+        const saved = await res.json().catch(() => null);
+        if (!saved?.success) {
+          toast.error("The inventory service returned an unexpected save response.");
+          return;
+        }
+        const refresh = await fetchInventory();
+        if (refresh.success) {
+          toast.success("Rapid stock capture saved and inventory refreshed.");
+        } else {
+          toast.error(`Stock was saved, but ${refresh.error.toLowerCase()}`);
+        }
         setShowCapture(false);
       } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.message || err.error || "Failed to add via capture");
+        toast.error(await getApiErrorMessage(res, "Failed to add via capture"));
       }
     } catch (err) {
       toast.error("Network error during rapid add");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleNext = async () => {
+    if (isSubmitting) return;
     // Basic validation
     if (!metadata.supplierId) return toast.error("Please select a verified partner / supplier");
     
     const validItems = items.filter(i => i.name && i.quantity > 0);
     if (validItems.length === 0) return toast.error("Please add at least one valid item");
 
+    setIsSubmitting(true);
     try {
       const selectedSupplier = suppliers.find(s => s.id === parseInt(metadata.supplierId));
       
@@ -84,20 +99,30 @@ export default function AddStockPage() {
       });
 
       if (res.ok) {
-        toast.success("Stock batch imported successfully");
-        fetchInventory();
+        const saved = await res.json().catch(() => null);
+        if (!saved?.success) {
+          toast.error("The inventory service returned an unexpected save response.");
+          return;
+        }
+        const refresh = await fetchInventory();
+        if (refresh.success) {
+          toast.success("Stock batch saved and inventory refreshed.");
+        } else {
+          toast.error(`Stock was saved, but ${refresh.error.toLowerCase()}`);
+        }
         handleCancel(); // Reset form
       } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.message || err.error || "Failed to import stock");
+        toast.error(await getApiErrorMessage(res, "Failed to import stock"));
       }
     } catch (err) {
       toast.error("Network error during stock import");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
-    setItems([{ id: Date.now(), name: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }]);
+    setItems([{ id: Date.now(), name: "", genericName: "", strength: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }]);
     setMetadata({
       supplierId: "",
       invoiceNumber: "",
@@ -116,6 +141,7 @@ export default function AddStockPage() {
         onNext={handleNext}
         onCancel={handleCancel}
         suppliers={suppliers}
+        isSubmitting={isSubmitting}
         inventory={inventory}
         onFastCapture={() => setShowCapture(true)}
       />

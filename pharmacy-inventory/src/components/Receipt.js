@@ -19,6 +19,11 @@ const Receipt = forwardRef(({ transaction }, ref) => {
         <p>Date: {date}</p>
         <p>Receipt #: {receiptNo || 'N/A'}</p>
         {transaction.customerName && <p>Customer: {transaction.customerName}</p>}
+        {transaction.pending && (
+          <p style={{ color: '#d97706', fontSize: '0.75rem', fontWeight: 700, margin: '4px 0' }}>
+            🟠 Saved Locally (Pending Sync)
+          </p>
+        )}
       </div>
 
       <div className={styles.items}>

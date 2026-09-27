@@ -387,3 +387,272 @@ test('predictive analytics expose forecasts, reorder suggestions, and risk signa
   assert.ok(risksPayload.stockoutRisk.some((item) => item.medicineId === firstItem.id));
   assert.ok(risksPayload.expiryRisk.some((item) => item.medicineId === expiringProduct.id));
 });
+
+test('inventory persists across refresh/login, rejects duplicate products, and permits separate batches and strengths', async () => {
+  const headers = {
+    Authorization: `Bearer ${authToken}`,
+    'Content-Type': 'application/json',
+  };
+  const product = {
+    name: 'Persistence Test Paracetamol',
+    genericName: 'Paracetamol',
+    strength: '500 mg',
+    dosage: 'Tablet',
+    manufacturer: 'Test Manufacturer',
+    batchNumber: 'PERSIST-500-A',
+    quantity: 10,
+    expiryDate: '2028-12-31',
+    costPrice: 2,
+    sellingPrice: 4,
+  };
+
+  const createResponse = await fetch(`${baseUrl}/api/inventory`, {
+    method: 'POST', headers, body: JSON.stringify(product),
+  });
+  assert.equal(createResponse.status, 201);
+  const created = await createResponse.json();
+  assert.ok(created.id);
+  assert.equal(created.Batches.length, 1);
+
+  const refreshedResponse = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+  assert.equal(refreshedResponse.status, 200);
+  const refreshed = await refreshedResponse.json();
+  assert.ok(refreshed.data.some((medicine) => medicine.id === created.id));
+
+  const duplicateResponse = await fetch(`${baseUrl}/api/inventory`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: product.name,
+      genericName: product.genericName,
+      strength: '500mg',
+      dosage: product.dosage,
+      manufacturer: product.manufacturer,
+    }),
+  });
+  assert.equal(duplicateResponse.status, 409);
+
+  const secondBatchResponse = await fetch(`${baseUrl}/api/inventory`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ ...product, batchNumber: 'PERSIST-500-B', quantity: 10 }),
+  });
+  assert.equal(secondBatchResponse.status, 201);
+  const secondBatchProduct = await secondBatchResponse.json();
+  assert.equal(secondBatchProduct.id, created.id);
+  assert.equal(secondBatchProduct.Batches.length, 2);
+
+  const differentStrengthResponse = await fetch(`${baseUrl}/api/inventory`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ ...product, strength: '1g', batchNumber: 'PERSIST-1G-A', quantity: 5 }),
+  });
+  assert.equal(differentStrengthResponse.status, 201);
+  const differentStrength = await differentStrengthResponse.json();
+  assert.notEqual(differentStrength.id, created.id);
+
+  const updateResponse = await fetch(`${baseUrl}/api/inventory/${created.id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ totalQuantity: 25 }),
+  });
+  assert.equal(updateResponse.status, 200);
+
+  const updatedRefreshResponse = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+  const updatedRefresh = await updatedRefreshResponse.json();
+  const updated = updatedRefresh.data.find((medicine) => medicine.id === created.id);
+  assert.equal(updated.Batches.reduce((total, batch) => total + batch.quantity, 0), 25);
+
+  const movementsResponse = await fetch(`${baseUrl}/api/inventory/${created.id}/movements`, { headers });
+  assert.equal(movementsResponse.status, 200);
+  const movements = await movementsResponse.json();
+  assert.ok(movements.data.some((movement) => movement.movementType === 'PURCHASE'));
+  assert.ok(movements.data.some((movement) => movement.movementType === 'ADJUSTMENT'));
+
+  const loginAgainResponse = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin@example.test', password: 'normal-password-for-tests' }),
+  });
+  assert.equal(loginAgainResponse.status, 200);
+  const loginAgain = await loginAgainResponse.json();
+  const afterLoginResponse = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, {
+    headers: { Authorization: `Bearer ${loginAgain.token}` },
+  });
+  const afterLogin = await afterLoginResponse.json();
+  assert.ok(afterLogin.data.some((medicine) => medicine.id === created.id));
+
+  const deleteResponse = await fetch(`${baseUrl}/api/inventory/${differentStrength.id}`, {
+    method: 'DELETE', headers,
+  });
+  assert.equal(deleteResponse.status, 200);
+  const afterDeleteResponse = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+  const afterDelete = await afterDeleteResponse.json();
+  assert.equal(afterDelete.data.some((medicine) => medicine.id === differentStrength.id), false);
+});
+
+test('sales creation is idempotent when clientTransactionId is supplied', async () => {
+  const headers = {
+    Authorization: `Bearer ${authToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Find a product with available stock
+  const invRes = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+  const inv = await invRes.json();
+  const testMed = inv.data.find((m) => m.Batches && m.Batches.some((b) => b.quantity >= 5));
+  assert.ok(testMed, 'Found product with sufficient stock');
+
+  const stockBefore = testMed.Batches.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
+  const clientTxId = `test_tx_${Date.now()}_sale_idempotency`;
+
+  // First request
+  const firstRes = await fetch(`${baseUrl}/api/sales`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      medicineId: testMed.id,
+      quantity: 2,
+      totalPrice: 20,
+      paymentMethod: 'Cash',
+      clientTransactionId: clientTxId,
+    }),
+  });
+  assert.equal(firstRes.status, 201);
+  const firstSale = await firstRes.json();
+  assert.ok(firstSale.id);
+  assert.equal(firstSale.clientTransactionId, clientTxId);
+
+  // Second duplicate request with SAME clientTransactionId (e.g. retry / offline replay)
+  const duplicateRes = await fetch(`${baseUrl}/api/sales`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      medicineId: testMed.id,
+      quantity: 2,
+      totalPrice: 20,
+      paymentMethod: 'Cash',
+      clientTransactionId: clientTxId,
+    }),
+  });
+  assert.equal(duplicateRes.status, 201);
+  const duplicateSale = await duplicateRes.json();
+  assert.equal(duplicateSale.id, firstSale.id, 'Duplicate request returned existing sale ID without re-creating');
+
+  // Verify stock was only deducted ONCE (2 units, not 4)
+  const afterRes = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+  const afterInv = await afterRes.json();
+  const updatedMed = afterInv.data.find((m) => m.id === testMed.id);
+  const stockAfter = updatedMed.Batches.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
+  assert.equal(stockAfter, stockBefore - 2, 'Stock was deducted only once despite duplicate request');
+});
+
+test('sync endpoint processes offline operations, enforces idempotency, and detects stock conflicts', async () => {
+  const headers = {
+    Authorization: `Bearer ${authToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  const invRes = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+  const inv = await invRes.json();
+  const testMed = inv.data.find((m) => m.Batches && m.Batches.some((b) => b.quantity >= 3));
+  assert.ok(testMed, 'Found product for sync test');
+
+  const availableStock = testMed.Batches.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
+  const validSaleTxId = `sync_tx_${Date.now()}_valid`;
+  const conflictSaleTxId = `sync_tx_${Date.now()}_conflict`;
+
+  // 1. Submit batch with valid sale and an over-quantity sale (conflict)
+  const syncPayload = {
+    operations: [
+      {
+        clientTransactionId: validSaleTxId,
+        type: 'SALE',
+        clientTimestamp: new Date().toISOString(),
+        payload: {
+          medicineId: testMed.id,
+          quantity: 1,
+          totalPrice: 15,
+          paymentMethod: 'Mobile',
+          receiptNumber: 'REC-OFFLINE-001',
+        },
+      },
+      {
+        clientTransactionId: conflictSaleTxId,
+        type: 'SALE',
+        clientTimestamp: new Date().toISOString(),
+        payload: {
+          medicineId: testMed.id,
+          quantity: availableStock + 9999, // Intentional conflict: impossible quantity
+          totalPrice: 99999,
+          paymentMethod: 'Cash',
+          receiptNumber: 'REC-CONFLICT-001',
+        },
+      },
+    ],
+  };
+
+  const syncRes = await fetch(`${baseUrl}/api/sync`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(syncPayload),
+  });
+
+  assert.equal(syncRes.status, 201);
+  const syncData = await syncRes.json();
+  assert.equal(syncData.success, true);
+  assert.equal(syncData.processedCount, 2);
+  assert.equal(syncData.syncedCount, 1);
+  assert.equal(syncData.conflictCount, 1);
+
+  const validResult = syncData.results.find((r) => r.clientTransactionId === validSaleTxId);
+  assert.ok(validResult);
+  assert.equal(validResult.status, 'synced');
+
+  const conflictResult = syncData.results.find((r) => r.clientTransactionId === conflictSaleTxId);
+  assert.ok(conflictResult);
+  assert.equal(conflictResult.status, 'conflict');
+  assert.ok(conflictResult.message.includes('Insufficient stock'));
+
+  // 2. Test re-syncing the same operations (idempotency check)
+  const resyncRes = await fetch(`${baseUrl}/api/sync`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      operations: [
+        {
+          clientTransactionId: validSaleTxId,
+          type: 'SALE',
+          payload: { medicineId: testMed.id, quantity: 1, totalPrice: 15 },
+        },
+      ],
+    }),
+  });
+  assert.equal(resyncRes.status, 201);
+  const resyncData = await resyncRes.json();
+  assert.equal(resyncData.results[0].status, 'already_synced');
+
+  // 3. Test inventory adjustment sync
+  const adjTxId = `sync_adj_${Date.now()}`;
+  const adjRes = await fetch(`${baseUrl}/api/sync`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      operations: [
+        {
+          clientTransactionId: adjTxId,
+          type: 'ADJUSTMENT',
+          payload: {
+            medicineId: testMed.id,
+            quantityChange: 5,
+            reason: 'Received return / donation offline',
+          },
+        },
+      ],
+    }),
+  });
+  assert.equal(adjRes.status, 201);
+  const adjData = await adjRes.json();
+  assert.equal(adjData.results[0].status, 'synced');
+});
+

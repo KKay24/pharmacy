@@ -4,9 +4,13 @@ const migrationDefinitions = [
   require('../migrations/001-initial-schema'),
   require('../migrations/002-sync-customer-schema'),
   require('../migrations/003-sync-prescription-sales'),
+  require('../migrations/004-update-medicine-image-type'),
+  require('../migrations/005-fix-image-column'),
   require('../migrations/006-add-password-bootstrap-flag'),
   require('../migrations/007-add-audit-logs'),
   require('../migrations/008-add-query-performance-indexes'),
+  require('../migrations/009-harden-inventory-persistence'),
+  require('../migrations/010-add-idempotency-and-sync'),
 ];
 
 function normalizeTableName(table) {

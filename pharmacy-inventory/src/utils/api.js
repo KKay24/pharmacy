@@ -39,3 +39,13 @@ export const apiFetch = async (path, options = {}) => {
 
   return response;
 };
+
+export const getApiErrorMessage = async (response, fallback = "Request failed") => {
+  try {
+    const payload = await response.json();
+    if (Array.isArray(payload?.message)) return payload.message.join(", ");
+    return payload?.message || payload?.error || fallback;
+  } catch (error) {
+    return fallback;
+  }
+};

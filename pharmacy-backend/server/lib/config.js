@@ -7,6 +7,7 @@ const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
 const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
 const hasConfiguredSqlitePath = Boolean(process.env.SQLITE_STORAGE_PATH);
 const isSqliteDatabaseUrl = /^sqlite:/i.test(databaseUrl);
+const isPostgresDatabaseUrl = /^postgres(?:ql)?:\/\//i.test(databaseUrl);
 const sqliteStoragePath = process.env.SQLITE_STORAGE_PATH
   ? path.resolve(process.cwd(), process.env.SQLITE_STORAGE_PATH)
   : path.join(__dirname, '..', 'pharmacy.sqlite');
@@ -33,12 +34,17 @@ if (isProduction && isSqliteDatabaseUrl) {
   throw new Error('SQLite database URLs are not allowed in production. Use PostgreSQL through DATABASE_URL.');
 }
 
+if (isProduction && !isPostgresDatabaseUrl) {
+  throw new Error('Production DATABASE_URL must use a PostgreSQL connection URL.');
+}
+
 module.exports = {
   allowLegacyDevAuth,
   databaseUrl,
   enableDemoSeeding,
   hasConfiguredSqlitePath,
   isProduction,
+  isPostgresDatabaseUrl,
   isSqliteDatabaseUrl,
   isTest,
   isVercel,

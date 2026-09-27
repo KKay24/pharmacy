@@ -53,22 +53,23 @@ export default function PosPage() {
         totalCost: 0, 
         paymentMethod: paymentMethod,
         taxAmount: 0,
-        date: now.toLocaleString(),
+        date: now.toISOString(),
         receiptNumber: transaction.receiptNo
       });
     });
 
     recordSale(newSales).then((res) => {
-        if (res && res.success) {
-            setLastTransaction(transaction);
-            setShowReceipt(true);
-            toast.success("Sale completed successfully!");
+      if (res && res.success) {
+        setLastTransaction({ ...transaction, pending: Boolean(res.pending) });
+        setShowReceipt(true);
+        if (res.pending) {
+          toast.success("Saved locally (Pending sync) — inventory updated offline!", { duration: 4000 });
         } else {
-            // Fallback if API fails (or mocking) for now, but ideally show error
-            // setLastTransaction(transaction);
-            // setShowReceipt(true);
-            toast.error("Failed to record sale. Please try again.");
+          toast.success("Sale completed and synchronized to server!");
         }
+      } else {
+        toast.error("Failed to record sale. Please try again.");
+      }
     });
   };
 

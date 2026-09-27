@@ -27,7 +27,8 @@ export default function AddStock({
     onCancel,
     inventory,
     suppliers = [],
-    onFastCapture
+    onFastCapture,
+    isSubmitting = false,
 }) {
     const [activeTab, setActiveTab] = useState("details");
     const [isScanning, setIsScanning] = useState(false);
@@ -46,6 +47,9 @@ export default function AddStock({
         setItems([...items, { 
             id: Date.now(), 
             name: "", 
+            genericName: "",
+            strength: "",
+            dosage: "",
             sku: "", 
             costPrice: "", 
             quantity: "", 
@@ -277,8 +281,8 @@ export default function AddStock({
                     <input 
                         type="date" 
                         className="asm-input"
-                        value={metadata.invoiceDate}
-                        onChange={e => setMetadata({...metadata, invoiceDate: e.target.value})}
+                        value={metadata.orderDate}
+                        onChange={e => setMetadata({...metadata, orderDate: e.target.value})}
                     />
                 </div>
             </div>
@@ -291,6 +295,8 @@ export default function AddStock({
                             <tr>
                                 <th style={{width:'40px'}}><input type="checkbox" /></th>
                                 <th style={{width:'30%'}}>Product</th>
+                                <th>Strength</th>
+                                <th>Form</th>
                                 <th>Status</th>
                                 <th>SKU</th>
                                 <th style={{width:'140px'}}>Expiry Date</th>
@@ -319,6 +325,22 @@ export default function AddStock({
                                                     onChange={e => updateItem(item.id, "name", e.target.value)}
                                                 />
                                             </div>
+                                        </td>
+                                        <td>
+                                            <input
+                                                className="asm-row-input"
+                                                placeholder="500mg"
+                                                value={item.strength || ""}
+                                                onChange={e => updateItem(item.id, "strength", e.target.value)}
+                                            />
+                                        </td>
+                                        <td>
+                                            <input
+                                                className="asm-row-input"
+                                                placeholder="Tablet"
+                                                value={item.dosage || ""}
+                                                onChange={e => updateItem(item.id, "dosage", e.target.value)}
+                                            />
                                         </td>
                                         <td>
                                             {item.isExisting ? (
@@ -462,8 +484,8 @@ export default function AddStock({
                             Review Batch <ChevronRight size={18} />
                         </button>
                     ) : (
-                        <button className="asm-btn asm-btn-primary" onClick={onNext} style={{background: 'var(--primary)'}}>
-                            Confirm & Save Stock
+                        <button className="asm-btn asm-btn-primary" onClick={onNext} disabled={isSubmitting} style={{background: 'var(--primary)'}}>
+                            {isSubmitting ? "Saving Stock…" : "Confirm & Save Stock"}
                         </button>
                     )}
                 </div>

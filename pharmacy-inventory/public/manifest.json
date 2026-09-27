@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "MediQuick",
+  "name": "MediQuick Pharmacy Management",
+  "description": "Production-ready Pharmacy Inventory and Point of Sale Management System",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,21 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "any",
+  "theme_color": "#039d83",
+  "background_color": "#0f172a",
+  "categories": ["medical", "business", "productivity"]
 }
