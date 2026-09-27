@@ -2,6 +2,32 @@ const { Injectable, InternalServerErrorException } = require('@nestjs/common');
 const { Medicine, Batch, sequelize } = require('../../models');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
 
+function sanitizeDate(value, defaultDate) {
+  if (value && typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+    const d = new Date(trimmed);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+  } else if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().split('T')[0];
+  }
+  return defaultDate;
+}
+
+function getDefaultExpiryDate() {
+  const future = new Date();
+  future.setFullYear(future.getFullYear() + 1);
+  return future.toISOString().split('T')[0];
+}
+
+function getTodayDate() {
+  return new Date().toISOString().split('T')[0];
+}
+
 class InventoryService {
   async list(query) {
     const pagination = parsePagination(query);
@@ -26,36 +52,61 @@ class InventoryService {
   async addBatch(body) {
     const transaction = await sequelize.transaction();
     try {
-      const { items, supplier, warehouse, invoiceNumber, receivedDate } = body;
-      if (!Array.isArray(items)) throw new Error('Items must be an array');
+      const metadata = body.metadata || {};
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (items.length === 0) throw new Error('Items array is required and must not be empty');
+
+      const supplier = body.supplier || metadata.supplier || null;
+      const warehouse = body.warehouse || metadata.warehouse || null;
+      const invoiceNumber = body.invoiceNumber || metadata.invoiceNumber || null;
+      const rawReceivedDate = body.receivedDate || metadata.orderDate || metadata.receivedDate;
+      const receivedDate = sanitizeDate(rawReceivedDate, getTodayDate());
+      const defaultExpiry = getDefaultExpiryDate();
+
       const createdItems = [];
 
       for (const item of items) {
-        let medicine = await Medicine.findOne({ where: { name: item.name } });
+        const name = (item.name || '').trim();
+        if (!name) continue;
+
+        let medicine = await Medicine.findOne({ where: { name }, transaction });
         if (!medicine) {
           medicine = await Medicine.create({
-            name: item.name,
-            genericName: item.genericName,
-            category: item.category,
-            dosage: item.dosage,
-            strength: item.strength,
-            supplier: supplier || item.supplier,
-            manufacturer: item.manufacturer,
-            barcode: item.barcode,
-            lowStockThreshold: item.threshold || 10,
+            name,
+            genericName: item.genericName || null,
+            category: item.category || null,
+            dosage: item.dosage || null,
+            strength: item.strength || null,
+            supplier: supplier || item.supplier || null,
+            manufacturer: item.manufacturer || null,
+            barcode: item.barcode || null,
+            imageUrl: item.imageUrl || null,
+            lowStockThreshold: Number(item.threshold) || 10,
+            totalQuantity: 0,
           }, { transaction });
         }
+
+        const quantity = Math.max(0, parseInt(item.quantity, 10) || 0);
+        const costPrice = Math.max(0, parseFloat(item.costPrice) || 0);
+        const sellingPrice = Math.max(0, parseFloat(item.sellingPrice) || 0);
+        const batchNumber = (item.batchNumber && typeof item.batchNumber === 'string' && item.batchNumber.trim())
+          ? item.batchNumber.trim()
+          : `BATCH-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const expiryDate = sanitizeDate(item.expiryDate, defaultExpiry);
+
         const batch = await Batch.create({
           medicineId: medicine.id,
-          batchNumber: item.batchNumber || `BATCH-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          quantity: Number(item.quantity),
-          expiryDate: item.expiryDate,
-          costPrice: Number(item.costPrice),
-          sellingPrice: Number(item.sellingPrice),
+          batchNumber,
+          quantity,
+          expiryDate,
+          costPrice,
+          sellingPrice,
           warehouse,
           invoiceNumber,
-          receivedDate: receivedDate || new Date(),
+          receivedDate,
         }, { transaction });
+
+        await medicine.increment('totalQuantity', { by: quantity, transaction });
         createdItems.push({ medicine, batch });
       }
 
@@ -70,36 +121,54 @@ class InventoryService {
   async add(body) {
     const transaction = await sequelize.transaction();
     try {
-      let medicine = await Medicine.findOne({ where: { name: body.name } });
+      const name = (body.name || '').trim();
+      if (!name) throw new Error('Medicine name is required');
+
+      let medicine = await Medicine.findOne({ where: { name }, transaction });
       if (!medicine) {
         medicine = await Medicine.create({
-          name: body.name,
-          genericName: body.genericName,
-          category: body.category,
-          dosage: body.dosage,
-          strength: body.strength,
-          supplier: body.supplier,
-          manufacturer: body.manufacturer,
-          barcode: body.barcode,
-          imageUrl: body.imageUrl,
-          lowStockThreshold: body.threshold || 10,
+          name,
+          genericName: body.genericName || null,
+          category: body.category || null,
+          dosage: body.dosage || null,
+          strength: body.strength || null,
+          supplier: body.supplier || null,
+          manufacturer: body.manufacturer || null,
+          barcode: body.barcode || null,
+          imageUrl: body.imageUrl || null,
+          lowStockThreshold: Number(body.threshold) || 10,
+          totalQuantity: 0,
         }, { transaction });
       }
+
       if (body.batchNumber && body.quantity) {
+        const quantity = Math.max(0, parseInt(body.quantity, 10) || 0);
+        const costPrice = Math.max(0, parseFloat(body.costPrice) || 0);
+        const sellingPrice = Math.max(0, parseFloat(body.sellingPrice) || 0);
+        const expiryDate = sanitizeDate(body.expiryDate, getDefaultExpiryDate());
+        const receivedDate = sanitizeDate(body.receivedDate, getTodayDate());
+        const batchNumber = String(body.batchNumber).trim();
+
         await Batch.create({
           medicineId: medicine.id,
-          batchNumber: body.batchNumber,
-          quantity: Number(body.quantity),
-          expiryDate: body.expiryDate,
-          costPrice: Number(body.costPrice),
-          sellingPrice: Number(body.sellingPrice),
+          batchNumber,
+          quantity,
+          expiryDate,
+          costPrice,
+          sellingPrice,
+          warehouse: body.warehouse || null,
+          invoiceNumber: body.invoiceNumber || null,
+          receivedDate,
         }, { transaction });
+
+        await medicine.increment('totalQuantity', { by: quantity, transaction });
       }
+
       await transaction.commit();
       return Medicine.findByPk(medicine.id, { include: [Batch] });
     } catch (error) {
       await transaction.rollback();
-      throw new InternalServerErrorException(error.message || 'Failed to add inventory');
+      throw new InternalServerErrorException(error.message || 'Failed to add inventory item');
     }
   }
 
@@ -119,7 +188,7 @@ class InventoryService {
             medicineId: id,
             batchNumber: `ADJ-${Date.now()}`,
             quantity: difference,
-            expiryDate: new Date(),
+            expiryDate: getDefaultExpiryDate(),
             costPrice: body.costPrice || 0,
             sellingPrice: body.sellingPrice || 0,
           });
@@ -132,11 +201,14 @@ class InventoryService {
     if (Array.isArray(body.Batches)) {
       for (const batch of body.Batches) {
         if (batch.id) {
-          await Batch.update({
+          const updateData = {
             batchNumber: batch.batchNumber,
-            expiryDate: batch.expiryDate,
             warehouse: batch.warehouse,
-          }, { where: { id: batch.id } });
+          };
+          if (batch.expiryDate) {
+            updateData.expiryDate = sanitizeDate(batch.expiryDate, getDefaultExpiryDate());
+          }
+          await Batch.update(updateData, { where: { id: batch.id } });
         }
       }
     }

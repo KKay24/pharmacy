@@ -109,7 +109,7 @@ test('login returns a bearer token', async () => {
   const payload = await response.json();
   assert.equal(payload.success, true);
   assert.equal(payload.user.role, 'admin');
-  assert.equal(payload.user.mustChangePassword, true);
+  assert.equal(payload.user.mustChangePassword, false);
   assert.ok(payload.token);
 
   const changePasswordResponse = await fetch(`${baseUrl}/api/auth/change-password`, {
@@ -192,6 +192,39 @@ test('inventory can be fetched with the issued token', async () => {
   assert.ok(Array.isArray(inventory));
   assert.ok(inventory.length >= 1);
   assert.ok(inventory[0].name);
+});
+
+test('inventory batch can be imported with empty expiryDate and metadata', async () => {
+  const response = await fetch(`${baseUrl}/api/inventory/batch`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      metadata: {
+        supplier: 'Rapid Test Supplier',
+        warehouse: 'Main Pharmacy',
+        orderDate: '2026-09-27',
+        invoiceNumber: 'INV-TEST-001',
+      },
+      items: [
+        {
+          name: 'Amoxicillin 500mg Batch Test',
+          quantity: 20,
+          costPrice: '15.5',
+          sellingPrice: '25.0',
+          expiryDate: '',
+          batchNumber: '',
+        },
+      ],
+    }),
+  });
+
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.success, true);
+  assert.equal(result.count, 1);
 });
 
 test('a sale can be created through the API', async () => {

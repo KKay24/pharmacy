@@ -290,12 +290,13 @@ export default function AddStock({
                         <thead>
                             <tr>
                                 <th style={{width:'40px'}}><input type="checkbox" /></th>
-                                <th style={{width:'40%'}}>Product</th>
+                                <th style={{width:'30%'}}>Product</th>
                                 <th>Status</th>
                                 <th>SKU</th>
+                                <th style={{width:'140px'}}>Expiry Date</th>
                                 <th>Purchase Cost</th>
                                 <th>Current Price</th>
-                                <th style={{width:'120px'}}>Quantity</th>
+                                <th style={{width:'100px'}}>Quantity</th>
                                 <th>Total Cost</th>
                                 <th style={{width:'40px'}}></th>
                             </tr>
@@ -332,6 +333,14 @@ export default function AddStock({
                                                 placeholder="P-00X"
                                                 value={item.sku}
                                                 onChange={e => updateItem(item.id, "sku", e.target.value)}
+                                            />
+                                        </td>
+                                        <td>
+                                            <input 
+                                                className="asm-row-input" 
+                                                type="date"
+                                                value={item.expiryDate || ""}
+                                                onChange={e => updateItem(item.id, "expiryDate", e.target.value)}
                                             />
                                         </td>
                                         <td>

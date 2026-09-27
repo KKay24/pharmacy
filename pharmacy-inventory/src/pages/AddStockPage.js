@@ -53,8 +53,8 @@ export default function AddStockPage() {
         fetchInventory();
         setShowCapture(false);
       } else {
-        const err = await res.json();
-        toast.error(err.error || "Failed to add via capture");
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || err.error || "Failed to add via capture");
       }
     } catch (err) {
       toast.error("Network error during rapid add");
@@ -88,8 +88,8 @@ export default function AddStockPage() {
         fetchInventory();
         handleCancel(); // Reset form
       } else {
-        const err = await res.json();
-        toast.error(err.error || "Failed to import stock");
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || err.error || "Failed to import stock");
       }
     } catch (err) {
       toast.error("Network error during stock import");
