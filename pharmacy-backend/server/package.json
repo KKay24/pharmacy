@@ -9,6 +9,7 @@
     "check:sensitive": "node scripts/check-sensitive-files.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed-admin.js",
+    "unlock:admin": "node scripts/unlock-admin.js",
     "test": "node --test tests/*.test.js",
     "sync:inventory": "node scripts/sync-local-sqlite-to-postgres.js",
     "sync:inventory:replace": "node scripts/sync-local-sqlite-to-postgres.js --replace"

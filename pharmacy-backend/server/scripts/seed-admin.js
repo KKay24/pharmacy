@@ -44,10 +44,10 @@ async function seedAdmin() {
     role: 'admin',
     locations: [],
     status: 'active',
-    mustChangePassword: true,
+    mustChangePassword: false,
   });
 
-  console.log('Admin account created. Change the bootstrap password on first login.');
+  console.log('Admin account created successfully.');
 }
 
 seedAdmin()
