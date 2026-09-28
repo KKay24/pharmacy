@@ -48,7 +48,6 @@ export default function AddStock({
             id: Date.now(), 
             name: "", 
             genericName: "",
-            strength: "",
             dosage: "",
             sku: "", 
             costPrice: "", 
@@ -295,7 +294,6 @@ export default function AddStock({
                             <tr>
                                 <th style={{width:'40px'}}><input type="checkbox" /></th>
                                 <th style={{width:'30%'}}>Product</th>
-                                <th>Strength</th>
                                 <th>Form</th>
                                 <th>Status</th>
                                 <th>SKU</th>
@@ -329,14 +327,6 @@ export default function AddStock({
                                         <td>
                                             <input
                                                 className="asm-row-input"
-                                                placeholder="500mg"
-                                                value={item.strength || ""}
-                                                onChange={e => updateItem(item.id, "strength", e.target.value)}
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                className="asm-row-input"
                                                 placeholder="Tablet"
                                                 value={item.dosage || ""}
                                                 onChange={e => updateItem(item.id, "dosage", e.target.value)}
@@ -359,7 +349,7 @@ export default function AddStock({
                                         </td>
                                         <td>
                                             <input 
-                                                className="asm-row-input" 
+                                                className="asm-date-picker" 
                                                 type="date"
                                                 value={item.expiryDate || ""}
                                                 onChange={e => updateItem(item.id, "expiryDate", e.target.value)}

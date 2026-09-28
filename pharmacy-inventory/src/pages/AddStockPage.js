@@ -9,7 +9,7 @@ export default function AddStockPage() {
   const { fetchInventory, suppliers, inventory } = useContext(DataContext);
   
   const [items, setItems] = useState([
-    { id: Date.now(), name: "", genericName: "", strength: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }
+    { id: Date.now(), name: "", genericName: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }
   ]);
   
   const [metadata, setMetadata] = useState({
@@ -122,7 +122,7 @@ export default function AddStockPage() {
   };
 
   const handleCancel = () => {
-    setItems([{ id: Date.now(), name: "", genericName: "", strength: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }]);
+    setItems([{ id: Date.now(), name: "", genericName: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }]);
     setMetadata({
       supplierId: "",
       invoiceNumber: "",

@@ -144,6 +144,22 @@
     border-color: var(--primary);
 }
 
+.asm-date-picker {
+    width: 132px;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #475569;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.asm-date-picker:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+
 /* Totals Footer */
 .asm-totals-panel {
     padding: 1.5rem;
