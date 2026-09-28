@@ -1,0 +1,21 @@
+{
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://pharmacy-inventory-backend-4.onrender.com"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://pharmacy-inventory-backend-4.onrender.com"
+      }
+    }
+  }
+}
