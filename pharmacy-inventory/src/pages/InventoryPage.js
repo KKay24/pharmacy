@@ -46,7 +46,8 @@ export default function InventoryPage() {
       }
     });
 
-    return { total: inventory.length, outOfStock, expiringSoon, lowStock };
+    const totalBatches = inventory.reduce((sum, medicine) => sum + (medicine.Batches?.length || 0), 0);
+    return { total: inventory.length, totalBatches, outOfStock, expiringSoon, lowStock };
   }, [inventory]);
 
   // --- Filtering Logic ---
@@ -155,6 +156,11 @@ export default function InventoryPage() {
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
+      </div>
+
+      <div style={{ margin: "0 0 1rem", color: "#64748b", fontSize: "0.85rem" }}>
+        Showing <strong style={{ color: "#1e293b" }}>{stats.total}</strong> unique products across{" "}
+        <strong style={{ color: "#1e293b" }}>{stats.totalBatches}</strong> stock batches. Expand a product row to view every batch.
       </div>
 
       {/* Table Section */}
