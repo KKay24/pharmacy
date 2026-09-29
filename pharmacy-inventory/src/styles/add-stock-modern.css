@@ -108,9 +108,64 @@
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 
+.asm-grid-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
 .asm-grid-table {
     width: 100%;
+    min-width: 1200px;
     border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.asm-product-column {
+    width: 250px;
+}
+
+.asm-product-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.asm-product-icon {
+    display: flex;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: #f1f5f9;
+}
+
+.asm-product-input {
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    min-height: 40px;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    color: #1e293b;
+    background: #ffffff;
+    font: inherit;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
+
+.asm-product-input:focus {
+    border-color: var(--primary);
+    outline: none;
 }
 
 .asm-grid-table th {
@@ -142,6 +197,22 @@
 
 .asm-row-input:focus {
     border-color: var(--primary);
+}
+
+.asm-grid-table th:not(.asm-product-column),
+.asm-grid-table td:not(.asm-product-column) {
+    padding-right: 0.55rem;
+    padding-left: 0.55rem;
+}
+
+.asm-grid-table th {
+    overflow-wrap: anywhere;
+}
+
+.asm-grid-table td:not(.asm-product-column) .asm-row-input {
+    min-width: 0;
+    padding-right: 0.4rem;
+    padding-left: 0.4rem;
 }
 
 .asm-date-picker {

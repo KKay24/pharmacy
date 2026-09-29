@@ -289,41 +289,58 @@ export default function AddStock({
             {/* Grid Area */}
             {activeTab === "details" ? (
                 <div className="asm-grid-card">
-                    <table className="asm-grid-table">
-                        <thead>
-                            <tr>
-                                <th style={{width:'40px'}}><input type="checkbox" /></th>
-                                <th style={{width:'30%'}}>Product</th>
-                                <th>Form</th>
-                                <th>Status</th>
-                                <th>SKU</th>
-                                <th style={{width:'140px'}}>Expiry Date</th>
-                                <th>Purchase Cost</th>
-                                <th>Current Price</th>
-                                <th style={{width:'100px'}}>Quantity</th>
-                                <th>Total Cost</th>
-                                <th style={{width:'40px'}}></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {items.map((item, idx) => {
-                                const isInvalid = !item.name || !item.quantity || item.quantity === "0" || !item.costPrice || item.costPrice === "0";
-                                return (
-                                    <tr key={item.id} className={isInvalid ? "asm-row-invalid" : ""}>
-                                        <td><input type="checkbox" /></td>
-                                        <td>
-                                            <div style={{display:'flex', gap:'0.75rem', alignItems:'center'}}>
-                                                <div style={{width:32, height:32, background:'#f1f5f9', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                                                    <Package size={16} color="#94a3b8" />
+                    <div className="asm-grid-scroll" role="region" aria-label="Stock items" tabIndex={0}>
+                        <table className="asm-grid-table">
+                            <colgroup>
+                                <col style={{ width: 40 }} />
+                                <col className="asm-product-column" />
+                                <col style={{ width: 92 }} />
+                                <col style={{ width: 112 }} />
+                                <col style={{ width: 92 }} />
+                                <col style={{ width: 150 }} />
+                                <col style={{ width: 118 }} />
+                                <col style={{ width: 118 }} />
+                                <col style={{ width: 88 }} />
+                                <col style={{ width: 108 }} />
+                                <col style={{ width: 48 }} />
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" /></th>
+                                    <th className="asm-product-column">Product</th>
+                                    <th>Form</th>
+                                    <th>Status</th>
+                                    <th>SKU</th>
+                                    <th>Expiry Date</th>
+                                    <th>Purchase Cost</th>
+                                    <th>Current Price</th>
+                                    <th>Quantity</th>
+                                    <th>Total Cost</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items.map((item, idx) => {
+                                    const isInvalid = !item.name || !item.quantity || item.quantity === "0" || !item.costPrice || item.costPrice === "0";
+                                    const productNameRows = Math.max(2, Math.min(5, Math.ceil((item.name || "").length / 24)));
+                                    return (
+                                        <tr key={item.id} className={isInvalid ? "asm-row-invalid" : ""}>
+                                            <td><input type="checkbox" /></td>
+                                            <td className="asm-product-column asm-product-cell">
+                                                <div className="asm-product-entry">
+                                                    <div className="asm-product-icon">
+                                                        <Package size={16} color="#94a3b8" />
+                                                    </div>
+                                                    <textarea
+                                                        className="asm-product-input"
+                                                        placeholder="Search or enter product..."
+                                                        rows={productNameRows}
+                                                        value={item.name}
+                                                        onChange={e => updateItem(item.id, "name", e.target.value)}
+                                                        onKeyDown={e => { if (e.key === "Enter") e.preventDefault(); }}
+                                                    />
                                                 </div>
-                                                <input 
-                                                    className="asm-row-input" 
-                                                    placeholder="Search or enter product..."
-                                                    value={item.name}
-                                                    onChange={e => updateItem(item.id, "name", e.target.value)}
-                                                />
-                                            </div>
-                                        </td>
+                                            </td>
                                         <td>
                                             <input
                                                 className="asm-row-input"
@@ -396,11 +413,12 @@ export default function AddStock({
                                                 <Trash2 size={18} />
                                             </button>
                                         </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                     <div style={{padding:'1rem 1.25rem', borderBottom:'1px solid #f1f5f9'}}>
                         <button className="asm-tab" style={{color:'var(--primary)', padding:0}} onClick={addRow}>
                             <Plus size={16} /> Add Product
