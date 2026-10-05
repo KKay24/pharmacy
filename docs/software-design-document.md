@@ -64,7 +64,7 @@ Brand, strength, pack size and unit of measure are separate medicine metadata; b
 
 ### 6.3 Sales
 
-Web and mobile POS clients submit sale data to `POST /api/sales`. The backend validates sale quantities/totals, resolves the medicine, checks stock and updates batches and sale records transactionally. It deducts quantities from batches ordered by expiry date and writes one or more movement records. The web PWA's operation queue sends supported offline operations to `/api/sync` with client transaction identifiers; the sync service checks permissions, detects prior processing and reports errors/conflicts.
+Web and mobile POS clients submit sale data to `POST /api/sales`. The web POS browses stock through dependent main-category, subcategory and product-form filters backed by the shared taxonomy endpoint. The backend validates sale quantities/totals, resolves the medicine, checks stock and updates batches and sale records transactionally. It deducts quantities from batches ordered by expiry date and writes one or more movement records. The web PWA's operation queue sends supported offline operations to `/api/sync` with client transaction identifiers; the sync service checks permissions, detects prior processing and reports errors/conflicts.
 
 ### 6.4 Customers and prescriptions
 

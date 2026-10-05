@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import AddStock from "./AddStock";
 import InventoryPage from "../pages/InventoryPage";
+import Pos from "./POS";
 import { DataContext } from "../context/DataContext";
 
 jest.mock("react-router-dom", () => ({
@@ -152,4 +153,44 @@ test("inventory filters cascade through taxonomy and filter generic name and bra
     target: { value: "Amoxi" },
   });
   expect(screen.getByTestId("inventory-results")).toHaveTextContent("Amoxicillin");
+});
+
+test("POS category filters show the hierarchy instead of dosage forms as main categories", () => {
+  const inventory = [
+    {
+      id: 1,
+      name: "Amoxicillin Syrup",
+      genericName: "Amoxicillin",
+      mainCategoryId: 1,
+      subcategoryId: 11,
+      productFormId: 111,
+      Batches: [{ quantity: 8, sellingPrice: 2 }],
+    },
+    {
+      id: 2,
+      name: "Baby Lotion",
+      mainCategoryId: 2,
+      subcategoryId: 21,
+      productFormId: 211,
+      Batches: [{ quantity: 6, sellingPrice: 3 }],
+    },
+  ];
+
+  render(<Pos inventory={inventory} categories={categories} handleSale={jest.fn()} />);
+
+  expect(screen.getByRole("group", { name: "Main category" })).toHaveTextContent("Medicines");
+  expect(screen.getByRole("group", { name: "Main category" })).not.toHaveTextContent("Syrup");
+  expect(screen.queryByRole("group", { name: "Product form" })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Medicines" }));
+  fireEvent.click(screen.getByRole("button", { name: "Antibiotics" }));
+  expect(screen.getByRole("group", { name: "Product form" })).toHaveTextContent("Syrup");
+  fireEvent.click(screen.getByRole("button", { name: "Syrup" }));
+
+  expect(screen.getByText("Amoxicillin Syrup")).toBeInTheDocument();
+  expect(screen.queryByText("Baby Lotion")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Baby Products" }));
+  expect(screen.queryByRole("group", { name: "Product form" })).not.toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "Subcategory" })).toHaveTextContent("Baby Care");
 });

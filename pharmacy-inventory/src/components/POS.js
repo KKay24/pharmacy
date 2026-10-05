@@ -49,22 +49,30 @@ function Pos({
 }) {
   const [searchText, setSearchText] = useState("");
   const [selectedItems, setSelectedItems] = useState([]);
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategoryId, setActiveCategoryId] = useState("");
+  const [activeSubcategoryId, setActiveSubcategoryId] = useState("");
+  const [activeFormId, setActiveFormId] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // 1. Filtering Logic
-  const categoryFilters = ["All", ...categories.map((category) => category.name)];
+  const selectedCategory = categories.find((category) => String(category.id) === activeCategoryId);
+  const selectedSubcategory = selectedCategory?.subcategories.find(
+    (subcategory) => String(subcategory.id) === activeSubcategoryId
+  );
   
   const filteredInventory = inventory.filter(item => {
     const qty = item.Batches ? item.Batches.reduce((acc,b) => acc+b.quantity, 0) : (item.quantity || 0);
     const search = searchText.toLowerCase();
-    const matchesSearch = item.name.toLowerCase().includes(search) ||
+    const matchesSearch = (item.name || "").toLowerCase().includes(search) ||
       (item.genericName || "").toLowerCase().includes(search) ||
       (item.brandName || "").toLowerCase().includes(search);
-    const matchesCategory = activeCategory === "All" ||
-      item.MainCategory?.name === activeCategory ||
-      (!item.MainCategory && item.category === activeCategory);
-    return matchesSearch && matchesCategory && qty > 0;
+    const matchesCategory = !activeCategoryId ||
+      String(item.mainCategoryId ?? item.MainCategory?.id ?? "") === activeCategoryId ||
+      (!item.mainCategoryId && !item.MainCategory && item.category === selectedCategory?.name);
+    const matchesSubcategory = !activeSubcategoryId ||
+      String(item.subcategoryId ?? item.Subcategory?.id ?? "") === activeSubcategoryId;
+    const matchesForm = !activeFormId ||
+      String(item.productFormId ?? item.ProductForm?.id ?? "") === activeFormId;
+    return matchesSearch && matchesCategory && matchesSubcategory && matchesForm && qty > 0;
   });
 
   // 2. Cart Helpers
@@ -143,17 +151,95 @@ function Pos({
                 onChange={e => setSearchText(e.target.value)}
               />
             </div>
-            <div className="pos-category-tabs">
-              {categoryFilters.map(cat => (
-                <button 
-                  key={cat} 
-                  className={`pos-category-tab ${activeCategory === cat ? 'active' : ''}`}
-                  onClick={() => setActiveCategory(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+            {categories.length > 0 ? (
+              <div className="pos-taxonomy-filters">
+                <div className="pos-category-tabs" role="group" aria-label="Main category">
+                  <button
+                    type="button"
+                    className={`pos-category-tab ${activeCategoryId === '' ? 'active' : ''}`}
+                    aria-pressed={activeCategoryId === ''}
+                    onClick={() => {
+                      setActiveCategoryId("");
+                      setActiveSubcategoryId("");
+                      setActiveFormId("");
+                    }}
+                  >
+                    All
+                  </button>
+                  {categories.map((category) => (
+                    <button
+                      type="button"
+                      key={category.id}
+                      className={`pos-category-tab ${activeCategoryId === String(category.id) ? 'active' : ''}`}
+                      aria-pressed={activeCategoryId === String(category.id)}
+                      onClick={() => {
+                        setActiveCategoryId(String(category.id));
+                        setActiveSubcategoryId("");
+                        setActiveFormId("");
+                      }}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+                {selectedCategory && (
+                  <div className="pos-category-tabs pos-subcategory-tabs" role="group" aria-label="Subcategory">
+                    <button
+                      type="button"
+                      className={`pos-category-tab ${activeSubcategoryId === '' ? 'active' : ''}`}
+                      aria-pressed={activeSubcategoryId === ''}
+                      onClick={() => {
+                        setActiveSubcategoryId("");
+                        setActiveFormId("");
+                      }}
+                    >
+                      All subcategories
+                    </button>
+                    {selectedCategory.subcategories.map((subcategory) => (
+                      <button
+                        type="button"
+                        key={subcategory.id}
+                        className={`pos-category-tab ${activeSubcategoryId === String(subcategory.id) ? 'active' : ''}`}
+                        aria-pressed={activeSubcategoryId === String(subcategory.id)}
+                        onClick={() => {
+                          setActiveSubcategoryId(String(subcategory.id));
+                          setActiveFormId("");
+                        }}
+                      >
+                        {subcategory.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedSubcategory && (
+                  <div className="pos-category-tabs pos-form-tabs" role="group" aria-label="Product form">
+                    <button
+                      type="button"
+                      className={`pos-category-tab ${activeFormId === '' ? 'active' : ''}`}
+                      aria-pressed={activeFormId === ''}
+                      onClick={() => setActiveFormId("")}
+                    >
+                      All forms
+                    </button>
+                    {selectedSubcategory.forms.map((form) => (
+                      <button
+                        type="button"
+                        key={form.id}
+                        className={`pos-category-tab ${activeFormId === String(form.id) ? 'active' : ''}`}
+                        aria-pressed={activeFormId === String(form.id)}
+                        onClick={() => setActiveFormId(String(form.id))}
+                      >
+                        {form.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="pos-taxonomy-error" role="status">
+                Product categories are unavailable. Refresh inventory to load category filters.
+              </p>
+            )}
           </div>
 
           <div className="pos-grid">

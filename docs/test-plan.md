@@ -41,7 +41,7 @@ Web automated coverage includes:
 - IndexedDB operations and offline data behavior.
 - Sync queue reconciliation/status behavior.
 - Sync status indicator rendering and user-visible states.
-- Dependent stock-entry category/subcategory/form selectors and inventory taxonomy, generic-name and brand filters.
+- Dependent stock-entry category/subcategory/form selectors, POS main-category → subcategory → form filtering, and inventory taxonomy, generic-name and brand filters.
 
 The inventory of test files may change; inspect the package before relying on this list.
 

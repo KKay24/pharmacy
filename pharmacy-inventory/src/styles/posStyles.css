@@ -107,6 +107,30 @@
   padding-bottom: 0.25rem;
 }
 
+.pos-taxonomy-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pos-subcategory-tabs,
+.pos-form-tabs {
+  padding-left: 0.5rem;
+  border-left: 2px solid #e2e8f0;
+}
+
+.pos-subcategory-tabs .pos-category-tab,
+.pos-form-tabs .pos-category-tab {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.pos-taxonomy-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
 .pos-category-tab {
   padding: 0.6rem 1.25rem;
   border-radius: 8px;

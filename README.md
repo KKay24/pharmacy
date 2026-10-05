@@ -60,7 +60,7 @@ Medicines are catalog records classified by main category, optional subcategory 
 
 ### Sales/POS
 
-The POS client submits sale line items to `POST /api/sales`. The API validates stock, deducts it across available batches in ascending expiry-date order, writes sale and movement records transactionally, and stores the selected payment-method label. The mobile POS currently submits online sales with `Cash` as its payment method. The web PWA can queue supported operations while offline for later reconciliation.
+The POS client submits sale line items to `POST /api/sales`. The web POS filters products through dependent main-category, subcategory and product-form controls sourced from the shared taxonomy. The API validates stock, deducts it across available batches in ascending expiry-date order, writes sale and movement records transactionally, and stores the selected payment-method label. The mobile POS currently submits online sales with `Cash` as its payment method. The web PWA can queue supported operations while offline for later reconciliation.
 
 ### Expiry and reporting
 
