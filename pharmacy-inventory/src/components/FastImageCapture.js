@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, X, Upload, Loader, Check, Edit2 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 
-export default function FastImageCapture({ onSave, onClose }) {
+export default function FastImageCapture({ onSave, onClose, categories = [] }) {
     const [viewMode, setViewMode] = useState('capture'); // capture, processing, confirm
     const [stream, setStream] = useState(null);
     const videoRef = useRef(null);
@@ -11,12 +11,28 @@ export default function FastImageCapture({ onSave, onClose }) {
     const [scanProgress, setScanProgress] = useState('');
     const [formData, setFormData] = useState({
         productName: '',
+        mainCategoryId: '',
+        subcategoryId: '',
+        productFormId: '',
         batchNumber: '',
         expiryDate: '',
         quantity: '1'
     });
     
     const [ocrConfidence, setOcrConfidence] = useState({ batch: 'high', expiry: 'high' });
+    const selectedCategory = categories.find((category) => String(category.id) === formData.mainCategoryId);
+    const selectedSubcategory = selectedCategory?.subcategories.find(
+        (subcategory) => String(subcategory.id) === formData.subcategoryId
+    );
+
+    const updateClassification = (field, value) => {
+        setFormData((current) => ({
+            ...current,
+            [field]: value,
+            ...(field === 'mainCategoryId' ? { subcategoryId: '', productFormId: '' } : {}),
+            ...(field === 'subcategoryId' ? { productFormId: '' } : {}),
+        }));
+    };
 
     const stopCamera = useCallback(() => {
         if (stream) {
@@ -141,7 +157,10 @@ export default function FastImageCapture({ onSave, onClose }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave(formData);
+        const form = selectedSubcategory?.forms.find(
+            (item) => String(item.id) === formData.productFormId
+        );
+        onSave({ ...formData, productFormName: form?.name });
     };
 
     return (
@@ -206,6 +225,27 @@ export default function FastImageCapture({ onSave, onClose }) {
                                 <div className="asm-field" style={{ marginBottom: '1rem' }}>
                                     <label>Product Name (Optional)</label>
                                     <input className="asm-input" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} placeholder="e.g. Amoxicillin 500mg" />
+                                </div>
+                                <div className="asm-field" style={{ marginBottom: '1rem' }}>
+                                    <label>Main Category *</label>
+                                    <select className="asm-input" required value={formData.mainCategoryId} onChange={e => updateClassification('mainCategoryId', e.target.value)}>
+                                        <option value="">Select main category...</option>
+                                        {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="asm-field" style={{ marginBottom: '1rem' }}>
+                                    <label>Subcategory</label>
+                                    <select className="asm-input" disabled={!selectedCategory} value={formData.subcategoryId} onChange={e => updateClassification('subcategoryId', e.target.value)}>
+                                        <option value="">Select subcategory...</option>
+                                        {selectedCategory?.subcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="asm-field" style={{ marginBottom: '1rem' }}>
+                                    <label>Product Form</label>
+                                    <select className="asm-input" disabled={!selectedSubcategory} value={formData.productFormId} onChange={e => updateClassification('productFormId', e.target.value)}>
+                                        <option value="">Select product form...</option>
+                                        {selectedSubcategory?.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}
+                                    </select>
                                 </div>
                                 <div className="asm-field" style={{ marginBottom: '1rem' }}>
                                     <label style={{ display: 'flex', justifyContent: 'space-between' }}>

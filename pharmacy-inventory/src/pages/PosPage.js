@@ -6,7 +6,7 @@ import { useReactToPrint } from "react-to-print";
 import { toast } from "react-hot-toast";
 
 export default function PosPage() {
-  const { inventory, sales, recordSale, customers, addCustomer } = useContext(DataContext);
+  const { inventory, inventoryCategories = [], sales, recordSale, customers, addCustomer } = useContext(DataContext);
   const [lastTransaction, setLastTransaction] = useState(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const receiptRef = useRef();
@@ -88,6 +88,7 @@ export default function PosPage() {
 
         <Pos
         inventory={inventory}
+        categories={inventoryCategories}
         setInventory={() => {}} 
         sales={sales}
         setSales={() => {}} 

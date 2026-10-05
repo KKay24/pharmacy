@@ -23,6 +23,8 @@ export const DataContext = createContext();
 export const DataProvider = ({ children }) => {
   const initialSession = loadAuthSession();
   const [inventory, setInventory] = useState([]);
+  const [inventoryCategories, setInventoryCategories] = useState([]);
+  const [inventoryCategoriesError, setInventoryCategoriesError] = useState(null);
   const [sales, setSales] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -170,6 +172,29 @@ export const DataProvider = ({ children }) => {
     }
   }, []);
 
+  const fetchInventoryCategories = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/inventory/categories");
+      if (!res.ok) {
+        const error = await getApiErrorMessage(res, "Failed to load product categories");
+        setInventoryCategoriesError(error);
+        return { success: false, error };
+      }
+      const categories = await res.json();
+      if (!Array.isArray(categories)) {
+        setInventoryCategoriesError("The inventory service returned invalid category data");
+        return { success: false, error: "The inventory service returned invalid category data" };
+      }
+      setInventoryCategories(categories);
+      setInventoryCategoriesError(null);
+      return { success: true };
+    } catch (err) {
+      console.error("Failed to fetch product categories", err);
+      setInventoryCategoriesError("Unable to reach the category service");
+      return { success: false, error: "Unable to reach the category service" };
+    }
+  }, []);
+
   const fetchSales = useCallback(async () => {
     try {
       const res = await apiFetch("/api/sales");
@@ -290,6 +315,7 @@ export const DataProvider = ({ children }) => {
     }
 
     fetchInventory();
+    fetchInventoryCategories();
     fetchSales();
 
     if (userRole === "admin" || userRole === "manager") {
@@ -301,7 +327,7 @@ export const DataProvider = ({ children }) => {
       fetchReorderInsights();
       fetchRiskInsights();
     }
-  }, [username, userRole, fetchInventory, fetchSales, fetchCustomers]);
+  }, [username, userRole, fetchInventory, fetchInventoryCategories, fetchSales, fetchCustomers]);
 
   useEffect(() => {
     const handleForcedLogout = () => logoutUser();
@@ -500,6 +526,8 @@ export const DataProvider = ({ children }) => {
     <DataContext.Provider
       value={{
         inventory,
+        inventoryCategories,
+        inventoryCategoriesError,
         setInventory,
         sales,
         setSales,
@@ -508,6 +536,7 @@ export const DataProvider = ({ children }) => {
         deleteInventoryItem,
         recordSale,
         fetchInventory,
+        fetchInventoryCategories,
         customers,
         fetchCustomers,
         userRole,

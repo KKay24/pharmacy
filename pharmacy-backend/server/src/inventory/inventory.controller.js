@@ -9,6 +9,7 @@ const PermissionsGuard = require('../auth/permissions.guard');
 
 class InventoryController {
   constructor(service) { this.service = service; }
+  categories() { return this.service.categories(); }
   list(query) { return this.service.list(query); }
   lowStock() { return this.service.lowStock(); }
   movements(params, query) { return this.service.movements(params.id, query); }
@@ -21,6 +22,7 @@ class InventoryController {
 applyClassDecorator(Controller, InventoryController, 'api/inventory');
 Inject(InventoryService)(InventoryController, undefined, 0);
 applyMethodDecorator(Get, InventoryController.prototype, 'list');
+applyMethodDecorator(Get, InventoryController.prototype, 'categories', 'categories');
 applyMethodDecorator(Get, InventoryController.prototype, 'lowStock', 'low-stock');
 applyMethodDecorator(Get, InventoryController.prototype, 'movements', ':id/movements');
 applyMethodDecorator(Post, InventoryController.prototype, 'addBatch', 'batch');
@@ -28,11 +30,13 @@ applyMethodDecorator(Post, InventoryController.prototype, 'add');
 applyMethodDecorator(Put, InventoryController.prototype, 'update', ':id');
 applyMethodDecorator(Delete, InventoryController.prototype, 'remove', ':id');
 applyMethodDecorator(UseGuards, InventoryController.prototype, 'list', AuthGuard, PermissionsGuard);
+applyMethodDecorator(UseGuards, InventoryController.prototype, 'categories', AuthGuard, PermissionsGuard);
 applyMethodDecorator(UseGuards, InventoryController.prototype, 'lowStock', AuthGuard, PermissionsGuard);
 applyMethodDecorator(UseGuards, InventoryController.prototype, 'movements', AuthGuard, PermissionsGuard);
 for (const method of ['addBatch', 'add', 'update', 'remove']) applyMethodDecorator(UseGuards, InventoryController.prototype, method, AuthGuard, PermissionsGuard);
 for (const method of ['list', 'lowStock']) RequirePermissions(Permissions.INVENTORY_READ)(InventoryController.prototype, method);
 RequirePermissions(Permissions.INVENTORY_READ)(InventoryController.prototype, 'movements');
+RequirePermissions(Permissions.INVENTORY_READ)(InventoryController.prototype, 'categories');
 for (const method of ['addBatch', 'add', 'update', 'remove']) RequirePermissions(Permissions.INVENTORY_WRITE)(InventoryController.prototype, method);
 applyParameterDecorator(Body, InventoryController.prototype, 'addBatch', 0);
 applyParameterDecorator(Query, InventoryController.prototype, 'list', 0);

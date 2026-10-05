@@ -42,6 +42,7 @@ const getProductImage = (item) => {
 
 function Pos({ 
   inventory = [], 
+  categories = [],
   handleSale, 
   customers = [],
   addCustomer
@@ -52,12 +53,17 @@ function Pos({
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   // 1. Filtering Logic
-  const categories = ["All", "Tablets", "Syrups", "Antibiotics", "Supplements", "Equipment"];
+  const categoryFilters = ["All", ...categories.map((category) => category.name)];
   
   const filteredInventory = inventory.filter(item => {
     const qty = item.Batches ? item.Batches.reduce((acc,b) => acc+b.quantity, 0) : (item.quantity || 0);
-    const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase());
-    const matchesCategory = activeCategory === "All" || (item.category && item.category === activeCategory);
+    const search = searchText.toLowerCase();
+    const matchesSearch = item.name.toLowerCase().includes(search) ||
+      (item.genericName || "").toLowerCase().includes(search) ||
+      (item.brandName || "").toLowerCase().includes(search);
+    const matchesCategory = activeCategory === "All" ||
+      item.MainCategory?.name === activeCategory ||
+      (!item.MainCategory && item.category === activeCategory);
     return matchesSearch && matchesCategory && qty > 0;
   });
 
@@ -138,7 +144,7 @@ function Pos({
               />
             </div>
             <div className="pos-category-tabs">
-              {categories.map(cat => (
+              {categoryFilters.map(cat => (
                 <button 
                   key={cat} 
                   className={`pos-category-tab ${activeCategory === cat ? 'active' : ''}`}

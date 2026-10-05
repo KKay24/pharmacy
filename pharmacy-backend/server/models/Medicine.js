@@ -17,8 +17,35 @@ const Medicine = sequelize.define('Medicine', {
     type: DataTypes.STRING(64),
     allowNull: true,
   },
+  mainCategoryId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'InventoryCategories', key: 'id' },
+  },
+  subcategoryId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'InventoryCategories', key: 'id' },
+  },
+  productFormId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'InventoryCategories', key: 'id' },
+  },
   genericName: {
     type: DataTypes.STRING
+  },
+  brandName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  packSize: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  unitOfMeasure: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   category: {
     type: DataTypes.STRING

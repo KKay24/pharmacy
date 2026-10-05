@@ -120,6 +120,7 @@ export default function DashboardPage() {
     riskInsights = EMPTY_RISK_INSIGHTS,
   } = useContext(DataContext);
   const LOW_STOCK_THRESHOLD = 10;
+  const [inventoryBreakdownLevel, setInventoryBreakdownLevel] = React.useState("main");
   const predictions = predictiveAnalytics.predictions || [];
   const predictiveSummary = predictiveAnalytics.summary || {};
   const reorderSuggestions = reorderInsights.items || [];
@@ -151,6 +152,43 @@ export default function DashboardPage() {
   const outOfStockItems = useMemo(() => {
     return inventory.filter((item) => getTotalQuantity(item) === 0);
   }, [inventory]);
+
+  const expiryStockTotals = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const warningDate = new Date(today);
+    warningDate.setDate(warningDate.getDate() + 30);
+    return inventory.reduce((totals, item) => {
+      for (const batch of item.Batches || []) {
+        const quantity = Number(batch.quantity || 0);
+        if (quantity <= 0 || !batch.expiryDate) continue;
+        const expiryDate = new Date(batch.expiryDate);
+        if (expiryDate < today) totals.expiredUnits += quantity;
+        else if (expiryDate <= warningDate) totals.nearExpiryUnits += quantity;
+      }
+      return totals;
+    }, { expiredUnits: 0, nearExpiryUnits: 0 });
+  }, [inventory]);
+
+  const inventoryBreakdown = useMemo(() => {
+    const groups = new Map();
+    for (const item of inventory) {
+      const label = inventoryBreakdownLevel === "main"
+        ? item.MainCategory?.name || "Unclassified"
+        : inventoryBreakdownLevel === "subcategory"
+          ? item.Subcategory?.name || "Unclassified"
+          : item.ProductForm?.name || "Unclassified";
+      const current = groups.get(label) || { label, products: 0, units: 0, stockValue: 0 };
+      current.products += 1;
+      current.units += getTotalQuantity(item);
+      current.stockValue += (item.Batches || []).reduce(
+        (sum, batch) => sum + Number(batch.quantity || 0) * Number(batch.costPrice || 0),
+        0
+      );
+      groups.set(label, current);
+    }
+    return [...groups.values()].sort((left, right) => right.stockValue - left.stockValue);
+  }, [inventory, inventoryBreakdownLevel]);
 
   const getMonths = () => {
     const months = [];
@@ -240,6 +278,20 @@ export default function DashboardPage() {
       accentClass: "color-red",
       sparkColor: "#ef4444",
       sparkValue: expiringProductCount,
+    },
+    {
+      title: "Expired Stock Units",
+      value: expiryStockTotals.expiredUnits.toLocaleString(),
+      accentClass: "color-red",
+      sparkColor: "#b91c1c",
+      sparkValue: expiryStockTotals.expiredUnits,
+    },
+    {
+      title: "Near-Expiry Units",
+      value: expiryStockTotals.nearExpiryUnits.toLocaleString(),
+      accentClass: "color-orange",
+      sparkColor: "#f97316",
+      sparkValue: expiryStockTotals.nearExpiryUnits,
     },
     {
       title: "Dead Stock",
@@ -355,6 +407,46 @@ export default function DashboardPage() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      </div>
+
+      <div className="dash-card">
+        <div className="dash-card-header">
+          <h3>Inventory Classification & Value</h3>
+          <select
+            className="dash-select"
+            aria-label="Inventory reporting level"
+            value={inventoryBreakdownLevel}
+            onChange={(event) => setInventoryBreakdownLevel(event.target.value)}
+          >
+            <option value="main">Main category</option>
+            <option value="subcategory">Subcategory</option>
+            <option value="form">Product form</option>
+          </select>
+        </div>
+        <div className="dash-card-body" style={{ padding: 0 }}>
+          <table className="mini-table">
+            <thead>
+              <tr>
+                <th>{inventoryBreakdownLevel === "main" ? "Main Category" : inventoryBreakdownLevel === "subcategory" ? "Subcategory" : "Product Form"}</th>
+                <th>Products</th>
+                <th>Units</th>
+                <th>Stock Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inventoryBreakdown.length === 0 ? (
+                <tr><td colSpan="4" style={{ textAlign: "center", padding: "2rem" }}>No inventory is available for reporting.</td></tr>
+              ) : inventoryBreakdown.map((row) => (
+                <tr key={row.label}>
+                  <td style={{ fontWeight: 600 }}>{row.label}</td>
+                  <td>{row.products}</td>
+                  <td>{row.units.toLocaleString()}</td>
+                  <td>{formatCurrency(row.stockValue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

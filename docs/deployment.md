@@ -85,7 +85,7 @@ These files are present but are not the topology described by the root Render/Ve
 
 1. Confirm the intended target and review the checked-in configuration for that target.
 2. Verify API build/syntax check and backend tests; build the web client and typecheck mobile if it is in scope.
-3. Review schema/data migrations, run them against a disposable PostgreSQL environment, and prepare a tested backup/restore path.
+3. Review schema/data migrations (including `011` taxonomy references and safe legacy mapping), run them against a disposable PostgreSQL environment, and prepare a tested backup/restore path.
 4. Configure `DATABASE_URL`, `JWT_SECRET`, allowed frontend origins and client backend URLs in provider-managed settings.
 5. Keep demo seeding and legacy development auth disabled in production.
 6. Deploy backend and database, then verify `GET /health`.

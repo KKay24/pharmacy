@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, RefreshControl, TextInput } from 'react-native';
+import { StyleSheet, FlatList, Pressable, RefreshControl, ScrollView, TextInput } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import apiClient from '@/api/client';
 import { Search } from 'lucide-react-native';
@@ -8,19 +8,50 @@ import { getMedicineBatches, getMedicineCurrentPrice, getMedicineTotalQuantity }
 interface Medicine {
   id: number;
   name: string;
-  genericName: string;
-  category: string;
+  genericName?: string;
+  category?: string;
+  mainCategoryId?: number | null;
+  subcategoryId?: number | null;
+  productFormId?: number | null;
+  brandName?: string;
+  strength?: string;
+  dosage?: string;
+  MainCategory?: { name: string };
+  Subcategory?: { name: string };
+  ProductForm?: { name: string };
   totalQuantity: number;
   lowStockThreshold: number;
   Batches: any[];
 }
 
+interface TaxonomyForm {
+  id: number;
+  name: string;
+}
+
+interface TaxonomySubcategory extends TaxonomyForm {
+  forms: TaxonomyForm[];
+}
+
+interface TaxonomyCategory extends TaxonomyForm {
+  subcategories: TaxonomySubcategory[];
+}
+
 export default function InventoryScreen() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [filteredMedicines, setFilteredMedicines] = useState<Medicine[]>([]);
+  const [inventoryCategories, setInventoryCategories] = useState<TaxonomyCategory[]>([]);
+  const [taxonomyError, setTaxonomyError] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [mainCategoryId, setMainCategoryId] = useState('');
+  const [subcategoryId, setSubcategoryId] = useState('');
+  const [productFormId, setProductFormId] = useState('');
+  const selectedCategory = inventoryCategories.find((category) => String(category.id) === mainCategoryId);
+  const selectedSubcategory = selectedCategory?.subcategories.find(
+    (subcategory) => String(subcategory.id) === subcategoryId
+  );
 
   const fetchInventory = async () => {
     try {
@@ -45,23 +76,42 @@ export default function InventoryScreen() {
     }
   };
 
+  const fetchInventoryCategories = async () => {
+    try {
+      const response = await apiClient.get('/api/inventory/categories');
+      if (!Array.isArray(response.data)) {
+        throw new Error('Inventory category response was not a list');
+      }
+      setInventoryCategories(response.data);
+      setTaxonomyError('');
+    } catch (error) {
+      console.error('Failed to fetch inventory categories:', error);
+      setTaxonomyError('Category filters are unavailable');
+    }
+  };
+
   useEffect(() => {
     fetchInventory();
+    fetchInventoryCategories();
   }, []);
 
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredMedicines(medicines);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = medicines.filter(med => 
-        med.name.toLowerCase().includes(query) || 
-        med.genericName?.toLowerCase().includes(query) ||
-        med.category?.toLowerCase().includes(query)
-      );
-      setFilteredMedicines(filtered);
-    }
-  }, [searchQuery, medicines]);
+    const query = searchQuery.trim().toLowerCase();
+    setFilteredMedicines(medicines.filter((medicine) => {
+      const matchesClassification =
+        (!mainCategoryId || String(medicine.mainCategoryId) === mainCategoryId) &&
+        (!subcategoryId || String(medicine.subcategoryId) === subcategoryId) &&
+        (!productFormId || String(medicine.productFormId) === productFormId);
+      const matchesSearch = !query ||
+        medicine.name.toLowerCase().includes(query) ||
+        medicine.genericName?.toLowerCase().includes(query) ||
+        medicine.brandName?.toLowerCase().includes(query) ||
+        medicine.MainCategory?.name.toLowerCase().includes(query) ||
+        medicine.Subcategory?.name.toLowerCase().includes(query) ||
+        medicine.ProductForm?.name.toLowerCase().includes(query);
+      return matchesClassification && matchesSearch;
+    }));
+  }, [searchQuery, medicines, mainCategoryId, subcategoryId, productFormId]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -77,13 +127,18 @@ export default function InventoryScreen() {
         <View style={styles.cardHeader}>
           <View>
             <Text style={styles.medicineName}>{item.name}</Text>
-            <Text style={styles.genericName}>{item.genericName || 'N/A'}</Text>
+            <Text style={styles.genericName}>{[item.brandName, item.genericName, item.strength].filter(Boolean).join(' · ') || 'N/A'}</Text>
           </View>
           <Text style={styles.price}>K {currentPrice.toFixed(2)}</Text>
         </View>
         
         <View style={styles.cardFooter}>
-          <Text style={styles.categoryBadge}>{item.category || 'General'}</Text>
+          <View style={styles.classification}>
+            <Text style={styles.categoryBadge}>{item.MainCategory?.name || 'Unclassified'}</Text>
+            <Text style={styles.classificationDetail}>
+              {[item.Subcategory?.name, item.ProductForm?.name || item.dosage].filter(Boolean).join(' · ') || 'Classification needed'}
+            </Text>
+          </View>
           <View style={styles.stockContainer}>
             <Text style={[styles.stockText, isLowStock && styles.lowStockText]}>
               Stock: {item.totalQuantity}
@@ -111,6 +166,72 @@ export default function InventoryScreen() {
           onChangeText={setSearchQuery}
         />
       </View>
+      {taxonomyError ? <Text style={styles.taxonomyError}>{taxonomyError}</Text> : null}
+      <View style={styles.filterGroup}>
+        <Text style={styles.filterLabel}>Main category</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {[{ id: '', name: 'All' }, ...inventoryCategories].map((category) => (
+            <Pressable
+              key={String(category.id || 'all')}
+              accessibilityRole="button"
+              accessibilityLabel={`Main category: ${category.name}`}
+              style={[styles.filterChip, mainCategoryId === String(category.id) && styles.activeFilterChip]}
+              onPress={() => {
+                setMainCategoryId(String(category.id));
+                setSubcategoryId('');
+                setProductFormId('');
+              }}
+            >
+              <Text style={[styles.filterText, mainCategoryId === String(category.id) && styles.activeFilterText]}>
+                {category.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+      {selectedCategory ? (
+        <View style={styles.filterGroup}>
+          <Text style={styles.filterLabel}>Subcategory</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+            {[{ id: '', name: 'All' }, ...selectedCategory.subcategories].map((subcategory) => (
+              <Pressable
+                key={String(subcategory.id || 'all')}
+                accessibilityRole="button"
+                accessibilityLabel={`Subcategory: ${subcategory.name}`}
+                style={[styles.filterChip, subcategoryId === String(subcategory.id) && styles.activeFilterChip]}
+                onPress={() => {
+                  setSubcategoryId(String(subcategory.id));
+                  setProductFormId('');
+                }}
+              >
+                <Text style={[styles.filterText, subcategoryId === String(subcategory.id) && styles.activeFilterText]}>
+                  {subcategory.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+      {selectedSubcategory ? (
+        <View style={styles.filterGroup}>
+          <Text style={styles.filterLabel}>Product form</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+            {[{ id: '', name: 'All' }, ...selectedSubcategory.forms].map((form) => (
+              <Pressable
+                key={String(form.id || 'all')}
+                accessibilityRole="button"
+                accessibilityLabel={`Product form: ${form.name}`}
+                style={[styles.filterChip, productFormId === String(form.id) && styles.activeFilterChip]}
+                onPress={() => setProductFormId(String(form.id))}
+              >
+                <Text style={[styles.filterText, productFormId === String(form.id) && styles.activeFilterText]}>
+                  {form.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <FlatList
         data={filteredMedicines}
@@ -155,6 +276,47 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: '#0f172a',
+  },
+  taxonomyError: {
+    color: '#b91c1c',
+    marginHorizontal: 18,
+    marginBottom: 8,
+    fontSize: 12,
+  },
+  filterGroup: {
+    backgroundColor: 'transparent',
+    marginBottom: 6,
+  },
+  filterLabel: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 18,
+    marginBottom: 5,
+  },
+  filterRow: {
+    paddingHorizontal: 15,
+    gap: 7,
+  },
+  filterChip: {
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  activeFilterChip: {
+    backgroundColor: '#dbeafe',
+    borderColor: '#2563eb',
+  },
+  filterText: {
+    color: '#475569',
+    fontSize: 12,
+  },
+  activeFilterText: {
+    color: '#1d4ed8',
+    fontWeight: '600',
   },
   listContent: {
     paddingHorizontal: 15,
@@ -209,6 +371,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     color: '#475569',
     overflow: 'hidden',
+  },
+  classification: {
+    backgroundColor: 'transparent',
+    flexShrink: 1,
+  },
+  classificationDetail: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 3,
   },
   stockContainer: {
     flexDirection: 'row',

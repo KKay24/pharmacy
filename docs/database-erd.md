@@ -11,6 +11,10 @@ This diagram reflects Sequelize model associations and checked-in migrations in 
 ```mermaid
 erDiagram
     MEDICINES ||--o{ BATCHES : contains
+    INVENTORY_CATEGORIES o|--o{ INVENTORY_CATEGORIES : parent_of
+    INVENTORY_CATEGORIES o|--o{ MEDICINES : classifies_main
+    INVENTORY_CATEGORIES o|--o{ MEDICINES : classifies_subcategory
+    INVENTORY_CATEGORIES o|--o{ MEDICINES : classifies_form
     SUPPLIERS o|--o{ BATCHES : supplies
     MEDICINES o|--o{ SALES : sold_as
     BATCHES o|--o{ SALES : single_batch_reference
@@ -37,8 +41,14 @@ erDiagram
         string productKey UK
         string genericName
         string category
+        int mainCategoryId FK
+        int subcategoryId FK
+        int productFormId FK
+        string brandName
         string strength
         string dosage
+        string packSize
+        string unitOfMeasure
         string supplier
         string manufacturer
         boolean prescriptionRequired
@@ -46,6 +56,15 @@ erDiagram
         int lowStockThreshold
         text imageUrl
         int totalQuantity
+    }
+
+    INVENTORY_CATEGORIES {
+        int id PK
+        int parentId FK
+        string name
+        string slug
+        string path UK
+        int level
     }
 
     BATCHES {
@@ -160,7 +179,8 @@ erDiagram
 | Entity | Confirmed purpose and important details |
 |---|---|
 | `Users` | Staff account, hashed password, role (`admin`, `manager`, `user`), status, locations and password-change flag. |
-| `Medicines` | Product identity and catalog fields. `category` is a text field; no separate categories or subcategories table is present. `totalQuantity` is an aggregate maintained by inventory/sales logic. |
+| `Medicines` | Product identity/catalog fields, including references to main category, optional subcategory and optional product form. Legacy `category` and `dosage` text remain for compatibility; `totalQuantity` is maintained by inventory/sales logic. |
+| `InventoryCategories` | Seeded self-referencing taxonomy: level 1 main categories, level 2 subcategories and level 3 allowed product forms. `path` is unique and stable; migration seeding uses `findOrCreate`. |
 | `Batches` | Stock quantity and expiry/pricing/receiving details for one medicine. A unique index protects `(medicineId, batchNumber)`. |
 | `InventoryMovements` | Quantity delta and movement/reference metadata; optional medicine/batch association; optional client transaction ID for sync. |
 | `Sales` | Sale line/record with quantities, totals, costs, payment method, optional customer/product/batch references and optional client transaction ID. A sale drawing from multiple batches can have a null direct `batchId`; corresponding movements retain per-batch changes. |
@@ -178,6 +198,7 @@ erDiagram
 - `Batch.hasMany(Sales)` and `Sales.belongsTo(Batch)`. The sale's batch reference is nullable for legacy sales and multi-batch sales.
 - `Customer.hasMany(Sales)` and `Sales.belongsTo(Customer)`.
 - `Customer.hasMany(Prescription)` and `Prescription.belongsTo(Customer)`.
+- `InventoryCategory` self-references through `parentId`; medicines reference category nodes through three role-specific foreign keys. Service validation ensures selected nodes have the expected level and parent relationship.
 - `Medicine` and `Batch` each have many `InventoryMovements`; their movement references are nullable and configured to become null on deletion.
 - No ORM relationships are declared for `Users`, `Expenses` or `AuditLogs`. `AuditLogs.userId` is metadata, not a verified relational association.
 
@@ -186,12 +207,13 @@ erDiagram
 - Migrations are versioned in `pharmacy-backend/server/migrations`; the migration runner records applied versions.
 - Migration `009` adds medicine product identity, supporting indexes, batch uniqueness and movement history. Ambiguous legacy medicine identities are intentionally left for review rather than automatically merged.
 - Migration `010` adds sale idempotency indexing and movement client transaction identifiers.
+- Migration `011` creates and idempotently seeds `InventoryCategories`, adds indexed classification IDs and brand/pack/unit metadata to existing `Medicines`, and safely maps recognized legacy values without deleting legacy text or product/batch data.
 - Migration `007` adds `AuditLogs`.
 - A production migration must be reviewed against the existing PostgreSQL data and indexes before execution. See [Deployment](deployment.md) for operational cautions.
 
 ## Not modeled/verified
 
-- Product category hierarchy, subcategories or a separate category table.
+- A category-to-therapeutic-class join model or many-to-many classification; each medicine currently stores at most one subcategory and one product form.
 - Prescription line-item/medication tables or a prescription-to-sale fulfillment relation.
 - A sale header and sale-line table split; current `Sales` records are the observed sale persistence model.
 - A user-to-sale, user-to-movement or user-to-expense foreign-key relation.

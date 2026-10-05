@@ -34,12 +34,14 @@ Backend automated coverage includes:
 - Removed debug/seed routes are not exposed.
 - Admin creation is restricted to the controlled seed process.
 - Authenticated inventory fetch, batch receiving and sale creation.
+- Hierarchical taxonomy retrieval, allowed-form scoping, product creation with classification, ID/name inventory filtering and rejection of mismatched form/subcategory filters.
 
 Web automated coverage includes:
 
 - IndexedDB operations and offline data behavior.
 - Sync queue reconciliation/status behavior.
 - Sync status indicator rendering and user-visible states.
+- Dependent stock-entry category/subcategory/form selectors and inventory taxonomy, generic-name and brand filters.
 
 The inventory of test files may change; inspect the package before relying on this list.
 
@@ -50,14 +52,14 @@ The inventory of test files may change; inspect the package before relying on th
 | API routes | Authenticated/unauthenticated access, role/permission boundary, valid/invalid input, response/error shape, database effect and web/mobile caller compatibility. |
 | Models/migrations | Migration on a disposable database, idempotent rerun behavior where intended, relationship/constraint checks, index checks and preservation of existing data. |
 | Authentication | Valid/invalid credentials, expired/invalid token, suspended account, forced password change, password hashing and prohibited role changes. |
-| Inventory/products | Product identity match/ambiguity, unique product/batch behavior, receiving, stock aggregate, low-stock thresholds and movement records. |
+| Inventory/products | Product identity match/ambiguity, unique product/batch behavior, receiving, stock aggregate, low-stock thresholds and movement records. Validate main category requirement, subcategory/form parentage, dependent selector resets, generic/brand/supplier filters and safe legacy-data migration. |
 | Batches/expiry | Expiry date persistence and display, quantity across multiple batches, ordering used by sales, analytics warnings and retained references. Do not assume expiry-sale blocking unless code/tests implement it. |
 | Sales/POS | Cart payload, quantity/total validation, insufficient stock, batch deduction, movement creation, customer association, payment label and sale/movement transaction atomicity. |
 | Offline PWA/sync | Data available from cache, enqueue and persistence across reload, online retry, duplicate idempotency, permission failures, server stock conflicts, failed-operation visibility and queue removal only after success. |
 | Customers/prescriptions | Customer required/optional fields, list/search/detail/create, customer associations, prescription create/list/status validation and sensitive data handling. |
 | Reports/analytics | Empty and representative datasets, time windows, monthly totals, COGS/expenses, forecast input, stockout/expiry results, pagination and no sensitive-field leakage. |
 | UI components/pages | Loading/error/empty states, keyboard/accessible interactions where established, API failure messaging and role-based display. |
-| Mobile client | API URL resolution, SecureStore session behavior, login redirect, inventory loading, online POS success/error and `npm run typecheck`. |
+| Mobile client | API URL resolution, SecureStore session behavior, login redirect, inventory loading/search and category → subcategory → form filters, online POS success/error and `npm run typecheck`. |
 | Deployment/configuration | Production config checks, build output, CORS/proxy path, `/health`, PostgreSQL connectivity, migration rollout and client-to-backend connectivity. |
 
 ## 6. Manual acceptance scenarios
@@ -72,11 +74,13 @@ The inventory of test files may change; inspect the package before relying on th
 
 ### Receiving, inventory and expiry
 
-1. Create or select a product and receive a batch with a unique batch number, positive quantity, prices and expiry date.
-2. Confirm product/batch listing and movement history.
-3. Receive another batch for that product and verify aggregate quantity and low-stock calculations.
-4. Attempt duplicate product/batch inputs and verify the API returns the established validation/conflict behavior without duplicate or lost stock.
-5. Confirm expiry-risk analytics on controlled near-expiry stock; do not interpret that as proof of sale blocking.
+1. Choose a main category, verify the subcategory list is scoped to it, and verify product forms are scoped to the selected subcategory (for example, Baby Products must not offer medicine injections).
+2. Create a product with a main category and optional subcategory/form, then receive a batch with a unique batch number, positive quantity, prices and expiry date.
+3. Confirm product/batch listing, classification labels and movement history.
+4. Filter by main category → subcategory → form, generic name, brand, supplier, stock status and expiry status; verify changing a parent clears dependent selections.
+5. Receive another batch for that product and verify aggregate quantity and low-stock calculations.
+6. Attempt mismatched category/subcategory/form IDs and duplicate product/batch inputs; confirm validation/conflict behavior without duplicate or lost stock.
+7. Confirm expiry-risk analytics on controlled near-expiry stock; do not interpret that as proof of sale blocking.
 
 ### POS and server synchronization
 

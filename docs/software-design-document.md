@@ -56,9 +56,11 @@ The roles are `admin`, `manager` and `user`, with permissions defined centrally 
 
 ### 6.2 Product, receiving and stock control
 
-Medicines represent product identity/catalog metadata. Inventory batches belong to a medicine and carry their own quantities, expiry dates, cost and selling prices. `POST /api/inventory/batch` receives stock and creates stock movement records. The service normalizes product identity and uses database uniqueness/indexing to avoid silent product/batch duplication.
+Medicines represent product identity/catalog metadata. The `InventoryCategories` reference tree holds main categories, their subcategories and allowed product forms. A medicine stores nullable foreign keys for those three levels; the main category is required when creating a new product, while subcategory and form are optional. The inventory service validates level/parent relationships, and the authenticated `GET /api/inventory/categories` endpoint supplies the tree used by dependent web selectors. Existing `category`/`dosage` text values remain for compatibility and safe handling of older records.
 
-`GET /api/inventory/low-stock` compares batch-derived quantity with each product's threshold. `GET /api/inventory/:id/movements` returns recorded movement history. The medicine `category` field is a text label; categories and subcategories are not modeled as managed entities.
+Brand, strength, pack size and unit of measure are separate medicine metadata; batch-level cost/selling prices, expiry and quantity remain attached to `Batches`. `POST /api/inventory/batch` receives stock and creates stock movement records. The service normalizes product identity and uses database uniqueness/indexing to avoid silent product/batch duplication. Migration `011` seeds reference data idempotently, maps recognizable legacy values without deleting source text or stock, and indexes category references.
+
+`GET /api/inventory/low-stock` compares batch-derived quantity with each product's threshold. `GET /api/inventory/:id/movements` returns recorded movement history. Inventory listing supports category, subcategory and form IDs (or names), generic name, brand, supplier, stock status and expiry status. Repeated form names can match all valid taxonomy nodes unless scoped by a parent filter.
 
 ### 6.3 Sales
 
@@ -83,7 +85,7 @@ Current response shapes are not globally normalized:
 - Other operations can return raw arrays, individual model/resource records or endpoint-specific objects.
 - Not-found, validation, authentication and authorization failures use framework/service errors; an API-wide response schema has not been documented.
 
-There is no repository-verified OpenAPI specification. The concrete route/access listing is in [Architecture](architecture-diagram.md#api-and-access-matrix).
+There is no repository-verified OpenAPI specification. Taxonomy and inventory filter parameters are documented above; the concrete route/access listing is in [Architecture](architecture-diagram.md#api-and-access-matrix).
 
 ## 8. Persistence and consistency
 
@@ -113,7 +115,7 @@ The root Render blueprint configures backend/PostgreSQL resources; the web proje
 |---|---|
 | Shared API for web/mobile, inventory, receiving, POS, customers, suppliers and expenses | Implemented |
 | Batch expiry and stock movement persistence | Implemented |
-| Product category/subcategory hierarchy | Single text category only; subcategory management not implemented/verified |
+| Product category/subcategory/form hierarchy | Implemented through seeded reference data and medicine references; subcategory and form remain optional, and ambiguous legacy values remain unclassified |
 | Prescription record creation and status update | Implemented as a limited record workflow |
 | Prescription OCR/dispensing integration | Not currently documented/verified |
 | Web PWA local cache and queued sale/restock/adjustment sync | Implemented with server reconciliation |

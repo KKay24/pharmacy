@@ -48,7 +48,7 @@ export default function InventoryTable({
                 <tr>
                     <th style={{width:'40px'}}></th>
                     <th>Medicine Details</th>
-                    <th>Category</th>
+                    <th>Classification</th>
                     <th style={{width:'180px'}}>Inventory Status</th>
                     <th style={{width:'140px'}}>Current Price</th>
                     <th style={{width:'180px'}}>Shelf Status</th>
@@ -84,7 +84,12 @@ export default function InventoryTable({
                                     </div>
                                 </td>
                                 <td>
-                                    <span style={{fontSize:'0.85rem', color:'#475569', fontWeight:500}}>{med.category}</span>
+                                    <div style={{fontSize:'0.85rem', color:'#475569', fontWeight:600}}>
+                                        {med.MainCategory?.name || 'Unclassified'}
+                                    </div>
+                                    <div style={{fontSize:'0.72rem', color:'#64748b'}}>
+                                        {[med.Subcategory?.name, med.ProductForm?.name || med.dosage].filter(Boolean).join(' › ') || (med.category ? `Legacy label: ${med.category}` : 'Classification needed')}
+                                    </div>
                                 </td>
                                 <td>
                                     <div style={{display:'flex', flexDirection:'column', gap:'0.25rem'}}>

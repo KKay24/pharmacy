@@ -6,10 +6,10 @@ import { apiFetch, getApiErrorMessage } from "../utils/api";
 import toast from "react-hot-toast";
 
 export default function AddStockPage() {
-  const { fetchInventory, suppliers, inventory } = useContext(DataContext);
+  const { fetchInventory, suppliers, inventory, inventoryCategories, inventoryCategoriesError } = useContext(DataContext);
   
   const [items, setItems] = useState([
-    { id: Date.now(), name: "", genericName: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }
+    { id: Date.now(), name: "", genericName: "", brandName: "", strength: "", packSize: "", unitOfMeasure: "", mainCategoryId: "", subcategoryId: "", productFormId: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }
   ]);
   
   const [metadata, setMetadata] = useState({
@@ -36,6 +36,10 @@ export default function AddStockPage() {
         items: [{
            id: Date.now(),
            name: extractedData.productName || "Unknown Box",
+           mainCategoryId: extractedData.mainCategoryId,
+           subcategoryId: extractedData.subcategoryId || undefined,
+           productFormId: extractedData.productFormId || undefined,
+           dosage: extractedData.productFormName || undefined,
            sku: "AUTO-" + Math.floor(Math.random() * 1000),
            costPrice: "0",
            sellingPrice: "0",
@@ -79,7 +83,11 @@ export default function AddStockPage() {
     // Basic validation
     if (!metadata.supplierId) return toast.error("Please select a verified partner / supplier");
     
-    const validItems = items.filter(i => i.name && i.quantity > 0);
+    const namedItems = items.filter(i => i.name);
+    if (namedItems.some((item) => !item.mainCategoryId)) {
+      return toast.error("Select a main category for every product before saving");
+    }
+    const validItems = namedItems.filter(i => i.quantity > 0);
     if (validItems.length === 0) return toast.error("Please add at least one valid item");
 
     setIsSubmitting(true);
@@ -122,7 +130,7 @@ export default function AddStockPage() {
   };
 
   const handleCancel = () => {
-    setItems([{ id: Date.now(), name: "", genericName: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }]);
+    setItems([{ id: Date.now(), name: "", genericName: "", brandName: "", strength: "", packSize: "", unitOfMeasure: "", mainCategoryId: "", subcategoryId: "", productFormId: "", dosage: "", sku: "", costPrice: "", quantity: "", sellingPrice: "", expiryDate: "", batchNumber: "" }]);
     setMetadata({
       supplierId: "",
       invoiceNumber: "",
@@ -143,6 +151,8 @@ export default function AddStockPage() {
         suppliers={suppliers}
         isSubmitting={isSubmitting}
         inventory={inventory}
+        categories={inventoryCategories}
+        categoriesError={inventoryCategoriesError}
         onFastCapture={() => setShowCapture(true)}
       />
       
@@ -150,6 +160,7 @@ export default function AddStockPage() {
           <FastImageCapture 
               onSave={handleFastSave}
               onClose={() => setShowCapture(false)}
+              categories={inventoryCategories}
           />
       )}
     </>

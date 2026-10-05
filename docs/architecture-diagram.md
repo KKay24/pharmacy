@@ -46,7 +46,7 @@ Stock/invoice capture has browser OCR support using Tesseract.js and PDF.js. A p
 
 ### Mobile client
 
-`pharmacy-mobile/app` uses Expo Router. Current top-level routes include login and tabs for inventory, POS and profile. `api/client.ts` uses Axios and adds a bearer token retrieved from Expo SecureStore. `context/AuthContext.tsx` manages the mobile session. The repository does not confirm parity with the web client for all resource pages or offline queueing.
+`pharmacy-mobile/app` uses Expo Router. Current top-level routes include login and tabs for inventory, POS and profile. The inventory screen searches product and classification metadata and provides dependent main-category, subcategory and form filters from the API taxonomy. `api/client.ts` uses Axios and adds a bearer token retrieved from Expo SecureStore. `context/AuthContext.tsx` manages the mobile session. The repository does not confirm parity with the web client for all resource pages or offline queueing.
 
 ## 4. Backend architecture
 
@@ -60,7 +60,10 @@ Sequelize connects to PostgreSQL in production using `DATABASE_URL`. Production 
 
 Important data behavior:
 
-- Medicine records have one text `category`; there is no separate category/subcategory entity.
+- `InventoryCategories` is a seeded self-referencing taxonomy: level 1 is the main category, level 2 the subcategory and level 3 a product form scoped to its parent subcategory. Existing `Medicines` records reference the three levels directly; service validation enforces their hierarchy.
+- Main categories include Medicines, Medical Supplies, Personal Care, Baby Products, Vitamins & Supplements and Medical Devices. Medicine subcategories include Antibiotics, Pain & Fever and Dermatology; forms such as Tablet, Syrup and Cream are separate from main categories.
+- Legacy medicine `category` and `dosage` text remain for compatibility. Migration `011` maps known values only where safe; historic products without a safe mapping remain loadable with nullable taxonomy references.
+- Medicine product metadata includes generic/brand names, strength, pack size and unit of measure. Purchase/selling prices and expiry remain associated with batches.
 - A medicine can have multiple batches. Batch quantities are the underlying stock records.
 - Sales link to a medicine, optionally to a single batch (when one batch suffices) and optionally to a customer.
 - Sales spanning multiple batches retain a nullable single `batchId`; per-batch deductions are represented by `InventoryMovements`.
@@ -108,9 +111,15 @@ flowchart LR
     Deduct --> Movement
 ```
 
-The inventory API includes paginated medicine listing, low-stock listing, batch receiving, medicine creation/update/deletion and movement history. Batch receiving records batch-specific expiry date, quantity and pricing. The backend uses a normalized product identity and database uniqueness constraints to help prevent duplicate products/batches; legacy ambiguous medicine records are not silently merged.
+```mermaid
+flowchart TD
+    Main[Main category] --> Subcategory[Subcategory / therapeutic category]
+    Subcategory --> Form[Allowed product form]
+    Form --> Medicine[Existing Medicine product record]
+    Medicine --> Batch[Batch quantity, price and expiry]
+```
 
-The exact category value is a string on a medicine. No category management or subcategory route/entity was found.
+The authenticated `GET /api/inventory/categories` endpoint returns the seeded hierarchy for dependent web selectors. `GET /api/inventory` accepts main-category (`category`/`mainCategoryId`), subcategory (`subcategory`/`subcategoryId`), form (`form`/`productFormId`), generic-name, brand, supplier, stock-status and expiry-status filters. Batch receiving records batch-specific expiry date, quantity and pricing. The backend uses a normalized product identity and database uniqueness constraints to help prevent duplicate products/batches; legacy ambiguous medicine records are not silently merged.
 
 ## 8. Sales/POS workflow
 
@@ -181,6 +190,7 @@ All API paths below are rooted at the same host. Except `POST /api/auth/login`, 
 | `GET` | `/api/auth/me` | Current user | Authenticated |
 | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `/api/auth/users[/:id]`, `/api/auth/users/:id/status` | User management | Admin role and users permissions |
 | `GET`, `POST` | `/api/inventory` | List/create medicine | Inventory read/write permission |
+| `GET` | `/api/inventory/categories` | Main categories, subcategories and allowed forms | Inventory read permission |
 | `GET` | `/api/inventory/low-stock` | Low-stock products | Inventory read permission |
 | `GET` | `/api/inventory/:id/movements` | Movement history | Inventory read permission |
 | `POST` | `/api/inventory/batch` | Add stock batch | Inventory write permission |

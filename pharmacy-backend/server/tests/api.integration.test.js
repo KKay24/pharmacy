@@ -11,6 +11,20 @@ let childProcess;
 let baseUrl;
 let authToken;
 let createdSaleId;
+let inventoryTaxonomy = [];
+
+function taxonomyNode(path) {
+  const nodes = [];
+  const visit = (node) => {
+    nodes.push(node);
+    (node.subcategories || []).forEach(visit);
+    (node.forms || []).forEach(visit);
+  };
+  inventoryTaxonomy.forEach(visit);
+  const match = nodes.find((node) => node.path === path);
+  assert.ok(match, `Taxonomy node exists: ${path}`);
+  return match;
+}
 
 function getAvailablePort() {
   return new Promise((resolve, reject) => {
@@ -153,6 +167,110 @@ test('removed seed and debug endpoints are not available', async () => {
   }
 });
 
+test('inventory taxonomy is hierarchical and limits forms to the selected subcategory', async () => {
+  const response = await fetch(`${baseUrl}/api/inventory/categories`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  assert.equal(response.status, 200);
+  inventoryTaxonomy = await response.json();
+  const medicines = inventoryTaxonomy.find((category) => category.slug === 'medicines');
+  const babyProducts = inventoryTaxonomy.find((category) => category.slug === 'baby-products');
+  assert.ok(medicines.subcategories.some((subcategory) => subcategory.name === 'Antibiotics'));
+  assert.ok(medicines.subcategories.find((subcategory) => subcategory.name === 'Antibiotics')
+    .forms.some((form) => form.name === 'Syrup'));
+  assert.equal(babyProducts.subcategories.some((subcategory) =>
+    subcategory.forms.some((form) => form.name === 'Injection')
+  ), false);
+});
+
+test('new products save hierarchical classification and inventory filters use category IDs', async () => {
+  const headers = {
+    Authorization: `Bearer ${authToken}`,
+    'Content-Type': 'application/json',
+  };
+  const mainCategory = taxonomyNode('medicines');
+  const subcategory = taxonomyNode('medicines/antibiotics');
+  const form = taxonomyNode('medicines/antibiotics/syrup');
+  const createResponse = await fetch(`${baseUrl}/api/inventory`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: 'Taxonomy Integration Amoxicillin',
+      genericName: 'Amoxicillin',
+      brandName: 'Test Brand',
+      supplier: 'Test Supply',
+      strength: '125 mg/5 mL',
+      packSize: '100',
+      unitOfMeasure: 'mL',
+      mainCategoryId: mainCategory.id,
+      subcategoryId: subcategory.id,
+      productFormId: form.id,
+      batchNumber: 'TAXONOMY-001',
+      quantity: 12,
+      expiryDate: '2028-12-31',
+      costPrice: 2,
+      sellingPrice: 4,
+    }),
+  });
+  assert.equal(createResponse.status, 201);
+  const created = await createResponse.json();
+  assert.ok(created.id);
+
+  const filteredResponse = await fetch(
+    `${baseUrl}/api/inventory?category=${mainCategory.id}&subcategory=${subcategory.id}&form=${form.id}`,
+    { headers }
+  );
+  assert.equal(filteredResponse.status, 200);
+  const filtered = await filteredResponse.json();
+  const product = filtered.data.find((medicine) => medicine.id === created.id);
+  assert.ok(product);
+  assert.equal(product.MainCategory.id, mainCategory.id);
+  assert.equal(product.Subcategory.id, subcategory.id);
+  assert.equal(product.ProductForm.id, form.id);
+  assert.equal(product.brandName, 'Test Brand');
+
+  const formNameResponse = await fetch(
+    `${baseUrl}/api/inventory?form=${encodeURIComponent(form.name)}`,
+    { headers }
+  );
+  assert.equal(formNameResponse.status, 200);
+  const formNameFiltered = await formNameResponse.json();
+  assert.ok(formNameFiltered.data.some((medicine) => medicine.id === created.id));
+  assert.ok(formNameFiltered.data.some((medicine) => medicine.name === 'Vitamin C Syrup'));
+
+  const metadataFilteredResponse = await fetch(
+    `${baseUrl}/api/inventory?genericName=Amoxicillin&brand=Test%20Brand&supplier=Test%20Supply&stockStatus=in&expiryStatus=valid`,
+    { headers }
+  );
+  assert.equal(metadataFilteredResponse.status, 200);
+  const metadataFiltered = await metadataFilteredResponse.json();
+  assert.ok(metadataFiltered.data.some((medicine) => medicine.id === created.id));
+
+  const invalidFormResponse = await fetch(
+    `${baseUrl}/api/inventory?category=${mainCategory.id}&subcategory=${subcategory.id}&form=${taxonomyNode('medicines/pain-and-fever/tablet').id}`,
+    { headers }
+  );
+  assert.equal(invalidFormResponse.status, 400);
+
+  const missingMainCategoryResponse = await fetch(`${baseUrl}/api/inventory`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: 'Unclassified API Product' }),
+  });
+  assert.equal(missingMainCategoryResponse.status, 400);
+
+  const mismatchedSubcategoryResponse = await fetch(`${baseUrl}/api/inventory`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: 'Mismatched Taxonomy Product',
+      mainCategoryId: taxonomyNode('medicines').id,
+      subcategoryId: taxonomyNode('personal-care/skin-care').id,
+    }),
+  });
+  assert.equal(mismatchedSubcategoryResponse.status, 400);
+});
+
 test('admins cannot be created through the API', async () => {
   const response = await fetch(`${baseUrl}/api/auth/users`, {
     method: 'POST',
@@ -211,6 +329,9 @@ test('inventory batch can be imported with empty expiryDate and metadata', async
       items: [
         {
           name: 'Amoxicillin 500mg Batch Test',
+          mainCategoryId: taxonomyNode('medicines').id,
+          subcategoryId: taxonomyNode('medicines/antibiotics').id,
+          productFormId: taxonomyNode('medicines/antibiotics/capsule').id,
           quantity: 20,
           costPrice: '15.5',
           sellingPrice: '25.0',
@@ -325,7 +446,9 @@ test('predictive analytics expose forecasts, reorder suggestions, and risk signa
     body: JSON.stringify({
       name: 'Expiry Risk Demo',
       genericName: 'Forecast Test Item',
-      category: 'Diagnostics',
+      mainCategoryId: taxonomyNode('medical-devices').id,
+      subcategoryId: taxonomyNode('medical-devices/other').id,
+      productFormId: taxonomyNode('medical-devices/other/device').id,
       threshold: 5,
       batchNumber: 'EXP-TEST-001',
       quantity: 30,
@@ -396,6 +519,9 @@ test('inventory persists across refresh/login, rejects duplicate products, and p
   const product = {
     name: 'Persistence Test Paracetamol',
     genericName: 'Paracetamol',
+    mainCategoryId: taxonomyNode('medicines').id,
+    subcategoryId: taxonomyNode('medicines/pain-and-fever').id,
+    productFormId: taxonomyNode('medicines/pain-and-fever/tablet').id,
     strength: '500 mg',
     dosage: 'Tablet',
     manufacturer: 'Test Manufacturer',
@@ -655,4 +781,3 @@ test('sync endpoint processes offline operations, enforces idempotency, and dete
   const adjData = await adjRes.json();
   assert.equal(adjData.results[0].status, 'synced');
 });
-

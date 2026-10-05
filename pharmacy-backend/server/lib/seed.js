@@ -1,4 +1,4 @@
-const { Batch, Customer, Expense, Medicine, Prescription, Sales, Supplier } = require('../models');
+const { Batch, Customer, Expense, InventoryCategory, Medicine, Prescription, Sales, Supplier } = require('../models');
 
 async function seedSuppliers() {
   const count = await Supplier.count();
@@ -37,12 +37,28 @@ async function seedInventory() {
   }
 
   const firstSupplier = await Supplier.findOne({ order: [['id', 'ASC']] });
+  const taxonomyId = async (path) => {
+    const category = await InventoryCategory.findOne({ where: { path } });
+    if (!category) throw new Error(`Missing inventory taxonomy seed: ${path}`);
+    return category.id;
+  };
+  const medicinesCategoryId = await taxonomyId('medicines');
+  const painCategoryId = await taxonomyId('medicines/pain-and-fever');
+  const tabletFormId = await taxonomyId('medicines/pain-and-fever/tablet');
+  const antibioticsCategoryId = await taxonomyId('medicines/antibiotics');
+  const capsuleFormId = await taxonomyId('medicines/antibiotics/capsule');
+  const supplementsCategoryId = await taxonomyId('vitamins-supplements');
+  const vitaminsCategoryId = await taxonomyId('vitamins-supplements/vitamins');
+  const syrupFormId = await taxonomyId('vitamins-supplements/vitamins/syrup');
   const medicines = await Medicine.bulkCreate(
     [
       {
         name: 'Paracetamol',
         genericName: 'Acetaminophen',
-        category: 'Tablets',
+        category: 'Medicines',
+        mainCategoryId: medicinesCategoryId,
+        subcategoryId: painCategoryId,
+        productFormId: tabletFormId,
         strength: '500mg',
         dosage: 'Tablet',
         supplier: firstSupplier?.name || 'Internal',
@@ -53,7 +69,10 @@ async function seedInventory() {
       {
         name: 'Amoxicillin',
         genericName: 'Amoxicillin',
-        category: 'Antibiotics',
+        category: 'Medicines',
+        mainCategoryId: medicinesCategoryId,
+        subcategoryId: antibioticsCategoryId,
+        productFormId: capsuleFormId,
         strength: '250mg',
         dosage: 'Capsule',
         supplier: firstSupplier?.name || 'Internal',
@@ -64,7 +83,10 @@ async function seedInventory() {
       {
         name: 'Vitamin C Syrup',
         genericName: 'Ascorbic Acid',
-        category: 'Supplements',
+        category: 'Vitamins & Supplements',
+        mainCategoryId: supplementsCategoryId,
+        subcategoryId: vitaminsCategoryId,
+        productFormId: syrupFormId,
         strength: '100ml',
         dosage: 'Syrup',
         supplier: firstSupplier?.name || 'Internal',

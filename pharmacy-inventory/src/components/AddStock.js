@@ -26,6 +26,8 @@ export default function AddStock({
     onNext,
     onCancel,
     inventory,
+    categories = [],
+    categoriesError,
     suppliers = [],
     onFastCapture,
     isSubmitting = false,
@@ -48,6 +50,14 @@ export default function AddStock({
             id: Date.now(), 
             name: "", 
             genericName: "",
+            brandName: "",
+            strength: "",
+            packSize: "",
+            unitOfMeasure: "",
+            reorderLevel: "",
+            mainCategoryId: "",
+            subcategoryId: "",
+            productFormId: "",
             dosage: "",
             sku: "", 
             costPrice: "", 
@@ -64,7 +74,15 @@ export default function AddStock({
     };
 
     const updateItem = (id, field, value) => {
-        setItems(items.map(i => i.id === id ? { ...i, [field]: value } : i));
+        setItems(items.map(i => {
+            if (i.id !== id) return i;
+            return {
+                ...i,
+                [field]: value,
+                ...(field === "mainCategoryId" ? { subcategoryId: "", productFormId: "", dosage: "" } : {}),
+                ...(field === "subcategoryId" ? { productFormId: "", dosage: "" } : {}),
+            };
+        }));
     };
 
     // --- OCR & PDF Logic ---
@@ -230,6 +248,7 @@ export default function AddStock({
                         <h1>Add New Stock</h1>
                     </div>
                     <p>Enter details or scan invoice to add products.</p>
+                    {categoriesError && <p role="alert" style={{ color: "#b91c1c" }}>Category options could not be loaded: {categoriesError}. Refresh and try again.</p>}
                 </div>
                 
             </div>
@@ -323,6 +342,13 @@ export default function AddStock({
                                 {items.map((item, idx) => {
                                     const isInvalid = !item.name || !item.quantity || item.quantity === "0" || !item.costPrice || item.costPrice === "0";
                                     const productNameRows = Math.max(2, Math.min(5, Math.ceil((item.name || "").length / 24)));
+                                    const selectedCategory = categories.find((category) => String(category.id) === String(item.mainCategoryId));
+                                    const selectedSubcategory = selectedCategory?.subcategories.find(
+                                        (subcategory) => String(subcategory.id) === String(item.subcategoryId)
+                                    );
+                                    const selectedForm = selectedSubcategory?.forms.find(
+                                        (form) => String(form.id) === String(item.productFormId)
+                                    );
                                     return (
                                         <tr key={item.id} className={isInvalid ? "asm-row-invalid" : ""}>
                                             <td><input type="checkbox" /></td>
@@ -339,15 +365,32 @@ export default function AddStock({
                                                         onChange={e => updateItem(item.id, "name", e.target.value)}
                                                         onKeyDown={e => { if (e.key === "Enter") e.preventDefault(); }}
                                                     />
+                                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(130px, 1fr))", gap: "0.35rem", marginTop: "0.4rem" }}>
+                                                        <select className="asm-row-input" aria-label="Main category" required value={item.mainCategoryId || ""} onChange={e => updateItem(item.id, "mainCategoryId", e.target.value)}>
+                                                            <option value="">Main category *</option>
+                                                            {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                                                        </select>
+                                                        <select className="asm-row-input" aria-label="Subcategory" disabled={!selectedCategory} value={item.subcategoryId || ""} onChange={e => updateItem(item.id, "subcategoryId", e.target.value)}>
+                                                            <option value="">Subcategory (optional)</option>
+                                                            {selectedCategory?.subcategories.map(subcategory => <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>)}
+                                                        </select>
+                                                        <select className="asm-row-input" aria-label="Product form" disabled={!selectedSubcategory} value={item.productFormId || ""} onChange={e => {
+                                                            updateItem(item.id, "productFormId", e.target.value);
+                                                        }}>
+                                                            <option value="">Product form (optional)</option>
+                                                            {selectedSubcategory?.forms.map(form => <option key={form.id} value={form.id}>{form.name}</option>)}
+                                                        </select>
+                                                        <input className="asm-row-input" aria-label="Generic name" placeholder="Generic name" value={item.genericName || ""} onChange={e => updateItem(item.id, "genericName", e.target.value)} />
+                                                        <input className="asm-row-input" aria-label="Brand name" placeholder="Brand name" value={item.brandName || ""} onChange={e => updateItem(item.id, "brandName", e.target.value)} />
+                                                        <input className="asm-row-input" aria-label="Strength" placeholder="Strength" value={item.strength || ""} onChange={e => updateItem(item.id, "strength", e.target.value)} />
+                                                        <input className="asm-row-input" aria-label="Pack size" placeholder="Pack size" value={item.packSize || ""} onChange={e => updateItem(item.id, "packSize", e.target.value)} />
+                                                        <input className="asm-row-input" aria-label="Unit of measure" placeholder="Unit of measure" value={item.unitOfMeasure || ""} onChange={e => updateItem(item.id, "unitOfMeasure", e.target.value)} />
+                                                        <input className="asm-row-input" aria-label="Reorder level" placeholder="Reorder level" type="number" min="0" value={item.reorderLevel || ""} onChange={e => updateItem(item.id, "reorderLevel", e.target.value)} />
+                                                    </div>
                                                 </div>
                                             </td>
                                         <td>
-                                            <input
-                                                className="asm-row-input"
-                                                placeholder="Tablet"
-                                                value={item.dosage || ""}
-                                                onChange={e => updateItem(item.id, "dosage", e.target.value)}
-                                            />
+                                            <span>{selectedForm?.name || item.dosage || "—"}</span>
                                         </td>
                                         <td>
                                             {item.isExisting ? (
@@ -445,6 +488,11 @@ export default function AddStock({
                             <div key={item.id} style={{display:'flex', justifyContent:'space-between', paddingBottom:'0.5rem', borderBottom:'1px solid #f1f5f9'}}>
                                 <div>
                                     <div style={{fontWeight:700}}>{item.name}</div>
+                                    <div style={{fontSize:'0.8rem', color:'#64748b'}}>
+                                        {[categories.find(category => String(category.id) === String(item.mainCategoryId))?.name,
+                                          categories.flatMap(category => category.subcategories).find(subcategory => String(subcategory.id) === String(item.subcategoryId))?.name,
+                                          categories.flatMap(category => category.subcategories).flatMap(subcategory => subcategory.forms).find(form => String(form.id) === String(item.productFormId))?.name].filter(Boolean).join(' › ')}
+                                    </div>
                                     <div style={{fontSize:'0.8rem', color:'#64748b'}}>Qty: {item.quantity} | Batch: {item.batchNumber}</div>
                                 </div>
                                 <div style={{fontWeight:700}}>K{(parseFloat(item.costPrice || 0) * parseInt(item.quantity || 0)).toLocaleString()}</div>

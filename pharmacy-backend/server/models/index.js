@@ -9,10 +9,17 @@ const Expense = require('./Expense');
 const Supplier = require('./Supplier');
 const AuditLog = require('./AuditLog');
 const InventoryMovement = require('./InventoryMovement');
+const InventoryCategory = require('./InventoryCategory');
 
 // Associations
 Medicine.hasMany(Batch, { foreignKey: 'medicineId', onDelete: 'CASCADE' });
 Batch.belongsTo(Medicine, { foreignKey: 'medicineId' });
+
+InventoryCategory.hasMany(InventoryCategory, { as: 'Children', foreignKey: 'parentId' });
+InventoryCategory.belongsTo(InventoryCategory, { as: 'Parent', foreignKey: 'parentId' });
+Medicine.belongsTo(InventoryCategory, { as: 'MainCategory', foreignKey: 'mainCategoryId' });
+Medicine.belongsTo(InventoryCategory, { as: 'Subcategory', foreignKey: 'subcategoryId' });
+Medicine.belongsTo(InventoryCategory, { as: 'ProductForm', foreignKey: 'productFormId' });
 
 Batch.hasMany(Sales, { foreignKey: 'batchId' });
 Sales.belongsTo(Batch, { foreignKey: 'batchId' });
@@ -48,4 +55,5 @@ module.exports = {
   Supplier
   ,AuditLog
   ,InventoryMovement
+  ,InventoryCategory
 };

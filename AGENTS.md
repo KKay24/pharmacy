@@ -69,6 +69,9 @@ docs/                  Root project architecture, design, deployment and test do
 - PostgreSQL is the production database. Do not introduce SQLite-specific behavior or assumptions into production paths; SQLite is used for local/test configurations.
 - Preserve existing indexes and constraints, including product identity, batch uniqueness and offline idempotency indexes.
 - Keep inventory quantities and batch records consistent; stock changes must follow existing transaction and movement-history behavior.
+- Keep product classification in the existing `Medicines` records, using the `InventoryCategories` self-referencing hierarchy and the `mainCategoryId`, `subcategoryId` and `productFormId` references. Do not add a parallel product catalog or treat dosage forms as main categories.
+- Use `GET /api/inventory/categories` as the shared taxonomy source. Validate that a selected subcategory belongs to the selected main category and that a selected product form belongs to the selected subcategory. Preserve the distinction between the legacy `category`/`dosage` text and the new relation IDs.
+- Keep the taxonomy migration idempotent and non-destructive. Preserve legacy text and unrecognized products; do not guess mappings that could misclassify inventory. Maintain the supporting category/product indexes.
 - Never commit database URLs, usernames/passwords, dumps containing real data, or other credentials.
 - Do not add ORM associations or infer foreign keys based only on matching field names; document only relationships present in models/migrations.
 
@@ -89,6 +92,7 @@ docs/                  Root project architecture, design, deployment and test do
 - Preserve service-level validation and Nest/Express error behavior. Not all endpoints use one identical error or success envelope; do not standardize responses without checking every caller.
 - List endpoints using the shared pagination helper accept `page` and `limit` (defaults: page 1/25 rows, maximum 100) and return `{ data, pagination }`. Do not assume all routes are paginated.
 - Preserve the established batch, sale and sync payload shapes and `clientTransactionId` idempotency behavior. Update web/mobile callers and tests together when a contract changes.
+- Inventory listing supports `category`/`mainCategoryId`, `subcategory`/`subcategoryId`, `form`/`productFormId`, `genericName`, `brand`, `supplier`, `stockStatus` and `expiryStatus`; preserve ID-based selection and hierarchy validation when changing these filters.
 - Do not claim an endpoint is authenticated, role-restricted, paginated or permission-gated from UI behavior alone; verify its controller guards and service.
 
 ## Testing Rules
@@ -99,6 +103,7 @@ Add/update tests when changing:
 - **Database entities/migrations:** cover migration behavior against supported dialects where practical, constraints/relationships, upgrade safety and preservation of existing data.
 - **Authentication:** cover login, token validation/expiry, inactive users, password change and role/permission enforcement.
 - **Inventory:** cover batch quantities, duplicate/product identity behavior, movements, low-stock thresholds, expiry dates and concurrent-safe stock adjustments.
+- **Product taxonomy:** cover reference data, required main-category validation, invalid parent/form combinations, dependent-select reset behavior, repeated form-name filters across subcategories and safe retention/mapping of legacy product records.
 - **Sales:** cover quantity validation, stock insufficiency, batch deduction, totals, customer association, idempotent retries and sale/movement atomicity.
 - **Reports:** cover aggregation windows, empty data, dates, totals and sensitive-field exclusion.
 - **UI components:** cover user-visible states, loading/error/empty behavior, API contract interactions and offline/conflict behavior where relevant.

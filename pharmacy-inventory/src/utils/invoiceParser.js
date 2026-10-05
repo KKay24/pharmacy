@@ -162,6 +162,14 @@ const finalize = (buffer, fuse) => {
         quantity: Math.floor(parseFloat(qty.replace(/[^0-9.]/g, '') || 1)).toString(),
         expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         batchNumber: `AUTO-${Math.floor(Math.random() * 10000)}`,
-        category: match ? match.category : "Tablets"
+        mainCategoryId: match?.mainCategoryId || "",
+        subcategoryId: match?.subcategoryId || "",
+        productFormId: match?.productFormId || "",
+        genericName: match?.genericName || "",
+        brandName: match?.brandName || "",
+        strength: match?.strength || "",
+        packSize: match?.packSize || "",
+        unitOfMeasure: match?.unitOfMeasure || "",
+        dosage: match?.dosage || ""
     };
 };

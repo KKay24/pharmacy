@@ -25,7 +25,7 @@ const safeFormatDate = (dateString) => {
     return d.toISOString().split('T')[0];
 };
 
-export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
+export default function StockCardSidebar({ medicine, onClose, onUpdate, categories = [] }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editedData, setEditedData] = useState(null);
     const fileInputRef = useRef(null);
@@ -49,6 +49,20 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
 
     const totalQty = medicine.Batches ? medicine.Batches.reduce((acc, b) => acc + b.quantity, 0) : 0;
     const batches = medicine.Batches || [];
+    const selectedCategory = categories.find((category) =>
+        Number(category.id) === Number(editedData.mainCategoryId)
+    );
+    const selectedSubcategory = selectedCategory?.subcategories.find((subcategory) =>
+        Number(subcategory.id) === Number(editedData.subcategoryId)
+    );
+    const changeClassification = (field, value) => {
+        setEditedData((current) => ({
+            ...current,
+            [field]: value,
+            ...(field === 'mainCategoryId' ? { subcategoryId: '', productFormId: '' } : {}),
+            ...(field === 'subcategoryId' ? { productFormId: '' } : {}),
+        }));
+    };
 
     const handleSave = async () => {
         if (onUpdate) {
@@ -227,15 +241,55 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate }) {
                         <h3><Info size={16} color="var(--primary)" /> Product Metadata</h3>
                         <div className="inv-detail-grid">
                             <div className="inv-detail-item">
-                                <span className="inv-detail-label">Category</span>
+                                <span className="inv-detail-label">Main Category</span>
                                 {isEditing ? (
-                                    <input 
-                                        className="asm-input"
-                                        value={editedData.category || ""}
-                                        onChange={e => setEditedData({...editedData, category: e.target.value})}
-                                    />
+                                    <select className="asm-input" required value={editedData.mainCategoryId || ""} onChange={e => changeClassification('mainCategoryId', e.target.value)}>
+                                        <option value="">Select main category...</option>
+                                        {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                                    </select>
                                 ) : (
-                                    <span className="inv-detail-value">{medicine.category}</span>
+                                    <span className="inv-detail-value">{medicine.MainCategory?.name || medicine.category || 'Unclassified'}</span>
+                                )}
+                            </div>
+                            <div className="inv-detail-item">
+                                <span className="inv-detail-label">Subcategory</span>
+                                {isEditing ? (
+                                    <select className="asm-input" disabled={!selectedCategory} value={editedData.subcategoryId || ""} onChange={e => changeClassification('subcategoryId', e.target.value)}>
+                                        <option value="">Select subcategory...</option>
+                                        {selectedCategory?.subcategories.map(subcategory => <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>)}
+                                    </select>
+                                ) : (
+                                    <span className="inv-detail-value">{medicine.Subcategory?.name || '—'}</span>
+                                )}
+                            </div>
+                            <div className="inv-detail-item">
+                                <span className="inv-detail-label">Product Form</span>
+                                {isEditing ? (
+                                    <select className="asm-input" disabled={!selectedSubcategory} value={editedData.productFormId || ""} onChange={e => changeClassification('productFormId', e.target.value)}>
+                                        <option value="">Select product form...</option>
+                                        {selectedSubcategory?.forms.map(form => <option key={form.id} value={form.id}>{form.name}</option>)}
+                                    </select>
+                                ) : (
+                                    <span className="inv-detail-value">{medicine.ProductForm?.name || medicine.dosage || '—'}</span>
+                                )}
+                            </div>
+                            <div className="inv-detail-item">
+                                <span className="inv-detail-label">Brand Name</span>
+                                {isEditing ? (
+                                    <input className="asm-input" value={editedData.brandName || ""} onChange={e => setEditedData({...editedData, brandName: e.target.value})} />
+                                ) : (
+                                    <span className="inv-detail-value">{medicine.brandName || 'Not specified'}</span>
+                                )}
+                            </div>
+                            <div className="inv-detail-item">
+                                <span className="inv-detail-label">Pack Size / Unit</span>
+                                {isEditing ? (
+                                    <div style={{display:'flex', gap:'0.35rem'}}>
+                                        <input className="asm-input" aria-label="Pack size" placeholder="Pack size" value={editedData.packSize || ""} onChange={e => setEditedData({...editedData, packSize: e.target.value})} />
+                                        <input className="asm-input" aria-label="Unit of measure" placeholder="Unit" value={editedData.unitOfMeasure || ""} onChange={e => setEditedData({...editedData, unitOfMeasure: e.target.value})} />
+                                    </div>
+                                ) : (
+                                    <span className="inv-detail-value">{[medicine.packSize, medicine.unitOfMeasure].filter(Boolean).join(' ') || 'Not specified'}</span>
                                 )}
                             </div>
                             <div className="inv-detail-item">

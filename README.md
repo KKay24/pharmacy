@@ -16,8 +16,8 @@ The system centralizes pharmacy product and batch inventory, stock movements, po
 | Web PWA offline cache and sync queue | **Implemented** | The web client caches selected data in IndexedDB and submits queued sales, restocks and adjustments to `/api/sync`. |
 | Prescription records/status workflow | **Partially implemented** | The API stores and lists prescription records and updates status. A complete prescription fulfillment/e-prescribing workflow is not verified. |
 | Reports and analytics | **Partially implemented** | The API provides monthly profit/loss, forecast, reorder, stockout and expiry-risk data. Some daily-ledger reporting is calculated in the browser. |
-| Mobile application | **Partially implemented** | Expo includes login, inventory browsing, POS checkout, and profile tabs. It does not implement the web client's offline queue, and mobile checkout currently uses cash. |
-| Categories/subcategories | **Partially implemented** | Medicine has one free-text `category`; a separate category/subcategory model or API is not present. |
+| Mobile application | **Partially implemented** | Expo includes login, searchable inventory with hierarchical category filters, POS checkout and profile tabs. It does not implement the web client's offline queue, and mobile checkout currently uses cash. |
+| Product categories, subcategories and forms | **Implemented** | Product classification uses seeded main-category, subcategory and product-form references. New products require a main category; subcategory and form are optional, dependent selections. Legacy values are retained; unrecognized historical products can remain unclassified. |
 | Prescription OCR | **Not currently documented/verified** | OCR is present in web stock/invoice capture; a prescription OCR workflow was not confirmed. |
 | Approved future roadmap | **Not currently documented/verified** | No authoritative roadmap was found in the repository. |
 
@@ -25,7 +25,7 @@ This status describes repository code and configuration, not production availabi
 
 ## Features
 
-- Medicine catalog with generic name, category label, strength, dosage form, supplier/manufacturer labels, barcode, low-stock threshold and image URL.
+- Medicine catalog with hierarchical main category, subcategory and product form, generic/brand names, strength, pack size, unit of measure, supplier/manufacturer labels, barcode, reorder threshold and image URL.
 - Batch-level stock receiving with quantity, cost/selling prices, supplier reference, warehouse, invoice number, received date and expiry date.
 - Inventory movement history and low-stock queries.
 - Web POS with customer lookup/association, receipts, payment-method fields and offline queueing in the PWA.
@@ -34,7 +34,7 @@ This status describes repository code and configuration, not production availabi
 - Expense and supplier management.
 - Monthly profit/loss and sales/inventory risk analytics.
 - Administered staff accounts with `admin`, `manager` and `user` roles.
-- Expo mobile login, inventory view and online POS.
+- Expo mobile login, searchable/filterable inventory view and online POS.
 
 ## System overview and architecture
 
@@ -44,7 +44,7 @@ The workspace contains three related projects:
 2. **Web client** — `pharmacy-inventory`, a Create React App/React application with React Router, service-worker/PWA support, IndexedDB local data and a Vercel API proxy.
 3. **Mobile client** — `pharmacy-mobile`, a React Native/Expo application using Expo Router and the same backend API.
 
-The API is the source of truth for persisted operational data. Production database configuration requires PostgreSQL. SQLite is available for local development and tests. The web PWA's local data is a cache/queue, not a backup or authoritative ledger.
+The API is the source of truth for persisted operational data. Production database configuration requires PostgreSQL. SQLite is available for local development and tests. The web PWA's local data is a cache/queue, not a backup or authoritative ledger. Product classification is stored in the existing `Medicines` catalog using references to the seeded `InventoryCategories` hierarchy; it does not create a parallel product catalog.
 
 The separate `pharmacy-inventory/server` directory is identified in the existing project README as legacy; new API work belongs in `pharmacy-backend/server`.
 
@@ -54,9 +54,9 @@ The separate `pharmacy-inventory/server` directory is identified in the existing
 
 Users sign in at `POST /api/auth/login`. The API verifies the password, checks account status and returns a signed bearer token plus a serialized user. Protected requests send `Authorization: Bearer <ACCESS_TOKEN>`. The backend applies route-specific roles and permissions; web route restrictions are an additional UI layer, not a replacement for API authorization. The web client persists session data in browser local storage. The mobile client stores its session/token using Expo SecureStore.
 
-### Inventory and batches
+### Inventory, classification and batches
 
-Medicines are catalog records. Stock is held in batches linked to a medicine; the batch stores quantity and expiry date, among other receiving details. The API adds or updates batches and records stock movements. Medicine `category` is a single text value; category hierarchies/subcategories are not implemented in the current data model.
+Medicines are catalog records classified by main category, optional subcategory and optional product form. Forms such as Tablet, Syrup, Lotion and Syringe are not main categories. Web stock entry, product editing and inventory filters use the API taxonomy to present dependent selections. Product/batch receiving, expiry dates and stock movements continue to use the existing medicine and batch workflows. The migration keeps legacy category/dosage text and classifies recognized values where a safe mapping is available; unknown historic products remain loadable and may require classification.
 
 ### Sales/POS
 
@@ -218,6 +218,7 @@ The canonical API is rooted at `/api`; all routes except login and health requir
 
 - `/api/auth` — login, current user, password change and admin user management.
 - `/api/inventory` — medicines, batch receiving, low stock and per-medicine movements.
+- `/api/inventory/categories` — authenticated hierarchical product-category reference data. Inventory list filters accept `category`/`mainCategoryId`, `subcategory`/`subcategoryId`, and `form`/`productFormId`, along with generic name, brand, supplier, stock status and expiry status.
 - `/api/sales` — sale listing and sale creation.
 - `/api/customers`, `/api/prescriptions`, `/api/suppliers`, `/api/expenses` — operational records.
 - `/api/analytics` and `/api/reports` — profit/loss, forecasts, reorder suggestions and risk reports.
@@ -228,7 +229,7 @@ Some list endpoints return `{ data, pagination }` with `page` and `limit` query 
 
 ## Testing
 
-Automated tests currently cover backend API integration/configuration and web IndexedDB/synchronization/status-indicator behavior. There is no mobile test script. See [Test Plan](docs/test-plan.md) for the existing suite and the regression checks expected for future changes.
+Automated tests cover backend API integration/configuration, including taxonomy retrieval, product classification and filters; web tests cover IndexedDB/synchronization/status-indicator behavior and dependent taxonomy selection/filtering. There is no mobile test script. See [Test Plan](docs/test-plan.md) for the current suite and regression checks.
 
 ## Deployment overview
 
@@ -260,4 +261,4 @@ Read [AGENTS.md](AGENTS.md) before asking an AI coding agent to change the repos
 
 ## Future roadmap
 
-No approved roadmap was found in the repository. The status table above records confirmed gaps rather than promising future features. Potential work such as explicit product subcategories, a fuller prescription workflow, expanded mobile capabilities and additional tests requires product-owner confirmation before being treated as planned.
+No approved roadmap was found in the repository. The status table above records confirmed gaps rather than promising future features. Potential work such as a fuller prescription workflow, expanded mobile capabilities and additional tests requires product-owner confirmation before being treated as planned.

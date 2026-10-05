@@ -7,8 +7,9 @@ const {
   NotFoundException,
 } = require('@nestjs/common');
 const { Op, UniqueConstraintError } = require('sequelize');
-const { Batch, InventoryMovement, Medicine, sequelize } = require('../../models');
+const { Batch, InventoryCategory, InventoryMovement, Medicine, sequelize } = require('../../models');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
+const { taxonomySlug } = require('../../lib/inventory-taxonomy');
 const {
   buildProductKey,
   hasProductIdentityDetails,
@@ -17,8 +18,9 @@ const {
 } = require('./product-identity');
 
 const MEDICINE_UPDATE_FIELDS = [
-  'name', 'genericName', 'category', 'dosage', 'strength', 'supplier',
+  'name', 'genericName', 'brandName', 'category', 'dosage', 'strength', 'supplier',
   'manufacturer', 'barcode', 'imageUrl', 'lowStockThreshold', 'prescriptionRequired',
+  'packSize', 'unitOfMeasure',
 ];
 
 function sanitizeDate(value, defaultDate) {
@@ -85,13 +87,16 @@ function medicineAttributes(body = {}) {
     category: cleanText(body.category),
     dosage: cleanText(body.dosage),
     strength: cleanText(body.strength),
+    brandName: cleanText(body.brandName),
+    packSize: cleanText(body.packSize),
+    unitOfMeasure: cleanText(body.unitOfMeasure),
     supplier: cleanText(body.supplier),
     manufacturer: cleanText(body.manufacturer),
     barcode: cleanText(body.barcode) || cleanText(body.sku),
     imageUrl: cleanText(body.imageUrl),
-    lowStockThreshold: body.threshold === undefined
+    lowStockThreshold: body.lowStockThreshold === undefined && body.reorderLevel === undefined && body.threshold === undefined
       ? 10
-      : parseNonNegativeWholeNumber(body.threshold, 'Low-stock threshold'),
+      : parseNonNegativeWholeNumber(body.lowStockThreshold ?? body.reorderLevel ?? body.threshold, 'Low-stock threshold'),
     totalQuantity: 0,
   };
 }
@@ -136,11 +141,243 @@ function rethrowPersistenceError(error, fallbackMessage) {
 }
 
 class InventoryService {
+  async categories() {
+    const rows = await InventoryCategory.findAll({
+      order: [['level', 'ASC'], ['name', 'ASC'], ['id', 'ASC']],
+    });
+    const nodes = new Map(rows.map((row) => [Number(row.id), {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      path: row.path,
+      level: row.level,
+      subcategories: [],
+      forms: [],
+    }]));
+    const categories = [];
+
+    for (const row of rows) {
+      const node = nodes.get(Number(row.id));
+      if (row.level === 1) {
+        categories.push(node);
+      } else {
+        const parent = nodes.get(Number(row.parentId));
+        if (parent) {
+          if (row.level === 2) parent.subcategories.push(node);
+          else if (row.level === 3) parent.forms.push(node);
+        }
+      }
+    }
+
+    return categories;
+  }
+
+  async findCategory(value, { level, parentId, transaction } = {}) {
+    if (value === undefined || value === null || value === '') return null;
+    const numericId = Number(value);
+    const where = { level };
+    if (parentId !== undefined) where.parentId = parentId;
+    if (Number.isInteger(numericId) && numericId > 0) where.id = numericId;
+    else {
+      const text = cleanText(value);
+      where[Op.or] = [
+        { slug: taxonomySlug(text) },
+        { name: text },
+      ];
+    }
+    return InventoryCategory.findOne({ where, transaction });
+  }
+
+  async findCategories(value, { level, parentIds, transaction } = {}) {
+    const numericId = Number(value);
+    const where = { level };
+    if (Array.isArray(parentIds)) where.parentId = { [Op.in]: parentIds };
+    if (Number.isInteger(numericId) && numericId > 0) where.id = numericId;
+    else {
+      const text = cleanText(value);
+      where[Op.or] = [
+        { slug: taxonomySlug(text) },
+        { name: text },
+      ];
+    }
+    return InventoryCategory.findAll({ where, order: [['id', 'ASC']], transaction });
+  }
+
+  async resolveClassification(payload = {}, transaction, { required = false } = {}) {
+    const rawMain = payload.mainCategoryId ?? payload.categoryId ?? payload.category;
+    const hasMain = rawMain !== undefined && rawMain !== null && rawMain !== '';
+    if (!hasMain) {
+      if (required) throw new BadRequestException('Main category is required');
+      return {};
+    }
+
+    const mainCategory = await this.findCategory(rawMain, { level: 1, transaction });
+    if (!mainCategory) throw new BadRequestException('Invalid main category');
+
+    const rawSubcategory = payload.subcategoryId ?? payload.subcategory;
+    const hasSubcategory = rawSubcategory !== undefined && rawSubcategory !== null && rawSubcategory !== '';
+    let subcategory = null;
+    if (hasSubcategory) {
+      subcategory = await this.findCategory(rawSubcategory, {
+        level: 2,
+        parentId: mainCategory.id,
+        transaction,
+      });
+      if (!subcategory) throw new BadRequestException('Subcategory does not belong to the selected main category');
+    }
+
+    const rawForm = payload.productFormId ?? payload.formId ?? payload.form ?? payload.dosage;
+    const hasForm = rawForm !== undefined && rawForm !== null && rawForm !== '';
+    let productForm = null;
+    if (hasForm) {
+      if (!subcategory) throw new BadRequestException('Select a subcategory before selecting a product form');
+      productForm = await this.findCategory(rawForm, {
+        level: 3,
+        parentId: subcategory.id,
+        transaction,
+      });
+      if (!productForm) throw new BadRequestException('Product form is not available for the selected subcategory');
+    }
+
+    return {
+      mainCategoryId: mainCategory.id,
+      subcategoryId: subcategory?.id || null,
+      productFormId: productForm?.id || null,
+      category: mainCategory.name,
+      dosage: productForm?.name || null,
+    };
+  }
+
   async list(query) {
     const pagination = parsePagination(query);
+    const where = {};
+    const mainValue = query.mainCategoryId ?? query.category;
+    const subcategoryValue = query.subcategoryId ?? query.subcategory;
+    const formValue = query.productFormId ?? query.form;
+    let selectedSubcategoryIds = null;
+
+    if (mainValue) {
+      const category = await this.findCategory(mainValue, { level: 1 });
+      if (!category) throw new BadRequestException('Invalid main category filter');
+      where.mainCategoryId = category.id;
+    }
+    if (subcategoryValue) {
+      const subcategories = await this.findCategories(subcategoryValue, {
+        level: 2,
+        parentIds: where.mainCategoryId ? [where.mainCategoryId] : undefined,
+      });
+      if (subcategories.length === 0) throw new BadRequestException('Invalid subcategory filter');
+      selectedSubcategoryIds = subcategories.map((subcategory) => subcategory.id);
+      where.subcategoryId = selectedSubcategoryIds.length === 1
+        ? selectedSubcategoryIds[0]
+        : { [Op.in]: selectedSubcategoryIds };
+    }
+    if (formValue) {
+      let parentIds = selectedSubcategoryIds;
+      if (!parentIds && where.mainCategoryId) {
+        const subcategories = await InventoryCategory.findAll({
+          where: { level: 2, parentId: where.mainCategoryId },
+          attributes: ['id'],
+        });
+        parentIds = subcategories.map((subcategory) => subcategory.id);
+      }
+      const forms = await this.findCategories(formValue, {
+        level: 3,
+        parentIds,
+      });
+      if (forms.length === 0) throw new BadRequestException('Invalid product form filter');
+      where.productFormId = forms.length === 1
+        ? forms[0].id
+        : { [Op.in]: forms.map((form) => form.id) };
+    }
+    for (const [queryField, modelField] of [
+      ['genericName', 'genericName'],
+      ['brand', 'brandName'],
+      ['supplier', 'supplier'],
+    ]) {
+      const value = cleanText(query[queryField]);
+      if (value) where[modelField] = { [Op.like]: `%${value}%` };
+    }
+    const search = cleanText(query.search);
+    if (search) {
+      where[Op.and] = [
+        ...(where[Op.and] || []),
+        {
+          [Op.or]: [
+            { name: { [Op.like]: `%${search}%` } },
+            { genericName: { [Op.like]: `%${search}%` } },
+            { brandName: { [Op.like]: `%${search}%` } },
+            { barcode: { [Op.like]: `%${search}%` } },
+          ],
+        },
+      ];
+    }
+
+    let filterIds = null;
+    if (query.stockStatus || query.expiryStatus) {
+      const candidates = await Medicine.findAll({
+        where,
+        attributes: ['id', 'lowStockThreshold'],
+        raw: true,
+      });
+      filterIds = new Set(candidates.map((medicine) => Number(medicine.id)));
+      if (query.stockStatus) {
+        const quantities = await Batch.findAll({
+          attributes: ['medicineId', [sequelize.fn('SUM', sequelize.col('quantity')), 'quantity']],
+          where: { medicineId: [...filterIds] },
+          group: ['medicineId'],
+          raw: true,
+        });
+        const totals = new Map(quantities.map((row) => [Number(row.medicineId), Number(row.quantity || 0)]));
+        const status = String(query.stockStatus).toLowerCase();
+        if (!['low', 'out', 'in'].includes(status)) {
+          throw new BadRequestException('Invalid stock status filter');
+        }
+        const allowed = new Set(candidates.filter((medicine) => {
+          const quantity = totals.get(Number(medicine.id)) || 0;
+          const threshold = Number(medicine.lowStockThreshold || 10);
+          if (status === 'out') return quantity === 0;
+          if (status === 'low') return quantity > 0 && quantity <= threshold;
+          return quantity > threshold;
+        }).map((medicine) => Number(medicine.id)));
+        filterIds = new Set([...filterIds].filter((id) => allowed.has(id)));
+      }
+      if (query.expiryStatus) {
+        const status = String(query.expiryStatus).toLowerCase();
+        if (!['expired', 'near-expiry', 'valid'].includes(status)) {
+          throw new BadRequestException('Invalid expiry status filter');
+        }
+        const today = getTodayDate();
+        const warningDate = new Date();
+        warningDate.setDate(warningDate.getDate() + 30);
+        const expiryWhere = { quantity: { [Op.gt]: 0 } };
+        if (status === 'expired') expiryWhere.expiryDate = { [Op.lt]: today };
+        else if (status === 'near-expiry') {
+          expiryWhere.expiryDate = { [Op.gte]: today, [Op.lte]: warningDate.toISOString().slice(0, 10) };
+        } else {
+          expiryWhere.expiryDate = { [Op.gt]: warningDate.toISOString().slice(0, 10) };
+        }
+        const batches = await Batch.findAll({
+          where: expiryWhere,
+          attributes: ['medicineId'],
+          group: ['medicineId'],
+          raw: true,
+        });
+        const expiryIds = new Set(batches.map((batch) => Number(batch.medicineId)));
+        filterIds = new Set([...filterIds].filter((id) => expiryIds.has(id)));
+      }
+      where.id = { [Op.in]: [...filterIds] };
+    }
+
     const result = await Medicine.findAndCountAll({
+      where,
       order: [['name', 'ASC']],
-      include: [{ model: Batch }],
+      include: [
+        { model: Batch },
+        { model: InventoryCategory, as: 'MainCategory', attributes: ['id', 'name', 'slug', 'path'] },
+        { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug', 'path'] },
+        { model: InventoryCategory, as: 'ProductForm', attributes: ['id', 'name', 'slug', 'path'] },
+      ],
       distinct: true,
       limit: pagination.limit,
       offset: pagination.offset,
@@ -273,12 +510,25 @@ class InventoryService {
 
       for (const item of items) {
         const attributes = medicineAttributes({ ...item, supplier: shared.supplier || item.supplier });
+        const existingMedicine = await this.findMedicineByIdentity(attributes, transaction);
+        const classification = await this.resolveClassification(item, transaction, { required: !existingMedicine });
+        if (classification.dosage) attributes.dosage = classification.dosage;
         let medicine = await this.findMedicineByIdentity(attributes, transaction);
         if (!medicine) {
           medicine = await Medicine.create({
             ...attributes,
+            ...classification,
             productKey: buildProductKey(attributes),
           }, { transaction });
+        } else if (classification.mainCategoryId) {
+          if (medicine.mainCategoryId && (
+            Number(medicine.mainCategoryId) !== Number(classification.mainCategoryId) ||
+            (classification.subcategoryId && Number(medicine.subcategoryId) !== Number(classification.subcategoryId)) ||
+            (classification.productFormId && Number(medicine.productFormId) !== Number(classification.productFormId))
+          )) {
+            throw new ConflictException('Product classification differs from the existing product. Update the product before receiving stock.');
+          }
+          if (!medicine.mainCategoryId) await medicine.update(classification, { transaction });
         }
 
         const batch = await this.createBatchForMedicine(medicine, item, shared, transaction);
@@ -297,6 +547,9 @@ class InventoryService {
     const transaction = await sequelize.transaction();
     try {
       const attributes = medicineAttributes(body);
+      const existingMedicine = await this.findMedicineByIdentity(attributes, transaction);
+      const classification = await this.resolveClassification(body, transaction, { required: !existingMedicine });
+      if (classification.dosage) attributes.dosage = classification.dosage;
       let medicine = await this.findMedicineByIdentity(attributes, transaction);
       const receivedWithBatch = hasBatchPayload(body);
 
@@ -304,8 +557,11 @@ class InventoryService {
       if (!medicine) {
         medicine = await Medicine.create({
           ...attributes,
+          ...classification,
           productKey: buildProductKey(attributes),
         }, { transaction });
+      } else if (classification.mainCategoryId && !medicine.mainCategoryId) {
+        await medicine.update(classification, { transaction });
       }
       if (receivedWithBatch) await this.createBatchForMedicine(medicine, body, body, transaction);
 
@@ -324,15 +580,44 @@ class InventoryService {
       if (!medicine) throw new NotFoundException('Medicine not found');
 
       const mergedAttributes = updateAttributes(body, medicine);
-      const matchingMedicine = await this.findMedicineByIdentity(mergedAttributes, transaction, medicine.id);
+      const classificationWasSubmitted = [
+        body.mainCategoryId,
+        body.categoryId,
+        body.subcategoryId,
+        body.subcategory,
+        body.productFormId,
+        body.formId,
+        body.form,
+      ].some((value) => value !== undefined && value !== null && value !== '');
+      let classification = {};
+      if (classificationWasSubmitted) {
+        classification = await this.resolveClassification({
+          mainCategoryId: body.mainCategoryId ?? body.categoryId ?? medicine.mainCategoryId,
+          subcategoryId: body.subcategoryId ?? medicine.subcategoryId,
+          productFormId: body.productFormId ?? body.formId ?? body.form ?? medicine.productFormId,
+        }, transaction, { required: true });
+      }
+      const identityAttributes = classificationWasSubmitted
+        ? { ...mergedAttributes, dosage: classification.dosage }
+        : mergedAttributes;
+      const matchingMedicine = await this.findMedicineByIdentity(identityAttributes, transaction, medicine.id);
       if (matchingMedicine) throw new ConflictException('This medicine already exists.');
 
       const changes = {};
       for (const field of MEDICINE_UPDATE_FIELDS) {
         if (body[field] !== undefined) changes[field] = mergedAttributes[field];
       }
+      if (classificationWasSubmitted) {
+        Object.assign(changes, {
+          mainCategoryId: classification.mainCategoryId,
+          subcategoryId: classification.subcategoryId,
+          productFormId: classification.productFormId,
+          category: classification.category,
+          dosage: classification.dosage,
+        });
+      }
       if (Object.keys(changes).length > 0) {
-        changes.productKey = buildProductKey(mergedAttributes);
+        changes.productKey = buildProductKey(identityAttributes);
         await medicine.update(changes, { transaction });
       }
 
