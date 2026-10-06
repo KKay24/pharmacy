@@ -99,6 +99,26 @@ test("stock entry scopes subcategories and product forms to the selected categor
   expect(form).toBeDisabled();
 });
 
+test("stock table keeps row fields aligned and product details in a full-width detail row", () => {
+  render(<AddStockHarness />);
+
+  const table = screen.getByRole("table");
+  const headers = Array.from(table.querySelectorAll("thead th"));
+  const productRow = table.querySelector(".asm-product-row");
+  const detailsRow = table.querySelector(".asm-product-details-row");
+  const status = screen.getByText("⚠ New item");
+  const statusColumn = headers.findIndex(header => header.textContent === "Status");
+
+  expect(headers).toHaveLength(11);
+  expect(productRow.cells).toHaveLength(headers.length);
+  expect(productRow.cells[statusColumn]).toContainElement(status);
+  expect(detailsRow.cells[0]).toHaveAttribute("colspan", "11");
+  expect(screen.getByRole("textbox", { name: "Product name" }).closest("td")).toBe(productRow.cells[1]);
+  expect(screen.getByRole("spinbutton", { name: "Purchase cost" }).closest("label")).toHaveClass("asm-currency-input");
+  expect(screen.getByRole("spinbutton", { name: "Current price" }).closest("label")).toHaveClass("asm-currency-input");
+  expect(screen.getByRole("spinbutton", { name: "Quantity" })).toHaveClass("asm-quantity-input");
+});
+
 test("inventory filters cascade through taxonomy and filter generic name and brand", () => {
   const inventory = [
     {
@@ -139,6 +159,18 @@ test("inventory filters cascade through taxonomy and filter generic name and bra
       <InventoryPage />
     </DataContext.Provider>
   );
+
+  const exportButton = screen.getByRole("button", { name: /Export Data/ });
+  const addStockButton = screen.getByRole("button", { name: /Add New Stock/ });
+  expect(exportButton).toBeDisabled();
+  expect(exportButton.closest(".inv-health-row")).toBeTruthy();
+  expect(addStockButton.closest(".inv-health-row")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "All Inventory" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Low Stock Items" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Expired Batches" })).not.toBeInTheDocument();
+  const inventorySearch = screen.getByRole("textbox", { name: "Search inventory" });
+  expect(inventorySearch.closest(".inv-inventory-filters")).toBeTruthy();
+  expect(inventorySearch.closest(".inv-inventory-filters").lastElementChild).toBe(inventorySearch.parentElement);
 
   fireEvent.change(screen.getByRole("combobox", { name: "Filter main category" }), { target: { value: "1" } });
   fireEvent.change(screen.getByRole("combobox", { name: "Filter subcategory" }), { target: { value: "11" } });

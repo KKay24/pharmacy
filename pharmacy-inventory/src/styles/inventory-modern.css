@@ -11,47 +11,89 @@
 /* Stock Health Header */
 .inv-health-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
 }
 
 .inv-health-card {
   background: white;
-  padding: 1.25rem;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 71px;
+  padding: 1rem 0.75rem;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  gap: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.inv-health-actions-card {
+  grid-column: span 2;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 71px;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.inv-health-actions-card .asm-btn {
+  min-width: 0;
+  flex: 1;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .inv-health-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.inv-health-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
 .inv-health-copy {
   display: flex;
   flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
 }
 
 .inv-health-label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
+  white-space: nowrap;
 }
 
 .inv-health-value {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #1e293b;
+  line-height: 1.1;
+}
+
+@media (max-width: 600px) {
+  .inv-health-actions-card {
+    grid-column: span 1;
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* Status Indicators */
@@ -78,30 +120,34 @@
   gap: 1rem;
 }
 
-.inv-tabs {
+.inv-inventory-filters {
   display: flex;
-  gap: 0.5rem;
-  background: white;
-  padding: 0.35rem;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
-.inv-tab {
-  padding: 0.6rem 1rem;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: #64748b;
-  font-weight: 600;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
+.inv-search-field {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 470px;
+  min-width: min(100%, 260px);
+  margin-left: auto;
 }
 
-.inv-tab.active {
-  background: var(--primary);
-  color: white;
+.inv-search-field > svg {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  color: #94a3b8;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.inv-search-field .asm-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding-left: 38px;
 }
 
 /* Main Table Panel */

@@ -313,15 +313,15 @@ export default function AddStock({
                             <colgroup>
                                 <col style={{ width: 40 }} />
                                 <col className="asm-product-column" />
-                                <col style={{ width: 92 }} />
-                                <col style={{ width: 112 }} />
-                                <col style={{ width: 92 }} />
+                                <col style={{ width: 140 }} />
+                                <col style={{ width: 120 }} />
+                                <col style={{ width: 110 }} />
                                 <col style={{ width: 150 }} />
-                                <col style={{ width: 118 }} />
-                                <col style={{ width: 118 }} />
-                                <col style={{ width: 88 }} />
-                                <col style={{ width: 108 }} />
-                                <col style={{ width: 48 }} />
+                                <col style={{ width: 145 }} />
+                                <col style={{ width: 145 }} />
+                                <col style={{ width: 110 }} />
+                                <col style={{ width: 130 }} />
+                                <col style={{ width: 64 }} />
                             </colgroup>
                             <thead>
                                 <tr>
@@ -339,9 +339,8 @@ export default function AddStock({
                                 </tr>
                             </thead>
                             <tbody>
-                                {items.map((item, idx) => {
+                                {items.map((item) => {
                                     const isInvalid = !item.name || !item.quantity || item.quantity === "0" || !item.costPrice || item.costPrice === "0";
-                                    const productNameRows = Math.max(2, Math.min(5, Math.ceil((item.name || "").length / 24)));
                                     const selectedCategory = categories.find((category) => String(category.id) === String(item.mainCategoryId));
                                     const selectedSubcategory = selectedCategory?.subcategories.find(
                                         (subcategory) => String(subcategory.id) === String(item.subcategoryId)
@@ -350,35 +349,118 @@ export default function AddStock({
                                         (form) => String(form.id) === String(item.productFormId)
                                     );
                                     return (
-                                        <tr key={item.id} className={isInvalid ? "asm-row-invalid" : ""}>
-                                            <td><input type="checkbox" /></td>
-                                            <td className="asm-product-column asm-product-cell">
-                                                <div className="asm-product-entry">
-                                                    <div className="asm-product-icon">
-                                                        <Package size={16} color="#94a3b8" />
+                                        <React.Fragment key={item.id}>
+                                            <tr className={`asm-product-row${isInvalid ? " asm-row-invalid" : ""}`}>
+                                                <td><input type="checkbox" /></td>
+                                                <td className="asm-product-column asm-product-cell">
+                                                    <div className="asm-product-entry">
+                                                        <div className="asm-product-icon">
+                                                            <Package size={16} color="#94a3b8" />
+                                                        </div>
+                                                        <input
+                                                            className="asm-product-input"
+                                                            type="text"
+                                                            aria-label="Product name"
+                                                            placeholder="Product name"
+                                                            value={item.name}
+                                                            onChange={e => updateItem(item.id, "name", e.target.value)}
+                                                        />
                                                     </div>
-                                                    <textarea
-                                                        className="asm-product-input"
-                                                        placeholder="Search or enter product..."
-                                                        rows={productNameRows}
-                                                        value={item.name}
-                                                        onChange={e => updateItem(item.id, "name", e.target.value)}
-                                                        onKeyDown={e => { if (e.key === "Enter") e.preventDefault(); }}
+                                                </td>
+                                                <td>
+                                                    <select
+                                                        className="asm-row-input asm-select-input"
+                                                        aria-label="Product form"
+                                                        disabled={!selectedSubcategory}
+                                                        value={item.productFormId || ""}
+                                                        onChange={e => updateItem(item.id, "productFormId", e.target.value)}
+                                                    >
+                                                        <option value="">{selectedForm?.name || item.dosage || "Select form"}</option>
+                                                        {selectedSubcategory?.forms.map(form => (
+                                                            <option key={form.id} value={form.id}>{form.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                                <td className="asm-status-cell">
+                                                    {item.isExisting ? (
+                                                        <span className="asm-status-badge asm-status-matched">Matched</span>
+                                                    ) : (
+                                                        <span className="asm-status-badge asm-status-new">⚠ New item</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        className="asm-row-input"
+                                                        aria-label="SKU"
+                                                        placeholder="P-00X"
+                                                        value={item.sku}
+                                                        onChange={e => updateItem(item.id, "sku", e.target.value)}
                                                     />
-                                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(130px, 1fr))", gap: "0.35rem", marginTop: "0.4rem" }}>
-                                                        <select className="asm-row-input" aria-label="Main category" required value={item.mainCategoryId || ""} onChange={e => updateItem(item.id, "mainCategoryId", e.target.value)}>
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        className="asm-date-picker"
+                                                        type="date"
+                                                        aria-label="Expiry date"
+                                                        value={item.expiryDate || ""}
+                                                        onChange={e => updateItem(item.id, "expiryDate", e.target.value)}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <label className="asm-currency-input">
+                                                        <span aria-hidden="true">K</span>
+                                                        <input
+                                                            className="asm-row-input"
+                                                            aria-label="Purchase cost"
+                                                            type="number"
+                                                            value={item.costPrice}
+                                                            onChange={e => updateItem(item.id, "costPrice", e.target.value)}
+                                                        />
+                                                    </label>
+                                                </td>
+                                                <td>
+                                                    <label className="asm-currency-input">
+                                                        <span aria-hidden="true">K</span>
+                                                        <input
+                                                            className="asm-row-input"
+                                                            aria-label="Current price"
+                                                            type="number"
+                                                            value={item.sellingPrice}
+                                                            onChange={e => updateItem(item.id, "sellingPrice", e.target.value)}
+                                                        />
+                                                    </label>
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        className="asm-row-input asm-quantity-input"
+                                                        aria-label="Quantity"
+                                                        type="number"
+                                                        value={item.quantity}
+                                                        onChange={e => updateItem(item.id, "quantity", e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="asm-total-cell">
+                                                    K{(parseFloat(item.costPrice || 0) * parseInt(item.quantity || 0)).toLocaleString()}
+                                                </td>
+                                                <td className="asm-action-cell">
+                                                    <button
+                                                        aria-label={`Remove ${item.name || "product"} row`}
+                                                        onClick={() => removeRow(item.id)}
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr className="asm-product-details-row">
+                                                <td colSpan={11}>
+                                                    <div className="asm-product-details">
+                                                        <select className="asm-row-input asm-select-input" aria-label="Main category" required value={item.mainCategoryId || ""} onChange={e => updateItem(item.id, "mainCategoryId", e.target.value)}>
                                                             <option value="">Main category *</option>
                                                             {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
                                                         </select>
-                                                        <select className="asm-row-input" aria-label="Subcategory" disabled={!selectedCategory} value={item.subcategoryId || ""} onChange={e => updateItem(item.id, "subcategoryId", e.target.value)}>
+                                                        <select className="asm-row-input asm-select-input" aria-label="Subcategory" disabled={!selectedCategory} value={item.subcategoryId || ""} onChange={e => updateItem(item.id, "subcategoryId", e.target.value)}>
                                                             <option value="">Subcategory (optional)</option>
                                                             {selectedCategory?.subcategories.map(subcategory => <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>)}
-                                                        </select>
-                                                        <select className="asm-row-input" aria-label="Product form" disabled={!selectedSubcategory} value={item.productFormId || ""} onChange={e => {
-                                                            updateItem(item.id, "productFormId", e.target.value);
-                                                        }}>
-                                                            <option value="">Product form (optional)</option>
-                                                            {selectedSubcategory?.forms.map(form => <option key={form.id} value={form.id}>{form.name}</option>)}
                                                         </select>
                                                         <input className="asm-row-input" aria-label="Generic name" placeholder="Generic name" value={item.genericName || ""} onChange={e => updateItem(item.id, "genericName", e.target.value)} />
                                                         <input className="asm-row-input" aria-label="Brand name" placeholder="Brand name" value={item.brandName || ""} onChange={e => updateItem(item.id, "brandName", e.target.value)} />
@@ -387,76 +469,9 @@ export default function AddStock({
                                                         <input className="asm-row-input" aria-label="Unit of measure" placeholder="Unit of measure" value={item.unitOfMeasure || ""} onChange={e => updateItem(item.id, "unitOfMeasure", e.target.value)} />
                                                         <input className="asm-row-input" aria-label="Reorder level" placeholder="Reorder level" type="number" min="0" value={item.reorderLevel || ""} onChange={e => updateItem(item.id, "reorderLevel", e.target.value)} />
                                                     </div>
-                                                </div>
-                                            </td>
-                                        <td>
-                                            <span>{selectedForm?.name || item.dosage || "—"}</span>
-                                        </td>
-                                        <td>
-                                            {item.isExisting ? (
-                                                <span style={{padding:'4px 8px', borderRadius:12, background:'#ecfdf5', color:'#059669', fontSize:'0.75rem', fontWeight:600, whiteSpace:'nowrap'}}>✅ Matched</span>
-                                            ) : (
-                                                <span style={{padding:'4px 8px', borderRadius:12, background:'#fff7ed', color:'#d97706', fontSize:'0.75rem', fontWeight:600, whiteSpace:'nowrap'}}>⚠ New Item</span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <input 
-                                                className="asm-row-input" 
-                                                placeholder="P-00X"
-                                                value={item.sku}
-                                                onChange={e => updateItem(item.id, "sku", e.target.value)}
-                                            />
-                                        </td>
-                                        <td>
-                                            <input 
-                                                className="asm-date-picker" 
-                                                type="date"
-                                                value={item.expiryDate || ""}
-                                                onChange={e => updateItem(item.id, "expiryDate", e.target.value)}
-                                            />
-                                        </td>
-                                        <td>
-                                            <div style={{position:'relative'}}>
-                                                <span style={{position:'absolute', left:'8px', top:'50%', transform:'translateY(-50%)', color:'#94a3b8'}}>K</span>
-                                                <input 
-                                                    className="asm-row-input" style={{paddingLeft:'20px'}}
-                                                    type="number"
-                                                    value={item.costPrice}
-                                                    onChange={e => updateItem(item.id, "costPrice", e.target.value)}
-                                                />
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div style={{position:'relative'}}>
-                                                <span style={{position:'absolute', left:'8px', top:'50%', transform:'translateY(-50%)', color:'#94a3b8'}}>K</span>
-                                                <input
-                                                    className="asm-row-input" style={{paddingLeft:'20px'}}
-                                                    type="number"
-                                                    value={item.sellingPrice}
-                                                    onChange={e => updateItem(item.id, "sellingPrice", e.target.value)}
-                                                />
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <input 
-                                                className="asm-row-input" 
-                                                type="number"
-                                                value={item.quantity}
-                                                onChange={e => updateItem(item.id, "quantity", e.target.value)}
-                                            />
-                                        </td>
-                                        <td style={{fontWeight:700, color:'#1e293b'}}>
-                                            K{(parseFloat(item.costPrice || 0) * parseInt(item.quantity || 0)).toLocaleString()}
-                                        </td>
-                                        <td>
-                                            <button 
-                                                onClick={() => removeRow(item.id)}
-                                                style={{border:'none', background:'none', cursor:'pointer', color:'#94a3b8'}}
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </td>
-                                        </tr>
+                                                </td>
+                                            </tr>
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>

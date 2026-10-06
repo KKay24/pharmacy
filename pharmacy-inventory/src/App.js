@@ -114,6 +114,9 @@ function ShellLayout() {
   const location = useLocation();
   const { username, userRole, logoutUser } = useContext(DataContext);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.localStorage.getItem("pharmacy-sidebar-collapsed") === "true"
+  );
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -138,7 +141,7 @@ function ShellLayout() {
   const avatar = displayName.trim().charAt(0).toUpperCase();
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       <header className="shell-topbar">
         <div className="shell-topbar__title">
           <div className="shell-topbar__icon">
@@ -208,7 +211,14 @@ function ShellLayout() {
       </header>
 
       <div className="app-body">
-        <Navbar />
+        <Navbar
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => {
+            const nextCollapsed = !sidebarCollapsed;
+            window.localStorage.setItem("pharmacy-sidebar-collapsed", String(nextCollapsed));
+            setSidebarCollapsed(nextCollapsed);
+          }}
+        />
 
         <main className="main-content">
           <div className="workspace-panel">

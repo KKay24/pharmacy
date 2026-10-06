@@ -14,11 +14,13 @@ import {
   Truck,
   Heart,
   Home,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import "../styles/App.css";
 import { DataContext } from "../context/DataContext";
 
-function Navbar() {
+function Navbar({ collapsed = false, onToggleCollapsed }) {
   const location = useLocation();
   const { userRole, logoutUser } = useContext(DataContext);
 
@@ -104,15 +106,25 @@ function Navbar() {
 
   return (
     <>
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? " sidebar--collapsed" : ""}`}>
       <div className="sidebar-header">
         <div className="logo-icon" aria-hidden="true">
           <img src="/logo512.png" alt="Mediquick logo" width={44} height={44} />
         </div>
-        <div className="sidebar-brand">
+        <div className="sidebar-brand" aria-hidden={collapsed}>
           <h1>Mediquick</h1>
           <p>Pharmacy command center</p>
         </div>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={onToggleCollapsed}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
       </div>
 
       <nav className="sidebar-nav">
@@ -127,6 +139,8 @@ function Navbar() {
                   key={link.path}
                   to={link.path}
                   className={`nav-item ${isActive(link.path) ? "active" : ""}`}
+                  aria-label={collapsed ? link.label : undefined}
+                  title={collapsed ? link.label : undefined}
                 >
                   <Icon size={19} />
                   <span>{link.label}</span>
@@ -147,6 +161,8 @@ function Navbar() {
                     key={link.path}
                     to={link.path}
                     className={`nav-item ${isActive(link.path) ? "active" : ""}`}
+                    aria-label={collapsed ? link.label : undefined}
+                    title={collapsed ? link.label : undefined}
                   >
                     <Icon size={19} />
                     <span>{link.label}</span>

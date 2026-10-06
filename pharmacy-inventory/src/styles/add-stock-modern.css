@@ -117,7 +117,7 @@
 
 .asm-grid-table {
     width: 100%;
-    min-width: 1200px;
+    min-width: 1404px;
     border-collapse: collapse;
     table-layout: fixed;
 }
@@ -128,7 +128,7 @@
 
 .asm-product-entry {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.65rem;
     min-width: 0;
 }
@@ -149,7 +149,7 @@
     flex: 1 1 auto;
     min-width: 0;
     width: 100%;
-    min-height: 40px;
+    height: 40px;
     padding: 0.5rem 0.6rem;
     border: 1px solid #e2e8f0;
     border-radius: 6px;
@@ -158,9 +158,9 @@
     font: inherit;
     font-size: 0.9rem;
     line-height: 1.35;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    text-overflow: clip;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .asm-product-input:focus {
@@ -170,7 +170,7 @@
 
 .asm-grid-table th {
     text-align: left;
-    padding: 1rem 1.25rem;
+    padding: 0.8rem 0.55rem;
     background: #f8fafc;
     font-size: 0.8rem;
     font-weight: 700;
@@ -178,51 +178,175 @@
     border-bottom: 2px solid #f1f5f9;
     text-transform: uppercase;
     letter-spacing: 0.025em;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 
 .asm-grid-table td {
-    padding: 0.85rem 1.25rem;
+    padding: 0.75rem 0.55rem;
     border-bottom: 1px solid #f1f5f9;
     vertical-align: middle;
 }
 
 .asm-row-input {
+    box-sizing: border-box;
     width: 100%;
-    padding: 0.5rem 0.75rem;
+    min-width: 0;
+    height: 40px;
+    padding: 0.45rem 0.55rem;
     border-radius: 6px;
     border: 1px solid #e2e8f0;
     font-size: 0.9rem;
     outline: none;
+    background: #ffffff;
 }
 
 .asm-row-input:focus {
     border-color: var(--primary);
 }
 
-.asm-grid-table th:not(.asm-product-column),
-.asm-grid-table td:not(.asm-product-column) {
-    padding-right: 0.55rem;
-    padding-left: 0.55rem;
+.asm-grid-table th:first-child,
+.asm-grid-table td:first-child {
+    text-align: center;
 }
 
-.asm-grid-table th {
-    overflow-wrap: anywhere;
+.asm-grid-table td.asm-product-column {
+    padding-right: 0.8rem;
+    padding-left: 0.8rem;
 }
 
-.asm-grid-table td:not(.asm-product-column) .asm-row-input {
+.asm-select-input {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.asm-status-cell {
+    text-align: center;
+}
+
+.asm-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    min-height: 28px;
+    box-sizing: border-box;
+    padding: 0.3rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.asm-status-new {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.asm-status-matched {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.asm-currency-input {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 120px;
+    height: 40px;
+    padding: 0 0.45rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    color: #64748b;
+}
+
+.asm-currency-input:focus-within {
+    border-color: var(--primary);
+}
+
+.asm-currency-input .asm-row-input {
+    flex: 1 1 auto;
     min-width: 0;
-    padding-right: 0.4rem;
-    padding-left: 0.4rem;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    color: #1e293b;
+    background: transparent;
+}
+
+.asm-currency-input .asm-row-input:focus {
+    outline: none;
+}
+
+.asm-quantity-input {
+    min-width: 90px;
+}
+
+.asm-total-cell {
+    font-weight: 700;
+    color: #1e293b;
+    white-space: nowrap;
+}
+
+.asm-action-cell {
+    padding-right: 1rem !important;
+    padding-left: 0.75rem !important;
+}
+
+.asm-action-cell button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    color: #94a3b8;
+    background: transparent;
+    cursor: pointer;
+}
+
+.asm-action-cell button:hover {
+    color: #dc2626;
+    background: #fef2f2;
+}
+
+.asm-product-row td {
+    border-bottom: 0;
+}
+
+.asm-product-details-row td {
+    padding: 0 0.8rem 0.8rem;
+    background: #ffffff;
+}
+
+.asm-product-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #f1f5f9;
+    border-radius: 8px;
+    background: #f8fafc;
 }
 
 .asm-date-picker {
-    width: 132px;
-    padding: 0.45rem 0.5rem;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    padding: 0.45rem 0.35rem;
     border: 1px solid #e2e8f0;
     border-radius: 6px;
     background: #ffffff;
     color: #475569;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     cursor: pointer;
 }
 

@@ -19,7 +19,6 @@ export default function InventoryPage() {
   const { inventory, inventoryCategories = [], updateInventoryItem, deleteInventoryItem, userRole } = useContext(DataContext);
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
   const [selectedMedicine, setSelectedMedicine] = useState(null);
   const [filters, setFilters] = useState({
     mainCategoryId: "",
@@ -70,17 +69,6 @@ export default function InventoryPage() {
   const filteredInventory = useMemo(() => {
     let result = inventory;
 
-    if (activeTab === "low") {
-      result = result.filter(med => {
-        const total = med.Batches ? med.Batches.reduce((acc, b) => acc + b.quantity, 0) : 0;
-        return total > 0 && total <= (med.lowStockThreshold || LOW_STOCK_THRESHOLD);
-      });
-    } else if (activeTab === "expired") {
-      result = result.filter(med => {
-        return med.Batches && med.Batches.some(b => Number(b.quantity) > 0 && b.expiryDate && new Date(b.expiryDate) < new Date());
-      });
-    }
-
     if (filters.mainCategoryId) result = result.filter(med => String(med.mainCategoryId) === filters.mainCategoryId);
     if (filters.subcategoryId) result = result.filter(med => String(med.subcategoryId) === filters.subcategoryId);
     if (filters.productFormId) result = result.filter(med => String(med.productFormId) === filters.productFormId);
@@ -122,20 +110,10 @@ export default function InventoryPage() {
     }
 
     return result;
-  }, [inventory, activeTab, filters, searchQuery]);
+  }, [inventory, filters, searchQuery]);
 
   return (
     <div className="inv-container">
-      {/* Header Row */}
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-        <div style={{display:'flex', gap:'1rem'}}>
-          <button className="asm-btn asm-btn-secondary" disabled title="Export data is unavailable"><Download size={18} /> Export Data (Unavailable)</button>
-          <button className="asm-btn asm-btn-primary" onClick={() => navigate('/add-stock')}>
-            <Plus size={18} /> Add New Stock
-          </button>
-        </div>
-      </div>
-
       {/* Health Stats */}
       <div className="inv-health-row">
         <div className="inv-health-card">
@@ -189,37 +167,18 @@ export default function InventoryPage() {
             <span className="inv-health-value">K{stats.stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
           </div>
         </div>
+        <div className="inv-health-actions-card" aria-label="Inventory actions">
+          <button className="asm-btn asm-btn-secondary" disabled title="Export data is unavailable">
+            <Download size={18} /> Export Data (Unavailable)
+          </button>
+          <button className="asm-btn asm-btn-primary" onClick={() => navigate('/add-stock')}>
+            <Plus size={18} /> Add New Stock
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="inv-filter-bar">
-        <div className="inv-tabs">
-          <button 
-            className={`inv-tab ${activeTab === "all" ? "active" : ""}`}
-            onClick={() => setActiveTab("all")}
-          >All Inventory</button>
-          <button 
-            className={`inv-tab ${activeTab === "low" ? "active" : ""}`}
-            onClick={() => setActiveTab("low")}
-          >Low Stock Items</button>
-          <button 
-            className={`inv-tab ${activeTab === "expired" ? "active" : ""}`}
-            onClick={() => setActiveTab("expired")}
-          >Expired Batches</button>
-        </div>
-        <div style={{position:'relative'}}>
-          <Search size={18} style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:'#94a3b8'}} />
-          <input 
-            type="text" 
-            className="asm-input" 
-            style={{paddingLeft:'38px', width:'320px'}}
-            placeholder="Search name, generic, brand, supplier, or SKU..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="inv-filter-bar" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+      <div className="inv-filter-bar inv-inventory-filters">
         <select className="asm-input" aria-label="Filter main category" value={filters.mainCategoryId} onChange={e => setFilters(current => ({ ...current, mainCategoryId: e.target.value, subcategoryId: "", productFormId: "" }))}>
           <option value="">All main categories</option>
           {inventoryCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
@@ -247,6 +206,17 @@ export default function InventoryPage() {
           <option value="near-expiry">Near expiry (30 days)</option>
           <option value="expired">Expired</option>
         </select>
+        <div className="inv-search-field">
+          <Search size={18} aria-hidden="true" />
+          <input
+            type="text"
+            className="asm-input"
+            aria-label="Search inventory"
+            placeholder="Search name, generic, brand, supplier, or SKU..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       <div style={{ margin: "0 0 1rem", color: "#64748b", fontSize: "0.85rem" }}>
