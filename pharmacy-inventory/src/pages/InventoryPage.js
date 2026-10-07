@@ -14,6 +14,7 @@ import StockCardSidebar from "../components/StockCardSidebar";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import "../styles/inventory-modern.css";
+import { getInventoryStockValue } from "../utils/inventoryValuation";
 
 export default function InventoryPage() {
   const { inventory, inventoryCategories = [], updateInventoryItem, deleteInventoryItem, userRole } = useContext(DataContext);
@@ -54,8 +55,7 @@ export default function InventoryPage() {
       if (total === 0) outOfStock++;
       else if (total <= (med.lowStockThreshold || LOW_STOCK_THRESHOLD)) lowStock++;
       const batches = med.Batches || [];
-      const unitCost = Number(batches[0]?.costPrice || 0);
-      stockValue += batches.reduce((sum, batch) => sum + Number(batch.quantity || 0) * Number(batch.costPrice || unitCost), 0);
+      stockValue += getInventoryStockValue(med);
 
       if (batches.some(batch => Number(batch.quantity) > 0 && batch.expiryDate && new Date(batch.expiryDate) < now)) expired++;
       if (batches.some(batch => Number(batch.quantity) > 0 && batch.expiryDate && new Date(batch.expiryDate) >= now && new Date(batch.expiryDate) <= thirtyDays)) expiringSoon++;

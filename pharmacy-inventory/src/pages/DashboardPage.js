@@ -22,6 +22,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import "../styles/dashboard.css";
+import { getInventoryStockValue } from "../utils/inventoryValuation";
 
 const EMPTY_PREDICTIVE_ANALYTICS = {
   predictions: [],
@@ -132,14 +133,7 @@ export default function DashboardPage() {
   const totalProducts = inventory.length;
 
   const stockValue = useMemo(() => {
-    return inventory.reduce((sum, item) => {
-      const itemBatches = item.Batches || [];
-      const primaryCost =
-        itemBatches.length > 0 && itemBatches[0].costPrice
-          ? Number(itemBatches[0].costPrice)
-          : Number(item.price || item.currentPrice || 0);
-      return sum + primaryCost * getTotalQuantity(item);
-    }, 0);
+    return inventory.reduce((sum, item) => sum + getInventoryStockValue(item), 0);
   }, [inventory]);
 
   const lowStockItems = useMemo(() => {
@@ -181,10 +175,7 @@ export default function DashboardPage() {
       const current = groups.get(label) || { label, products: 0, units: 0, stockValue: 0 };
       current.products += 1;
       current.units += getTotalQuantity(item);
-      current.stockValue += (item.Batches || []).reduce(
-        (sum, batch) => sum + Number(batch.quantity || 0) * Number(batch.costPrice || 0),
-        0
-      );
+      current.stockValue += getInventoryStockValue(item);
       groups.set(label, current);
     }
     return [...groups.values()].sort((left, right) => right.stockValue - left.stockValue);

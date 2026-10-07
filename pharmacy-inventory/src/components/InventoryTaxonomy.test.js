@@ -3,8 +3,10 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import AddStock from "./AddStock";
 import InventoryPage from "../pages/InventoryPage";
+import DashboardPage from "../pages/DashboardPage";
 import Pos from "./POS";
 import { DataContext } from "../context/DataContext";
+import { getInventoryStockValue } from "../utils/inventoryValuation";
 
 jest.mock("react-router-dom", () => ({
   useNavigate: () => jest.fn(),
@@ -76,6 +78,55 @@ function AddStockHarness() {
     />
   );
 }
+
+test("stock value uses batch costs with first-batch fallback consistently", () => {
+  const inventory = [
+    {
+      id: 1,
+      name: "Amoxicillin",
+      mainCategoryId: 1,
+      subcategoryId: 11,
+      productFormId: 111,
+      MainCategory: { name: "Medicines" },
+      Subcategory: { name: "Antibiotics" },
+      ProductForm: { name: "Syrup" },
+      Batches: [
+        { id: 1, quantity: 5, costPrice: 10, expiryDate: "2030-12-31" },
+        { id: 2, quantity: 10, costPrice: null, expiryDate: "2030-12-31" },
+        { id: 3, quantity: 2, costPrice: 20, expiryDate: "2030-12-31" },
+      ],
+    },
+  ];
+  const context = {
+    inventory,
+    inventoryCategories: categories,
+    updateInventoryItem: jest.fn(),
+    deleteInventoryItem: jest.fn(),
+    userRole: "admin",
+  };
+
+  expect(getInventoryStockValue(inventory[0])).toBe(190);
+
+  const inventoryPage = render(
+    <DataContext.Provider value={context}>
+      <InventoryPage />
+    </DataContext.Provider>
+  );
+  expect(screen.getByText("Stock Value").parentElement).toHaveTextContent("K190");
+  inventoryPage.unmount();
+
+  render(
+    <DataContext.Provider value={context}>
+      <DashboardPage />
+    </DataContext.Provider>
+  );
+  const stockValueCard = Array.from(document.querySelectorAll(".metric-card"))
+    .find(card => card.querySelector(".metric-title")?.textContent === "Stock Value");
+  expect(stockValueCard).toHaveTextContent("K190");
+  const classificationTable = Array.from(document.querySelectorAll("table"))
+    .find(table => Array.from(table.querySelectorAll("th")).some(header => header.textContent === "Stock Value"));
+  expect(classificationTable.querySelector("tbody")).toHaveTextContent("K190");
+});
 
 test("stock entry scopes subcategories and product forms to the selected category", () => {
   render(<AddStockHarness />);

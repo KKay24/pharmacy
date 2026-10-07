@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getBatchStockValue, getEffectiveBatchCost } from "../utils/inventoryValuation";
 import { 
     ChevronDown, 
     ChevronUp, 
@@ -166,11 +167,11 @@ export default function InventoryTable({
                                                             </div>
                                                             <div>
                                                                 <label style={{fontSize:'0.65rem', color:'#94a3b8', display:'block'}}>UNIT COST</label>
-                                                                <span style={{fontSize:'0.85rem', fontWeight:600}}>K{batch.costPrice}</span>
+                                                                <span style={{fontSize:'0.85rem', fontWeight:600}}>K{getEffectiveBatchCost(batch, batches[0]?.costPrice)}</span>
                                                             </div>
                                                             <div style={{textAlign:'right'}}>
                                                                 <label style={{fontSize:'0.65rem', color:'#94a3b8', display:'block'}}>LANDING</label>
-                                                                <span style={{fontSize:'0.85rem', fontWeight:600, color:'var(--primary)'}}>K{((batch.costPrice || 0) * (batch.quantity || 0)).toLocaleString()}</span>
+                                                                <span style={{fontSize:'0.85rem', fontWeight:600, color:'var(--primary)'}}>K{getBatchStockValue(batch, batches[0]?.costPrice).toLocaleString()}</span>
                                                             </div>
                                                         </div>
                                                     </div>
