@@ -28,6 +28,7 @@ const ROLE_PERMISSIONS = Object.freeze({
     Permissions.CUSTOMERS_READ,
     Permissions.PRESCRIPTIONS_READ,
   ],
+  customer: [],
 });
 
 module.exports = { PERMISSIONS_KEY, Permissions, ROLE_PERMISSIONS };

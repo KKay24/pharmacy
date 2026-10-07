@@ -38,6 +38,26 @@ const Prescription = sequelize.define('Prescription', {
     type: DataTypes.ENUM('Pending', 'Ready for Pickup', 'Filled', 'On Hold', 'Cancelled'),
     defaultValue: 'Pending'
   },
+  prescriptionNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  patientPhone: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  deliveryPreference: {
+    type: DataTypes.STRING,
+    defaultValue: 'delivery'
+  },
+  deliveryAddress: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  notes: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   dueDate: {
     type: DataTypes.DATEONLY,
     allowNull: true

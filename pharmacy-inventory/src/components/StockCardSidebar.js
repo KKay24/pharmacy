@@ -324,7 +324,7 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate, categori
                                 <span className="inv-detail-label">Prescription</span>
                                 <span className="inv-detail-value">
                                     {isEditing ? (
-                                        <select 
+                                        <select
                                             className="asm-input"
                                             value={editedData.prescriptionRequired}
                                             onChange={e => setEditedData({...editedData, prescriptionRequired: e.target.value === 'true'})}
@@ -338,6 +338,42 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate, categori
                                             <span style={{color:'#64748b'}}>Not Required</span>
                                     )}
                                 </span>
+                            </div>
+                            <div className="inv-detail-item">
+                                <span className="inv-detail-label">Online Store</span>
+                                <span className="inv-detail-value">
+                                    {isEditing ? (
+                                        <select
+                                            className="asm-input"
+                                            value={editedData.isCustomerVisible !== false}
+                                            onChange={e => setEditedData({...editedData, isCustomerVisible: e.target.value === 'true'})}
+                                        >
+                                            <option value="true">Visible to Customers</option>
+                                            <option value="false">Hidden from Store</option>
+                                        </select>
+                                    ) : (
+                                        medicine.isCustomerVisible !== false ?
+                                            <span style={{color:'#166534'}}>Visible</span> :
+                                            <span style={{color:'#64748b'}}>Hidden</span>
+                                    )}
+                                </span>
+                            </div>
+                            <div className="inv-detail-item" style={{gridColumn: '1 / -1'}}>
+                                <span className="inv-detail-label">Store Description</span>
+                                {isEditing ? (
+                                    <textarea
+                                        className="asm-input"
+                                        rows="2"
+                                        value={editedData.description || ""}
+                                        onChange={e => setEditedData({...editedData, description: e.target.value})}
+                                        placeholder="Customer-facing description for the online store..."
+                                        style={{width: '100%', resize: 'vertical', marginTop: '4px'}}
+                                    />
+                                ) : (
+                                    <span className="inv-detail-value" style={{fontSize: '0.85rem', color: medicine.description ? 'inherit' : '#94a3b8'}}>
+                                        {medicine.description || 'No description provided'}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -1,7 +1,7 @@
 const { col, fn, where } = require('sequelize');
 const User = require('../models/User');
 
-const VALID_ROLES = ['admin', 'manager', 'user'];
+const VALID_ROLES = ['admin', 'manager', 'user', 'customer'];
 const VALID_STATUSES = ['active', 'suspended'];
 
 function normalizeUsernameInput(value) {

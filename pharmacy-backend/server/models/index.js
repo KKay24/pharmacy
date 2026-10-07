@@ -10,6 +10,8 @@ const Supplier = require('./Supplier');
 const AuditLog = require('./AuditLog');
 const InventoryMovement = require('./InventoryMovement');
 const InventoryCategory = require('./InventoryCategory');
+const Order = require('./Order');
+const SupportInquiry = require('./SupportInquiry');
 
 // Associations
 Medicine.hasMany(Batch, { foreignKey: 'medicineId', onDelete: 'CASCADE' });
@@ -34,6 +36,12 @@ Sales.belongsTo(Customer, { foreignKey: 'customerId' });
 Customer.hasMany(Prescription, { foreignKey: 'customerId' });
 Prescription.belongsTo(Customer, { foreignKey: 'customerId' });
 
+Customer.hasMany(Order, { foreignKey: 'customerId' });
+Order.belongsTo(Customer, { foreignKey: 'customerId' });
+
+User.hasMany(Order, { foreignKey: 'userId' });
+Order.belongsTo(User, { foreignKey: 'userId' });
+
 // Supplier Associations
 Supplier.hasMany(Batch, { foreignKey: 'supplierId' });
 Batch.belongsTo(Supplier, { foreignKey: 'supplierId' });
@@ -52,8 +60,10 @@ module.exports = {
   Customer,
   Prescription,
   Expense,
-  Supplier
-  ,AuditLog
-  ,InventoryMovement
-  ,InventoryCategory
+  Supplier,
+  AuditLog,
+  InventoryMovement,
+  InventoryCategory,
+  Order,
+  SupportInquiry,
 };

@@ -1,54 +1,106 @@
-import React, { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useOutletContext } from "react-router-dom";
 import {
-  ArrowRight, Check, ChevronRight, HeartPulse, Lock, Menu, Pill,
-  Search, ShieldCheck, ShoppingCart, Truck, User, X,
+  ArrowRight,
+  Check,
+  ChevronRight,
+  HeartPulse,
+  Lock,
+  Menu,
+  Pill,
+  Search,
+  ShieldCheck,
+  ShoppingCart,
+  Truck,
+  User,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { apiFetch } from "../utils/api";
+import { apiFetch as staffApiFetch } from "../utils/api";
 import { DataContext } from "../context/DataContext";
+import { useStore } from "../context/StoreContext";
+import StoreAuthModal from "../components/store/StoreAuthModal";
+import { ProductCard, ProductCardSkeleton } from "../components/store/ProductCard";
 import "../styles/login-modern.css";
 
-const categories = [
-  ["Prescription Medicines", "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=700&q=80"],
-  ["Over-the-Counter", "https://images.unsplash.com/photo-1550572017-edd951b55104?auto=format&fit=crop&w=700&q=80"],
-  ["Vitamins & Supplements", "https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?auto=format&fit=crop&w=700&q=80"],
-  ["Personal Care", "https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?auto=format&fit=crop&w=700&q=80"],
-  ["Baby & Child Care", "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=700&q=80"],
-  ["Health Devices", "https://images.unsplash.com/photo-1559757175-0eb30cd8c063?auto=format&fit=crop&w=700&q=80"],
-];
+const CATEGORY_IMAGES = {
+  medicines: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=700&q=80",
+  "medical-supplies": "https://images.unsplash.com/photo-1550572017-edd951b55104?auto=format&fit=crop&w=700&q=80",
+  "vitamins-supplements": "https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?auto=format&fit=crop&w=700&q=80",
+  "personal-care": "https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?auto=format&fit=crop&w=700&q=80",
+  "baby-products": "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=700&q=80",
+};
 
-function SignInModal({ onClose, onSubmit, username, password, setUsername, setPassword, isLoading }) {
+function StaffLogin({ onSubmit, username, password, setUsername, setPassword, loading }) {
   return (
-    <div className="hp-modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <div className="hp-login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title" onMouseDown={(event) => event.stopPropagation()}>
-        <button className="hp-modal-close" type="button" onClick={onClose} aria-label="Close sign in"><X size={19} /></button>
+    <main className="hp-staff-login">
+      <form className="hp-login-modal" onSubmit={onSubmit}>
         <div className="hp-modal-icon"><ShieldCheck size={24} /></div>
         <p className="hp-kicker">Secure staff access</p>
-        <h2 id="login-title">Welcome back</h2>
+        <h1>Welcome back</h1>
         <p className="hp-modal-copy">Sign in to manage pharmacy operations.</p>
-        <form onSubmit={onSubmit} className="hp-login-form">
-          <label>Username<span className="hp-field-wrap"><User size={17} /><input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username or Staff ID" autoFocus disabled={isLoading} /></span></label>
-          <label>Password<span className="hp-field-wrap"><Lock size={17} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Secure password" disabled={isLoading} /></span></label>
-          <button className="hp-primary-btn hp-login-submit" type="submit" disabled={isLoading}>{isLoading ? "Signing in..." : "Sign in"} {!isLoading && <ArrowRight size={17} />}</button>
-        </form>
-        <div className="hp-secure-note"><ShieldCheck size={15} /> Your account is protected</div>
-      </div>
-    </div>
+        <div className="hp-login-form">
+          <label>
+            Username
+            <span className="hp-field-wrap"><User size={17} /><input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username or Staff ID" autoFocus disabled={loading} /></span>
+          </label>
+          <label>
+            Password
+            <span className="hp-field-wrap"><Lock size={17} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" disabled={loading} /></span>
+          </label>
+          <button className="hp-primary-btn hp-login-submit" type="submit" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in"} {!loading && <ArrowRight size={17} />}
+          </button>
+        </div>
+        <Link className="hp-back-to-store" to="/">Back to the pharmacy store</Link>
+      </form>
+    </main>
   );
 }
 
-export default function LoginPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export default function LoginPage({ staffMode = false }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [featured, setFeatured] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const { loginUser } = useContext(DataContext);
+  const { apiFetch, cartCount, storeUser } = useStore();
+  const { openCart } = useOutletContext() || {};
+  const isStaffLogin = staffMode || location.pathname === "/staff/login";
 
-  const getLandingRoute = (role) => role === "admin" || role === "manager" ? "/dashboard" : "/pos";
+  const loadHomeCatalog = useCallback(async () => {
+    setCatalogError("");
+    setLoadingProducts(true);
+    try {
+      const [categoryRows, popularRows] = await Promise.all([
+        apiFetch("/api/products/categories"),
+        apiFetch("/api/products/popular?limit=8"),
+      ]);
+      setCategories(Array.isArray(categoryRows) ? categoryRows : []);
+      setFeatured(Array.isArray(popularRows) ? popularRows : []);
+    } catch (error) {
+      setCatalogError(error.message || "The pharmacy catalogue could not be loaded.");
+      setCategories([]);
+      setFeatured([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [apiFetch]);
 
-  const handleLogin = async (event) => {
+  useEffect(() => {
+    if (!isStaffLogin) loadHomeCatalog();
+  }, [isStaffLogin, loadHomeCatalog]);
+
+  const handleStaffLogin = async (event) => {
     event.preventDefault();
     if (isLoading) return;
     const trimmedUsername = username.trim();
@@ -60,19 +112,19 @@ export default function LoginPage() {
     setIsLoading(true);
     const toastId = toast.loading("Signing you in...");
     try {
-      const response = await apiFetch("/api/auth/login", {
+      const response = await staffApiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: trimmedUsername, password: trimmedPassword }),
       });
       const data = await response.json();
       if (!response.ok) {
-        toast.error(data.error || "Invalid credentials", { id: toastId });
+        toast.error(data.error || data.message || "Invalid credentials", { id: toastId });
         return;
       }
       toast.success(`Welcome back, ${data.user?.username || "Staff"}`, { id: toastId });
       loginUser(data);
-      navigate(getLandingRoute(data.user?.role));
+      navigate(data.user?.role === "admin" || data.user?.role === "manager" ? "/dashboard" : "/pos");
     } catch (error) {
       console.error("Login error", error);
       toast.error("Network error: verification failed", { id: toastId });
@@ -81,22 +133,130 @@ export default function LoginPage() {
     }
   };
 
+  if (isStaffLogin) {
+    return (
+      <div className="hp-page">
+        <StaffLogin onSubmit={handleStaffLogin} username={username} password={password} setUsername={setUsername} setPassword={setPassword} loading={isLoading} />
+      </div>
+    );
+  }
+
+  const submitSearch = (event) => {
+    event.preventDefault();
+    const query = search.trim();
+    if (query) navigate(`/shop?search=${encodeURIComponent(query)}`);
+  };
+
   return (
     <div className="hp-page">
       <header className="hp-header">
-        <a href="#top" className="hp-brand" aria-label="MediQuick Pharmacy home"><span className="hp-brand-mark" style={{ overflow: "hidden" }}><img src="/logo512.png" alt="" style={{ width: "84px", maxWidth: "none", transform: "translate(-22px, -5px)" }} /></span><span><strong>MediQuick <em>Pharmacy</em></strong><small>Better health. Delivered.</small></span></a>
-        <nav className="hp-nav" aria-label="Main navigation"><a className="active" href="#top">Home</a><a href="#categories">Shop</a><a href="#services">Prescriptions</a><a href="#services">Health &amp; Wellness</a><a href="#about">About Us</a></nav>
-        <div className="hp-header-actions"><button type="button" className="hp-icon-button" aria-label="Search"><Search size={19} /></button><button type="button" className="hp-signin-link" aria-label="Sign in or register" onClick={() => setIsModalOpen(true)}><User size={18} /> <span>Sign In / Register</span></button><button type="button" className="hp-cart-button" aria-label="Shopping cart"><ShoppingCart size={21} /><b>0</b></button></div>
-        <button type="button" className="hp-menu-button" aria-label="Open menu"><Menu size={23} /></button>
+        <Link to="/" className="hp-brand" aria-label="MediQuick Pharmacy home">
+          <span className="hp-brand-mark" style={{ overflow: "hidden" }}><img src="/logo512.png" alt="" style={{ width: "84px", maxWidth: "none", transform: "translate(-22px, -5px)" }} /></span>
+          <span><strong>MediQuick <em>Pharmacy</em></strong><small>Better health. Delivered.</small></span>
+        </Link>
+        <nav className="hp-nav" aria-label="Main navigation">
+          <Link className="active" to="/">Home</Link>
+          <Link to="/shop">Shop</Link>
+          <Link to="/prescription-upload">Prescriptions</Link>
+          <a href="#categories">Health &amp; Wellness</a>
+          <a href="#about">About Us</a>
+        </nav>
+        <div className="hp-header-actions">
+          <button type="button" className="hp-icon-button" aria-label="Search products" onClick={() => navigate("/shop")}><Search size={19} /></button>
+          {storeUser
+            ? <Link to="/account" className="hp-signin-link"><User size={18} /><span>My Account</span></Link>
+            : <button type="button" className="hp-signin-link" onClick={() => { setAuthMode("login"); setIsModalOpen(true); }}><User size={18} /><span>Sign In / Register</span></button>}
+          <button type="button" className="hp-cart-button" aria-label={`Shopping cart, ${cartCount} items`} onClick={openCart}>
+            <ShoppingCart size={21} /><b>{cartCount > 99 ? "99+" : cartCount}</b>
+          </button>
+        </div>
+        <button type="button" className="hp-menu-button" aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen((open) => !open)}>
+          {menuOpen ? <X size={23} /> : <Menu size={23} />}
+        </button>
+        {menuOpen && (
+          <nav className="hp-mobile-nav" aria-label="Mobile navigation">
+            <Link to="/shop" onClick={() => setMenuOpen(false)}>Shop products</Link>
+            <Link to="/prescription-upload" onClick={() => setMenuOpen(false)}>Prescriptions</Link>
+            <a href="#categories" onClick={() => setMenuOpen(false)}>Health &amp; Wellness</a>
+            <a href="#about" onClick={() => setMenuOpen(false)}>About Us</a>
+            {storeUser
+              ? <Link to="/account" onClick={() => setMenuOpen(false)}>My Account</Link>
+              : <button type="button" onClick={() => { setAuthMode("login"); setIsModalOpen(true); setMenuOpen(false); }}>Sign In / Register</button>}
+          </nav>
+        )}
       </header>
 
       <main id="top">
-        <section className="hp-hero"><div className="hp-hero-content"><p className="hp-kicker">Your online pharmacy</p><h1>Quality Medicines.<br /><span>Delivered to Your Door.</span></h1><p className="hp-hero-copy">Prescriptions, over-the-counter medicines, vitamins, and more &mdash; all in one place. Safe. Convenient. Affordable.</p><div className="hp-search-bar"><Search size={20} /><input aria-label="Search medicines" placeholder="Search for medicines, health products, or conditions..." /><button type="button">Search</button></div><div className="hp-hero-benefits"><div><Truck size={24} /><span><strong>Fast &amp; Reliable Delivery</strong><small>Get your order, on time.</small></span></div><div><ShieldCheck size={24} /><span><strong>Licensed Pharmacy</strong><small>100% genuine products.</small></span></div><div><Lock size={24} /><span><strong>Secure Checkout</strong><small>Your information is safe.</small></span></div></div></div><div className="hp-hero-image" aria-label="Pharmacist holding a tablet"></div></section>
-        <section className="hp-services" id="services"><div><span className="hp-service-icon"><Pill size={24} /></span><span><strong>Wide Range<br />of Products</strong><small>From everyday essentials<br />to specialist care.</small></span></div><div><span className="hp-service-icon"><Check size={25} /></span><span><strong>Great Prices</strong><small>Quality healthcare<br />within your budget.</small></span></div><div><span className="hp-service-icon"><Truck size={24} /></span><span><strong>Fast Delivery</strong><small>Get what you need,<br />when you need it.</small></span></div><div><span className="hp-service-icon"><HeartPulse size={24} /></span><span><strong>Expert Support</strong><small>Our pharmacists are<br />here to help.</small></span></div></section>
-        <section className="hp-categories" id="categories"><div className="hp-section-heading"><h2>Shop by Category</h2><a href="#categories">View All Categories <ArrowRight size={16} /></a></div><div className="hp-category-grid">{categories.map(([name, image]) => <a href="#categories" className="hp-category-card" key={name}><img src={image} alt="" /><span>{name}<ChevronRight size={17} /></span></a>)}</div></section>
-        <section className="hp-about" id="about"><p className="hp-kicker">Care you can count on</p><h2>Your health, made simpler.</h2><p>From trusted medicines to everyday wellness essentials, MediQuick Pharmacy helps your family feel ready for every day.</p></section>
+        <section className="hp-hero">
+          <div className="hp-hero-content">
+            <p className="hp-kicker">Your online pharmacy</p>
+            <h1>Quality Medicines.<br /><span>Delivered to Your Door.</span></h1>
+            <p className="hp-hero-copy">Browse medicines and health products from the pharmacy's current inventory. Search the catalogue or explore categories below.</p>
+            <form className="hp-search-bar" onSubmit={submitSearch}>
+              <Search size={20} />
+              <input aria-label="Search medicines" placeholder="Search medicines and health products..." value={search} onChange={(event) => setSearch(event.target.value)} />
+              <button type="submit">Search</button>
+            </form>
+            <div className="hp-hero-benefits">
+              <div><Pill size={24} /><span><strong>Pharmacy Products</strong><small>Browse current inventory.</small></span></div>
+              <div><ShieldCheck size={24} /><span><strong>Prescription Services</strong><small>Submit a prescription for review.</small></span></div>
+              <div><Lock size={24} /><span><strong>Order Checkout</strong><small>Orders are verified by the pharmacy.</small></span></div>
+            </div>
+          </div>
+          <div className="hp-hero-image" role="img" aria-label="Pharmacist holding a tablet" />
+        </section>
+
+        <section className="hp-services" id="services">
+          <div><span className="hp-service-icon"><Pill size={24} /></span><span><strong>Pharmacy Products</strong><small>Browse available items<br />from pharmacy inventory.</small></span></div>
+          <div><span className="hp-service-icon"><Check size={25} /></span><span><strong>Live Availability</strong><small>Stock status is read<br />from the inventory system.</small></span></div>
+          <div><span className="hp-service-icon"><Truck size={24} /></span><span><strong>Delivery or Pickup</strong><small>Choose an option<br />during checkout.</small></span></div>
+          <div><span className="hp-service-icon"><HeartPulse size={24} /></span><span><strong>Prescription Support</strong><small>Prescription products<br />require pharmacy review.</small></span></div>
+        </section>
+
+        <section className="hp-categories" id="categories">
+          <div className="hp-section-heading">
+            <h2>Shop by Category</h2>
+            <Link to="/shop">View all products <ArrowRight size={16} /></Link>
+          </div>
+          {catalogError && <div className="hp-catalog-error" role="alert">{catalogError} <button type="button" onClick={loadHomeCatalog}>Try again</button></div>}
+          <div className="hp-category-grid">
+            {categories.map((category) => (
+              <Link to={`/shop?category=${encodeURIComponent(category.slug)}`} className="hp-category-card" key={category.id}>
+                <img src={CATEGORY_IMAGES[category.slug] || CATEGORY_IMAGES.medicines} alt="" loading="lazy" />
+                <span>{category.name}<ChevronRight size={17} /></span>
+              </Link>
+            ))}
+            {!loadingProducts && !catalogError && categories.length === 0 && <p className="hp-empty-state">No product categories are available yet.</p>}
+            {loadingProducts && <p className="hp-loading-state">Loading pharmacy categories…</p>}
+          </div>
+        </section>
+
+        <section className="hp-products">
+          <div className="hp-section-heading">
+            <div><h2>Available Products</h2><p>Products and availability from the pharmacy inventory.</p></div>
+            <Link to="/shop">Browse all <ArrowRight size={16} /></Link>
+          </div>
+          {catalogError ? (
+            <div className="hp-catalog-error" role="alert">Products could not be loaded. <button type="button" onClick={loadHomeCatalog}>Retry</button></div>
+          ) : (
+            <div className="hp-product-grid">
+              {loadingProducts
+                ? Array.from({ length: 4 }, (_, index) => <ProductCardSkeleton key={index} />)
+                : featured.map((product) => <ProductCard key={product.id} product={product} onCartOpen={openCart} />)}
+              {!loadingProducts && !catalogError && featured.length === 0 && <p className="hp-empty-state">There are no customer-visible products in stock right now.</p>}
+            </div>
+          )}
+        </section>
+
+        <section className="hp-about" id="about">
+          <p className="hp-kicker">MediQuick Pharmacy</p>
+          <h2>Your health, made simpler.</h2>
+          <p>Browse pharmacy products, check availability, and send your order to the pharmacy for processing.</p>
+          <Link to="/shop" className="hp-about-link">Browse products <ArrowRight size={16} /></Link>
+        </section>
+        <footer className="hp-footer"><Link to="/staff/login">Staff sign in</Link></footer>
       </main>
-      {isModalOpen && <SignInModal onClose={() => setIsModalOpen(false)} onSubmit={handleLogin} username={username} password={password} setUsername={setUsername} setPassword={setPassword} isLoading={isLoading} />}
+      {isModalOpen && <StoreAuthModal mode={authMode} onClose={() => setIsModalOpen(false)} onSwitchMode={setAuthMode} />}
     </div>
   );
 }

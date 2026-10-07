@@ -80,6 +80,22 @@ const Medicine = sequelize.define('Medicine', {
   totalQuantity: { // Aggegrated from batches, updated via hooks or logic
     type: DataTypes.INTEGER,
     defaultValue: 0
+  },
+  isCustomerVisible: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  warnings: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  basePrice: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0.0
   }
 });
 

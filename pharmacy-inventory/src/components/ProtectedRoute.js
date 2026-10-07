@@ -7,7 +7,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // If there's no role yet (or they are completely logged out/session expired)
   if (!userRole) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/staff/login" replace />;
   }
 
   // If their role is not in the allowed list, send them to POS (or a generic safe page)

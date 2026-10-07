@@ -12,6 +12,7 @@ const migrationDefinitions = [
   require('../migrations/009-harden-inventory-persistence'),
   require('../migrations/010-add-idempotency-and-sync'),
   require('../migrations/011-add-product-taxonomy'),
+  require('../migrations/012-add-customer-ecom-and-orders'),
 ];
 
 function normalizeTableName(table) {

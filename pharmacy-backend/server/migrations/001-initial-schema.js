@@ -138,6 +138,10 @@ module.exports = {
         lowStockThreshold: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 10 },
         imageUrl: { type: DataTypes.STRING, allowNull: true },
         totalQuantity: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+        isCustomerVisible: { type: DataTypes.BOOLEAN, defaultValue: true },
+        description: { type: DataTypes.TEXT, allowNull: true },
+        warnings: { type: DataTypes.TEXT, allowNull: true },
+        basePrice: { type: DataTypes.FLOAT, defaultValue: 0 },
         ...timestampColumns,
       });
     } else {
@@ -153,6 +157,10 @@ module.exports = {
         lowStockThreshold: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 10 },
         imageUrl: { type: DataTypes.STRING, allowNull: true },
         totalQuantity: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+        isCustomerVisible: { type: DataTypes.BOOLEAN, defaultValue: true },
+        description: { type: DataTypes.TEXT, allowNull: true },
+        warnings: { type: DataTypes.TEXT, allowNull: true },
+        basePrice: { type: DataTypes.FLOAT, defaultValue: 0 },
       });
     }
 

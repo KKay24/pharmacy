@@ -34,6 +34,11 @@ class AuthController {
   updateStatus(params, body, request) { return this.authService.updateStatus(params.id, body?.status, request.user); }
   updateUser(params, body, request) { return this.authService.updateUser(params.id, body, request.user); }
   deleteUser(params, request) { return this.authService.deleteUser(params.id, request.user); }
+
+  // Customer-facing endpoints
+  registerCustomer(body) { return this.authService.registerCustomer(body); }
+  getMyProfile(request) { return this.authService.getProfile(request.user); }
+  updateMyProfile(body, request) { return this.authService.updateProfile(request.user, body); }
 }
 
 Controller('api/auth')(AuthController);
@@ -74,5 +79,18 @@ Roles('admin')(AuthController.prototype, 'updateUser');
 Roles('admin')(AuthController.prototype, 'deleteUser');
 RequirePermissions(Permissions.USERS_READ)(AuthController.prototype, 'listUsers');
 for (const method of ['createUser', 'updateStatus', 'updateUser', 'deleteUser']) RequirePermissions(Permissions.USERS_WRITE)(AuthController.prototype, method);
+
+// Customer-facing route wiring
+Post('register')(AuthController.prototype, 'registerCustomer', Object.getOwnPropertyDescriptor(AuthController.prototype, 'registerCustomer'));
+Body()(AuthController.prototype, 'registerCustomer', 0);
+
+Get('profile')(AuthController.prototype, 'getMyProfile', Object.getOwnPropertyDescriptor(AuthController.prototype, 'getMyProfile'));
+Req()(AuthController.prototype, 'getMyProfile', 0);
+UseGuards(AuthGuard)(AuthController.prototype, 'getMyProfile', Object.getOwnPropertyDescriptor(AuthController.prototype, 'getMyProfile'));
+
+Put('profile')(AuthController.prototype, 'updateMyProfile', Object.getOwnPropertyDescriptor(AuthController.prototype, 'updateMyProfile'));
+Body()(AuthController.prototype, 'updateMyProfile', 0);
+Req()(AuthController.prototype, 'updateMyProfile', 1);
+UseGuards(AuthGuard)(AuthController.prototype, 'updateMyProfile', Object.getOwnPropertyDescriptor(AuthController.prototype, 'updateMyProfile'));
 
 module.exports = AuthController;

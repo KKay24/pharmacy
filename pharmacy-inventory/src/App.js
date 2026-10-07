@@ -1,5 +1,5 @@
 import React, { useContext, useState, useRef, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import {
   Bell,
   Boxes,
@@ -40,6 +40,18 @@ import ExpensesPage from "./pages/ExpensesPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import CustomersPage from "./pages/CustomersPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+
+// ─── Customer Store ───────────────────────────────────────
+import StoreLayout from "./components/store/StoreLayout";
+import { StoreProvider } from "./context/StoreContext";
+import StoreShopPage from "./pages/store/StoreShopPage";
+import StoreProductDetailPage from "./pages/store/StoreProductDetailPage";
+import StoreCheckoutPage from "./pages/store/StoreCheckoutPage";
+import StoreOrderSuccessPage from "./pages/store/StoreOrderSuccessPage";
+import StorePrescriptionPage from "./pages/store/StorePrescriptionPage";
+import StoreAccountPage from "./pages/store/StoreAccountPage";
+import StoreTrackOrderPage from "./pages/store/StoreTrackOrderPage";
+import StoreContactPage from "./pages/store/StoreContactPage";
 
 const PAGE_META = [
   {
@@ -327,12 +339,31 @@ function ShellLayout() {
   );
 }
 
+function LegacyStoreRedirect() {
+  const { pathname, search } = useLocation();
+  const legacyPath = pathname.replace(/^\/store(?=\/|$)/, "") || "/";
+  const destination = legacyPath === "/prescriptions" ? "/prescription-upload" : legacyPath;
+  return <Navigate to={`${destination}${search}`} replace />;
+}
+
 function App() {
   return (
     <DataProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<LoginPage />} />
+          <Route path="/staff/login" element={<StoreProvider><LoginPage staffMode /></StoreProvider>} />
+          <Route path="/" element={<StoreLayout />}>
+            <Route index element={<LoginPage />} />
+            <Route path="shop" element={<StoreShopPage />} />
+            <Route path="product/:id" element={<StoreProductDetailPage />} />
+            <Route path="checkout" element={<StoreCheckoutPage />} />
+            <Route path="order-success" element={<StoreOrderSuccessPage />} />
+            <Route path="prescription-upload" element={<StorePrescriptionPage />} />
+            <Route path="account" element={<StoreAccountPage />} />
+            <Route path="track-order" element={<StoreTrackOrderPage />} />
+            <Route path="contact" element={<StoreContactPage />} />
+          </Route>
+          <Route path="/store/*" element={<LegacyStoreRedirect />} />
           <Route path="/*" element={<ShellLayout />} />
         </Routes>
       </Router>

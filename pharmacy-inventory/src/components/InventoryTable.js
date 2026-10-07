@@ -80,7 +80,14 @@ export default function InventoryTable({
                                         <div>
                                             <div style={{fontWeight:700, color:'#1e293b'}}>{med.name}</div>
                                             <div style={{fontSize:'0.75rem', color:'#64748b'}}>{med.genericName} • {med.strength || med.dosage}</div>
-                                            <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>{batches.length} stock batch{batches.length === 1 ? '' : 'es'}</div>
+                                            <div style={{display:'flex', alignItems:'center', gap:'0.35rem', marginTop:'2px'}}>
+                                                <span style={{fontSize:'0.7rem', color:'#94a3b8'}}>{batches.length} stock batch{batches.length === 1 ? '' : 'es'}</span>
+                                                {med.isCustomerVisible !== false && (
+                                                    <span style={{fontSize:'0.65rem', padding:'1px 5px', borderRadius:'4px', background:'#e0f2fe', color:'#0369a1', fontWeight:600}}>
+                                                        Store
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </td>

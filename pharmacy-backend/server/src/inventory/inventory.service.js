@@ -20,7 +20,7 @@ const {
 const MEDICINE_UPDATE_FIELDS = [
   'name', 'genericName', 'brandName', 'category', 'dosage', 'strength', 'supplier',
   'manufacturer', 'barcode', 'imageUrl', 'lowStockThreshold', 'prescriptionRequired',
-  'packSize', 'unitOfMeasure',
+  'packSize', 'unitOfMeasure', 'isCustomerVisible', 'description', 'warnings', 'basePrice',
 ];
 
 function sanitizeDate(value, defaultDate) {
@@ -107,8 +107,10 @@ function updateAttributes(body = {}, existing) {
     if (body[field] === undefined) continue;
     if (field === 'lowStockThreshold') {
       attributes[field] = parseNonNegativeWholeNumber(body[field], 'Low-stock threshold');
-    } else if (field === 'prescriptionRequired') {
+    } else if (field === 'prescriptionRequired' || field === 'isCustomerVisible') {
       attributes[field] = Boolean(body[field]);
+    } else if (field === 'basePrice') {
+      attributes[field] = parseNonNegativeNumber(body[field], 'Base price');
     } else if (field === 'name') {
       const name = cleanText(body.name);
       if (!name) throw new BadRequestException('Medicine name is required');
