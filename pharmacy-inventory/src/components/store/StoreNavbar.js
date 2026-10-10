@@ -1,156 +1,165 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ShoppingCart, User, Search, X, Package, FileText, LogOut } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Menu, Search, ShoppingCart, User, X } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import StoreAuthModal from "./StoreAuthModal";
+
+const NAV_LINKS = [
+  { label: "Home", href: "/", activePath: "/" },
+  { label: "Shop", href: "/shop", activePath: "/shop" },
+  { label: "Prescriptions", href: "/prescription-upload", activePath: "/prescription-upload" },
+  { label: "Health & Wellness", href: "/health-wellness", activePath: "/health-wellness" },
+  { label: "About Us", href: "/about", activePath: "/about" },
+];
 
 export default function StoreNavbar({ onCartOpen }) {
   const { cartCount, storeUser, storeLogout } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [search, setSearch] = useState("");
+  const location = useLocation();
   const navigate = useNavigate();
+  const activePath = location.hash
+    ? `${location.pathname}${location.hash}`
+    : location.pathname;
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (search.trim()) {
-      navigate(`/shop?search=${encodeURIComponent(search.trim())}`);
-      setSearch("");
-      setMenuOpen(false);
-    }
+  const handleSearch = (event) => {
+    event.preventDefault();
+    const query = search.trim();
+    if (!query) return;
+    navigate(`/shop?search=${encodeURIComponent(query)}`);
+    setSearch("");
+    setSearchOpen(false);
+    setMenuOpen(false);
   };
 
-  const openAuth = (mode = "login") => { setAuthMode(mode); setAuthOpen(true); };
-
-  const NAV_LINKS = [
-    { label: "Shop", href: "/shop" },
-    { label: "Prescriptions", href: "/prescription-upload" },
-    { label: "Track Order", href: "/track-order" },
-    { label: "Contact", href: "/contact" },
-  ];
+  const closeMenu = () => setMenuOpen(false);
 
   return (
-    <>
-      {/* Announcement */}
-      <div className="store-announcement">
-        MediQuick Pharmacy &nbsp;|&nbsp;
-        <Link to="/shop">Shop Now →</Link>
+    <header className="customer-navbar">
+      <div className="customer-navbar__topline" />
+      <div className="customer-navbar__bar">
+        <Link to="/" className="customer-navbar__brand" aria-label="MediQuick Pharmacy home">
+          <span className="customer-navbar__logo">
+            <img src="/logo512.png" alt="" />
+          </span>
+          <span className="customer-navbar__brand-copy">
+            <strong>MediQuick <em>Pharmacy</em></strong>
+            <small>Better health. Delivered.</small>
+          </span>
+        </Link>
+
+        <nav className="customer-navbar__links" aria-label="Customer navigation">
+          {NAV_LINKS.map(({ label, href, activePath: linkPath }) => (
+            <Link
+              key={label}
+              to={href}
+              className={activePath === linkPath ? "active" : ""}
+              aria-current={activePath === linkPath ? "page" : undefined}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="customer-navbar__actions">
+          <button
+            type="button"
+            className="customer-navbar__icon"
+            aria-label={searchOpen ? "Close product search" : "Search products"}
+            onClick={() => setSearchOpen((open) => !open)}
+          >
+            {searchOpen ? <X size={22} /> : <Search size={22} />}
+          </button>
+          {storeUser ? (
+            <Link to="/account" className="customer-navbar__account">
+              <User size={21} />
+              <span>My Account</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="customer-navbar__account"
+              onClick={() => { setAuthMode("login"); setAuthOpen(true); }}
+            >
+              <User size={21} />
+              <span>My Account</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="customer-navbar__cart"
+            aria-label={`Shopping cart, ${cartCount} ${cartCount === 1 ? "item" : "items"}`}
+            onClick={onCartOpen}
+          >
+            <ShoppingCart size={25} />
+            <span>{cartCount > 99 ? "99+" : cartCount}</span>
+          </button>
+          <button
+            type="button"
+            className="customer-navbar__menu-toggle"
+            aria-label={menuOpen ? "Close customer navigation" : "Open customer navigation"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X size={23} /> : <Menu size={23} />}
+          </button>
+        </div>
       </div>
 
-      <nav className="store-navbar">
-        <div className="store-navbar__inner">
-          {/* Logo */}
-          <Link to="/" className="store-navbar__logo">
-            <div className="store-navbar__logo-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-              </svg>
-            </div>
-            <div className="store-navbar__logo-text">
-              MediQuick
-              <span>Online Pharmacy</span>
-            </div>
-          </Link>
+      {searchOpen && (
+        <form className="customer-navbar__search" onSubmit={handleSearch}>
+          <Search size={18} aria-hidden="true" />
+          <input
+            type="search"
+            aria-label="Search pharmacy products"
+            placeholder="Search medicines and health products..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            autoFocus
+          />
+          <button type="submit">Search</button>
+        </form>
+      )}
 
-          {/* Search */}
-          <div className="store-navbar__search">
-            <form onSubmit={handleSearch} style={{ display: "contents" }}>
-              <Search size={16} className="store-navbar__search-icon" />
-              <input
-                type="text" placeholder="Search medicines, vitamins..."
-                value={search} onChange={e => setSearch(e.target.value)}
-              />
-              <button type="submit" className="store-navbar__search-btn">Search</button>
-            </form>
-          </div>
-
-          {/* Actions */}
-          <div className="store-navbar__actions">
-            {NAV_LINKS.slice(0, 2).map(l => (
-              <Link key={l.label} to={l.href} className="store-nav-btn">
-                {l.label === "Prescriptions" ? <FileText size={16} /> : null}
-                {l.label}
-              </Link>
-            ))}
-
-            {storeUser ? (
-              <Link to="/account" className="store-nav-btn">
-                <User size={17} />
-                <span className="mobile-hide">{storeUser.username?.split(" ")[0] || "My Account"}</span>
-              </Link>
-            ) : (
-              <button className="store-nav-btn" onClick={() => openAuth("login")}>
-                <User size={17} /> Sign In
-              </button>
-            )}
-
-            <button className="store-nav-btn store-cart-nav-btn" onClick={onCartOpen} style={{ position: "relative" }}>
-              <ShoppingCart size={20} />
-              {cartCount > 0 && <span className="store-nav-btn__badge">{cartCount > 99 ? "99+" : cartCount}</span>}
-            </button>
-
-            <button className="store-nav__hamburger" onClick={() => setMenuOpen(true)} aria-label="Menu">
-              <span /><span /><span />
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Mobile menu */}
-      <div
-        className={`store-nav__mobile-menu ${menuOpen ? "open" : ""}`}
+      <nav
+        className={`customer-navbar__mobile${menuOpen ? " open" : ""}`}
+        aria-label="Customer navigation"
         aria-hidden={!menuOpen}
         inert={!menuOpen}
       >
-        <button className="store-nav__mobile-close" onClick={() => setMenuOpen(false)}>
-          <X size={24} />
-        </button>
-        <form onSubmit={handleSearch} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-          <input
-            type="text" placeholder="Search medicines..."
-            value={search} onChange={e => setSearch(e.target.value)}
-            style={{ flex: 1, padding: "0.65rem 1rem", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.9rem", fontFamily: "inherit", outline: "none" }}
-          />
-          <button type="submit" style={{ background: "var(--brand-blue)", color: "white", padding: "0 1rem", borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", fontWeight: 600 }}>Go</button>
-        </form>
-
-        {NAV_LINKS.map(l => (
-          <Link key={l.label} to={l.href} className="store-nav__mobile-link" onClick={() => setMenuOpen(false)}>
-            {l.label}
-          </Link>
+        {NAV_LINKS.map(({ label, href }) => (
+          <Link key={label} to={href} onClick={closeMenu}>{label}</Link>
         ))}
+        {storeUser ? (
+          <>
+            <Link to="/account" onClick={closeMenu}>My Account &amp; Orders</Link>
+            <button
+              type="button"
+              onClick={() => { storeLogout(); closeMenu(); }}
+            >
+              Sign Out
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setAuthMode("login"); setAuthOpen(true); closeMenu(); }}
+          >
+            Sign In / Register
+          </button>
+        )}
+      </nav>
 
-        <div style={{ borderTop: "1px solid var(--border)", marginTop: "1rem", paddingTop: "1rem" }}>
-          {storeUser ? (
-            <>
-              <Link to="/account" className="store-nav__mobile-link" onClick={() => setMenuOpen(false)}>
-                <User size={18} /> My Account
-              </Link>
-              <Link to="/account" className="store-nav__mobile-link" onClick={() => setMenuOpen(false)}>
-                <Package size={18} /> My Orders
-              </Link>
-              <button className="store-nav__mobile-link" style={{ width: "100%", cursor: "pointer", color: "var(--red)" }}
-                onClick={() => { storeLogout(); setMenuOpen(false); }}>
-                <LogOut size={18} /> Sign Out
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="store-nav__mobile-link" style={{ width: "100%", cursor: "pointer" }}
-                onClick={() => { openAuth("login"); setMenuOpen(false); }}>
-                <User size={18} /> Sign In
-              </button>
-              <button className="store-nav__mobile-link" style={{ width: "100%", cursor: "pointer", background: "var(--brand-blue)", color: "white", borderRadius: "var(--radius)" }}
-                onClick={() => { openAuth("register"); setMenuOpen(false); }}>
-                <User size={18} /> Create Account
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {authOpen && <StoreAuthModal mode={authMode} onClose={() => setAuthOpen(false)} onSwitchMode={setAuthMode} />}
-    </>
+      {authOpen && (
+        <StoreAuthModal
+          mode={authMode}
+          onClose={() => setAuthOpen(false)}
+          onSwitchMode={setAuthMode}
+        />
+      )}
+    </header>
   );
 }

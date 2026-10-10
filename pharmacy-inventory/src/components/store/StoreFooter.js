@@ -32,6 +32,7 @@ export default function StoreFooter() {
             <li><Link to="/prescription-upload">Submit Prescription</Link></li>
             <li><Link to="/track-order">Track Your Order</Link></li>
             <li><Link to="/account">My Account</Link></li>
+            <li><Link to="/health-wellness">Health &amp; Wellness</Link></li>
             <li><Link to="/contact">Contact Us</Link></li>
           </ul>
         </div>
@@ -39,6 +40,7 @@ export default function StoreFooter() {
         <div className="store-footer__col">
           <h4>Pharmacy</h4>
           <ul>
+            <li><Link to="/about">About MediQuick</Link></li>
             <li><Link to="/staff/login">Staff sign in</Link></li>
             <li><Link to="/account">Order history</Link></li>
           </ul>

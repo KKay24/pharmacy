@@ -6,20 +6,16 @@ import {
   ChevronRight,
   HeartPulse,
   Lock,
-  Menu,
   Pill,
   Search,
   ShieldCheck,
-  ShoppingCart,
   Truck,
   User,
-  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiFetch as staffApiFetch } from "../utils/api";
 import { DataContext } from "../context/DataContext";
 import { useStore } from "../context/StoreContext";
-import StoreAuthModal from "../components/store/StoreAuthModal";
 import { ProductCard, ProductCardSkeleton } from "../components/store/ProductCard";
 import "../styles/login-modern.css";
 
@@ -62,9 +58,6 @@ export default function LoginPage({ staffMode = false }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState("login");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [categories, setCategories] = useState([]);
   const [featured, setFeatured] = useState([]);
@@ -73,7 +66,7 @@ export default function LoginPage({ staffMode = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { loginUser } = useContext(DataContext);
-  const { apiFetch, cartCount, storeUser } = useStore();
+  const { apiFetch } = useStore();
   const { openCart } = useOutletContext() || {};
   const isStaffLogin = staffMode || location.pathname === "/staff/login";
 
@@ -149,43 +142,6 @@ export default function LoginPage({ staffMode = false }) {
 
   return (
     <div className="hp-page">
-      <header className="hp-header">
-        <Link to="/" className="hp-brand" aria-label="MediQuick Pharmacy home">
-          <span className="hp-brand-mark" style={{ overflow: "hidden" }}><img src="/logo512.png" alt="" style={{ width: "84px", maxWidth: "none", transform: "translate(-22px, -5px)" }} /></span>
-          <span><strong>MediQuick <em>Pharmacy</em></strong><small>Better health. Delivered.</small></span>
-        </Link>
-        <nav className="hp-nav" aria-label="Main navigation">
-          <Link className="active" to="/">Home</Link>
-          <Link to="/shop">Shop</Link>
-          <Link to="/prescription-upload">Prescriptions</Link>
-          <a href="#categories">Health &amp; Wellness</a>
-          <a href="#about">About Us</a>
-        </nav>
-        <div className="hp-header-actions">
-          <button type="button" className="hp-icon-button" aria-label="Search products" onClick={() => navigate("/shop")}><Search size={19} /></button>
-          {storeUser
-            ? <Link to="/account" className="hp-signin-link"><User size={18} /><span>My Account</span></Link>
-            : <button type="button" className="hp-signin-link" onClick={() => { setAuthMode("login"); setIsModalOpen(true); }}><User size={18} /><span>Sign In / Register</span></button>}
-          <button type="button" className="hp-cart-button" aria-label={`Shopping cart, ${cartCount} items`} onClick={openCart}>
-            <ShoppingCart size={21} /><b>{cartCount > 99 ? "99+" : cartCount}</b>
-          </button>
-        </div>
-        <button type="button" className="hp-menu-button" aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen((open) => !open)}>
-          {menuOpen ? <X size={23} /> : <Menu size={23} />}
-        </button>
-        {menuOpen && (
-          <nav className="hp-mobile-nav" aria-label="Mobile navigation">
-            <Link to="/shop" onClick={() => setMenuOpen(false)}>Shop products</Link>
-            <Link to="/prescription-upload" onClick={() => setMenuOpen(false)}>Prescriptions</Link>
-            <a href="#categories" onClick={() => setMenuOpen(false)}>Health &amp; Wellness</a>
-            <a href="#about" onClick={() => setMenuOpen(false)}>About Us</a>
-            {storeUser
-              ? <Link to="/account" onClick={() => setMenuOpen(false)}>My Account</Link>
-              : <button type="button" onClick={() => { setAuthMode("login"); setIsModalOpen(true); setMenuOpen(false); }}>Sign In / Register</button>}
-          </nav>
-        )}
-      </header>
-
       <main id="top">
         <section className="hp-hero">
           <div className="hp-hero-content">
@@ -254,9 +210,7 @@ export default function LoginPage({ staffMode = false }) {
           <p>Browse pharmacy products, check availability, and send your order to the pharmacy for processing.</p>
           <Link to="/shop" className="hp-about-link">Browse products <ArrowRight size={16} /></Link>
         </section>
-        <footer className="hp-footer"><Link to="/staff/login">Staff sign in</Link></footer>
       </main>
-      {isModalOpen && <StoreAuthModal mode={authMode} onClose={() => setIsModalOpen(false)} onSwitchMode={setAuthMode} />}
     </div>
   );
 }

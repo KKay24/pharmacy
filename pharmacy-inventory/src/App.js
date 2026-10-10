@@ -52,6 +52,8 @@ import StorePrescriptionPage from "./pages/store/StorePrescriptionPage";
 import StoreAccountPage from "./pages/store/StoreAccountPage";
 import StoreTrackOrderPage from "./pages/store/StoreTrackOrderPage";
 import StoreContactPage from "./pages/store/StoreContactPage";
+import StoreHealthWellnessPage from "./pages/store/StoreHealthWellnessPage";
+import StoreAboutPage from "./pages/store/StoreAboutPage";
 
 const PAGE_META = [
   {
@@ -362,6 +364,8 @@ function App() {
             <Route path="account" element={<StoreAccountPage />} />
             <Route path="track-order" element={<StoreTrackOrderPage />} />
             <Route path="contact" element={<StoreContactPage />} />
+            <Route path="health-wellness" element={<StoreHealthWellnessPage />} />
+            <Route path="about" element={<StoreAboutPage />} />
           </Route>
           <Route path="/store/*" element={<LegacyStoreRedirect />} />
           <Route path="/*" element={<ShellLayout />} />
