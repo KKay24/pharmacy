@@ -42,21 +42,21 @@ describe("OrderManagementPage", () => {
     expect(await screen.findByText("ORD-TEST-12")).toBeTruthy();
     expect(screen.getByText(/customer@example.test/)).toBeTruthy();
     expect(screen.getByText("Mobile Money · Pending")).toBeTruthy();
-    expect(screen.getByText(/does not confirm or collect payment/i)).toBeTruthy();
+    expect(screen.getByText(/confirmed only when the full requested quantity is allocated/i)).toBeTruthy();
 
-    apiFetch.mockResolvedValueOnce(jsonResponse({ ...order, orderStatus: "Preparing" }));
+    apiFetch.mockResolvedValueOnce(jsonResponse({ ...order, orderStatus: "Confirmed" }));
     fireEvent.change(screen.getByLabelText("Fulfillment status", { selector: "#order-status-12" }), {
-      target: { value: "Preparing" },
+      target: { value: "Confirmed" },
     });
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenLastCalledWith("/api/orders/12/status", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Preparing" }),
+        body: JSON.stringify({ status: "Confirmed" }),
       });
     });
-    expect(await screen.findByText("Order ORD-TEST-12 updated to Preparing.")).toBeTruthy();
+    expect(await screen.findByText("Order ORD-TEST-12 updated to Confirmed.")).toBeTruthy();
 
     apiFetch.mockResolvedValueOnce(jsonResponse({
       ...order,

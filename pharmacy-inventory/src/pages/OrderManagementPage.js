@@ -139,7 +139,8 @@ export default function OrderManagementPage() {
       <div className="order-management__notice" role="note">
         <Clock3 size={17} />
         <span>
-          Store checkout records payment as pending. Updating fulfillment status does not confirm or collect payment.
+          Orders can be confirmed only when the full requested quantity is allocated from saleable stock.
+          Out-of-stock orders remain at Order Placed until stock is available. Payment remains pending until separately confirmed.
           Cancelling an order does not automatically restore its stock.
         </span>
       </div>

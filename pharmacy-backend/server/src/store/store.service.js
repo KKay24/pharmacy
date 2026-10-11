@@ -531,8 +531,120 @@ class StoreService {
       if (order.orderStatus === 'Cancelled') {
         throw new ConflictException('This order has already been cancelled');
       }
+      if (order.orderStatus === status) return order;
+      if (
+        order.orderStatus === 'Order Placed'
+        && ['Preparing', 'Ready', 'Out for Delivery', 'Delivered'].includes(status)
+      ) {
+        throw new ConflictException('Confirm the order before continuing fulfillment');
+      }
 
       const updates = { orderStatus: status };
+      if (status === 'Confirmed') {
+        const orderItems = Array.isArray(order.items) ? order.items : [];
+        if (orderItems.length === 0) {
+          throw new ConflictException('This order has no items to confirm');
+        }
+
+        const groupedItems = new Map();
+        for (const item of orderItems) {
+          const medicineId = Number(item.id || item.medicineId);
+          const requestedQuantity = Number(item.quantity);
+          if (!Number.isInteger(medicineId) || medicineId <= 0
+            || !Number.isInteger(requestedQuantity) || requestedQuantity <= 0) {
+            throw new ConflictException('This order contains invalid item details and cannot be confirmed');
+          }
+          const existing = groupedItems.get(medicineId);
+          if (existing) {
+            existing.requestedQuantity += requestedQuantity;
+          } else {
+            groupedItems.set(medicineId, { item, medicineId, requestedQuantity });
+          }
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        for (const { item, medicineId, requestedQuantity } of groupedItems.values()) {
+          const medicine = await Medicine.findByPk(medicineId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          if (!medicine) {
+            throw new ConflictException(`Product ${item.name || medicineId} is no longer available to confirm`);
+          }
+
+          const batches = await Batch.findAll({
+            where: { medicineId },
+            order: [['expiryDate', 'ASC'], ['id', 'ASC']],
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          const saleableBatches = batches.filter((batch) => (
+            String(batch.expiryDate) >= today && Number(batch.quantity || 0) > 0
+          ));
+          const existingMovements = await InventoryMovement.findAll({
+            where: {
+              medicineId,
+              referenceType: 'ONLINE_ORDER',
+              reason: `Order ${order.orderNumber}`,
+            },
+            transaction,
+          });
+          const alreadyAllocated = existingMovements.reduce((sum, movement) => (
+            Number(movement.quantityChange) < 0
+              ? sum + Math.abs(Number(movement.quantityChange))
+              : sum
+          ), 0);
+          const availableStock = batches.length > 0
+            ? saleableBatches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
+            : Math.max(0, Number(medicine.totalQuantity || 0));
+          const additionalQuantity = Math.max(0, requestedQuantity - alreadyAllocated);
+
+          if (availableStock < additionalQuantity) {
+            throw new ConflictException(
+              `Insufficient stock to confirm ${item.name || medicine.name}. `
+              + `Required: ${requestedQuantity}, available: ${alreadyAllocated + availableStock}.`
+            );
+          }
+
+          let remainingToAllocate = additionalQuantity;
+          if (batches.length > 0) {
+            for (const batch of saleableBatches) {
+              if (remainingToAllocate <= 0) break;
+              const deduction = Math.min(Number(batch.quantity || 0), remainingToAllocate);
+              if (deduction <= 0) continue;
+              await batch.update({ quantity: Number(batch.quantity) - deduction }, { transaction });
+              await InventoryMovement.create({
+                medicineId,
+                batchId: batch.id,
+                movementType: 'SALE',
+                quantityChange: -deduction,
+                referenceType: 'ONLINE_ORDER',
+                reason: `Order ${order.orderNumber}`,
+              }, { transaction });
+              remainingToAllocate -= deduction;
+            }
+            const updatedBatches = await Batch.findAll({
+              where: { medicineId },
+              transaction,
+            });
+            await medicine.update({
+              totalQuantity: updatedBatches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0),
+            }, { transaction });
+          } else if (additionalQuantity > 0) {
+            await medicine.update({
+              totalQuantity: Math.max(0, Number(medicine.totalQuantity || 0) - additionalQuantity),
+            }, { transaction });
+            await InventoryMovement.create({
+              medicineId,
+              batchId: null,
+              movementType: 'SALE',
+              quantityChange: -additionalQuantity,
+              referenceType: 'ONLINE_ORDER',
+              reason: `Order ${order.orderNumber}`,
+            }, { transaction });
+          }
+        }
+      }
       if (status === 'Cancelled') {
         if (!user || !['admin', 'manager', 'user'].includes(user.role)) {
           throw new ForbiddenException('Staff authorization is required to cancel an order');

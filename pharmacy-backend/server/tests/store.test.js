@@ -182,6 +182,30 @@ describe('Store E-Commerce Endpoints', () => {
       where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
     }), movementCount);
     assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 0);
+
+    const StoreService = require('../src/store/store.service');
+    const storeService = new StoreService();
+    await assert.rejects(
+      storeService.updateOrderStatus(outOfStockOrder.data.order.id, 'Confirmed'),
+      (error) => error.getStatus() === 409 && error.message.includes('Insufficient stock')
+    );
+    assert.equal(outOfStockOrder.data.order.orderStatus, 'Order Placed');
+
+    if (batches.length > 0) {
+      await Batch.update({ quantity: 0 }, { where: { medicineId: sample.id } });
+      await batches[0].update({ quantity: 2, expiryDate: '2099-12-31' });
+    }
+    await medicine.update({ totalQuantity: 2 });
+
+    const confirmedOrder = await storeService.updateOrderStatus(
+      outOfStockOrder.data.order.id,
+      'Confirmed'
+    );
+    assert.equal(confirmedOrder.orderStatus, 'Confirmed');
+    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 0);
+    assert.equal(await InventoryMovement.count({
+      where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
+    }), movementCount + 1);
   });
 
   test('POST /api/prescriptions/upload and GET /api/prescriptions/track/:ref', async () => {

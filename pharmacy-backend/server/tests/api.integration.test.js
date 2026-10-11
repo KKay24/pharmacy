@@ -385,8 +385,8 @@ test('all staff roles can list full online orders and update fulfillment status'
     headers: staffHeaders,
     body: JSON.stringify({ status: 'Preparing' }),
   });
-  assert.equal(updateResponse.status, 200);
-  assert.equal((await updateResponse.json()).orderStatus, 'Preparing');
+  assert.equal(updateResponse.status, 409);
+  assert.match((await updateResponse.json()).message, /Confirm the order before continuing fulfillment/);
 
   const missingReasonResponse = await fetch(`${baseUrl}/api/orders/${createdOrder.id}/status`, {
     method: 'PUT',
