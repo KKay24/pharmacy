@@ -3,6 +3,14 @@ import { apiUrl } from "../utils/api";
 
 export const StoreContext = createContext(null);
 
+function withoutInventoryLevels(product) {
+  const customerProduct = { ...product };
+  delete customerProduct.stock;
+  delete customerProduct.inStock;
+  delete customerProduct.batches;
+  return customerProduct;
+}
+
 export function StoreProvider({ children }) {
   // Auth
   const [storeUser, setStoreUser] = useState(() => {
@@ -12,12 +20,18 @@ export function StoreProvider({ children }) {
 
   // Cart
   const [cart, setCart] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("store_cart")) || []; } catch { return []; }
+    try {
+      const savedCart = JSON.parse(localStorage.getItem("store_cart")) || [];
+      return Array.isArray(savedCart) ? savedCart.map(withoutInventoryLevels) : [];
+    } catch { return []; }
   });
 
   // Wishlist
   const [wishlist, setWishlist] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("store_wishlist")) || []; } catch { return []; }
+    try {
+      const savedWishlist = JSON.parse(localStorage.getItem("store_wishlist")) || [];
+      return Array.isArray(savedWishlist) ? savedWishlist.map(withoutInventoryLevels) : [];
+    } catch { return []; }
   });
 
   // Persist cart & wishlist
@@ -74,16 +88,16 @@ export function StoreProvider({ children }) {
 
   // --- Cart helpers ---
   const addToCart = (product, qty = 1) => {
-    const availableStock = Number(product.stock);
-    if (!Number.isInteger(qty) || qty < 1 || availableStock < 1) return;
+    if (!Number.isInteger(qty) || qty < 1) return;
+    const customerProduct = withoutInventoryLevels(product);
     setCart(prev => {
-      const existing = prev.find(i => i.id === product.id);
+      const existing = prev.find(i => i.id === customerProduct.id);
       if (existing) {
-        return prev.map(i => i.id === product.id
-          ? { ...i, ...product, quantity: Math.min(availableStock, i.quantity + qty) }
+        return prev.map(i => i.id === customerProduct.id
+          ? { ...i, ...customerProduct, quantity: i.quantity + qty }
           : i);
       }
-      return [...prev, { ...product, quantity: Math.min(availableStock, qty) }];
+      return [...prev, { ...customerProduct, quantity: qty }];
     });
   };
 
@@ -92,7 +106,7 @@ export function StoreProvider({ children }) {
   const updateCartQty = (productId, qty) => {
     if (qty < 1) return removeFromCart(productId);
     setCart(prev => prev.map(i => i.id === productId
-      ? { ...i, quantity: Math.min(Number(i.stock) || 0, qty) }
+      ? { ...i, quantity: qty }
       : i).filter(item => item.quantity > 0));
   };
 
@@ -103,9 +117,10 @@ export function StoreProvider({ children }) {
 
   // --- Wishlist helpers ---
   const toggleWishlist = (product) => {
+    const customerProduct = withoutInventoryLevels(product);
     setWishlist(prev => {
-      const exists = prev.find(i => i.id === product.id);
-      return exists ? prev.filter(i => i.id !== product.id) : [...prev, product];
+      const exists = prev.find(i => i.id === customerProduct.id);
+      return exists ? prev.filter(i => i.id !== customerProduct.id) : [...prev, customerProduct];
     });
   };
   const isWishlisted = (productId) => wishlist.some(i => i.id === productId);

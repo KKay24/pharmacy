@@ -28,7 +28,7 @@ const SERVICES = [
   },
   {
     title: "Medical Supplies",
-    description: "Explore medical and first-aid supplies available in the catalogue.",
+    description: "Explore medical and first-aid supplies in our catalogue.",
     icon: ShieldCheck,
     image: "https://images.unsplash.com/photo-1584982751601-97dcc096659c?auto=format&fit=crop&w=720&q=80",
     href: "/shop",
@@ -49,7 +49,7 @@ const SERVICES = [
   },
   {
     title: "Convenient Online Shopping",
-    description: "Check product availability and submit orders through the store.",
+    description: "Browse the catalogue and submit orders through the store.",
     icon: ShoppingBag,
     image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=720&q=80",
     href: "/shop",
@@ -70,8 +70,8 @@ const VALUES = [
     icon: Coins,
   },
   {
-    title: "Stock-aware",
-    text: "Customer product availability comes from pharmacy inventory.",
+    title: "Pharmacy reviewed",
+    text: "Online orders are reviewed by the pharmacy team.",
     icon: PackageCheck,
   },
   {
@@ -100,7 +100,7 @@ export default function StoreAboutPage() {
           </p>
           <div className="about-hero__highlights">
             <span><ShieldCheck size={19} /> Pharmacy products</span>
-            <span><PackageCheck size={19} /> Inventory availability</span>
+            <span><PackageCheck size={19} /> Pharmacy review</span>
             <span><Headset size={19} /> Customer support</span>
           </div>
         </div>
@@ -133,7 +133,7 @@ export default function StoreAboutPage() {
         <div className="about-section-heading">
           <p className="about-section-kicker">What we offer</p>
           <h2 id="about-services-title">Everything you need for better health</h2>
-          <p>Explore pharmacy services and products available through MediQuick.</p>
+          <p>Explore pharmacy services and products through MediQuick.</p>
         </div>
         <div className="about-service-grid">
           {SERVICES.map(({ title, description, icon: Icon, image, href }) => (

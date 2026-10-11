@@ -7,7 +7,7 @@ import { showToast } from "../../components/store/StoreToast";
 export default function StoreProductDetailPage() {
   const { id } = useParams();
   const { openCart } = useOutletContext() || {};
-  const { apiFetch, addToCart, cart, toggleWishlist, isWishlisted } = useStore();
+  const { apiFetch, addToCart, toggleWishlist, isWishlisted } = useStore();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,14 +43,8 @@ export default function StoreProductDetailPage() {
   );
 
   const wished = isWishlisted(product.id);
-  const cartQuantity = cart.find((item) => item.id === product.id)?.quantity || 0;
-  const remainingStock = Math.max(0, Number(product.stock) - cartQuantity);
 
   const handleAdd = () => {
-    if (qty > remainingStock) {
-      showToast("Requested quantity exceeds current available stock", "error");
-      return;
-    }
     addToCart({ ...product }, qty);
     showToast(`${product.name} (×${qty}) added to cart`, "success");
     if (openCart) openCart();
@@ -111,10 +105,6 @@ export default function StoreProductDetailPage() {
                 ? <span className="store-product-detail__tag" style={{ borderColor: "var(--red)", color: "var(--red)" }}>⚕️ Prescription Required</span>
                 : <span className="store-product-detail__tag" style={{ borderColor: "var(--green)", color: "var(--green)" }}>✓ Over the Counter</span>
               }
-              {product.inStock
-                ? <span className="store-product-detail__tag" style={{ borderColor: "var(--green)", color: "var(--green)" }}>In Stock ({product.stock})</span>
-                : <span className="store-product-detail__tag" style={{ borderColor: "var(--red)", color: "var(--red)" }}>Out of Stock</span>
-              }
               {product.dosage && <span className="store-product-detail__tag">{product.dosage}</span>}
               {product.strength && <span className="store-product-detail__tag">{product.strength}</span>}
             </div>
@@ -123,16 +113,16 @@ export default function StoreProductDetailPage() {
               ZMW {(product.price || 0).toFixed(2)}
             </div>
 
-            {product.inStock && !product.prescriptionRequired && (
+            {!product.prescriptionRequired && (
               <>
                 <div className="store-product-detail__qty-control">
                   <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-secondary)" }}>Qty:</span>
                   <button className="store-product-detail__qty-btn" onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
                   <span className="store-product-detail__qty">{qty}</span>
-                  <button className="store-product-detail__qty-btn" disabled={qty >= remainingStock} onClick={() => setQty(q => Math.min(remainingStock, q + 1))} aria-label="Increase quantity">+</button>
+                  <button className="store-product-detail__qty-btn" onClick={() => setQty(q => q + 1)} aria-label="Increase quantity">+</button>
                 </div>
                 <div className="store-product-detail__actions">
-                  <button className="store-product-detail__add" disabled={remainingStock < 1} onClick={handleAdd}>
+                  <button className="store-product-detail__add" onClick={handleAdd}>
                     <ShoppingCart size={18} /> Add to Cart
                   </button>
                   <button
@@ -145,11 +135,8 @@ export default function StoreProductDetailPage() {
                 </div>
               </>
             )}
-            {product.inStock && !product.prescriptionRequired && remainingStock < 1 && (
-              <p className="store-product-detail__stock-limit">You already have the available stock in your cart.</p>
-            )}
 
-            {product.prescriptionRequired && product.inStock && (
+            {product.prescriptionRequired && (
               <div style={{ background: "var(--red-light)", border: "1px solid #fca5a5", borderRadius: "var(--radius)", padding: "1rem", marginBottom: "1rem" }}>
                 <p style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--red)", marginBottom: "0.5rem" }}>
                   ⚕️ This medicine requires a valid prescription
@@ -159,12 +146,6 @@ export default function StoreProductDetailPage() {
                     <FileText size={15} /> Upload Prescription
                   </button>
                 </Link>
-              </div>
-            )}
-
-            {!product.inStock && (
-              <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "1rem" }}>
-                <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)" }}>This product is currently out of stock. <Link to="/contact" style={{ color: "var(--brand-blue)", fontWeight: 600 }}>Contact us</Link> to be notified.</p>
               </div>
             )}
 

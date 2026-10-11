@@ -339,7 +339,8 @@ test('all staff roles can list full online orders and update fulfillment status'
     body: JSON.stringify({ username, password: 'order-staff-password-test' }),
   });
   assert.equal(loginResponse.status, 200);
-  const staffToken = (await loginResponse.json()).token;
+  const staffLogin = await loginResponse.json();
+  const staffToken = staffLogin.token;
   const staffHeaders = {
     Authorization: `Bearer ${staffToken}`,
     'Content-Type': 'application/json',
@@ -347,7 +348,7 @@ test('all staff roles can list full online orders and update fulfillment status'
 
   const productsResponse = await fetch(`${baseUrl}/api/products?limit=10`);
   assert.equal(productsResponse.status, 200);
-  const product = (await productsResponse.json()).data.find((item) => item.inStock);
+  const product = (await productsResponse.json()).data.find((item) => !item.prescriptionRequired);
   assert.ok(product, 'A customer-orderable product is available');
   const createOrderResponse = await fetch(`${baseUrl}/api/orders`, {
     method: 'POST',
@@ -386,6 +387,33 @@ test('all staff roles can list full online orders and update fulfillment status'
   });
   assert.equal(updateResponse.status, 200);
   assert.equal((await updateResponse.json()).orderStatus, 'Preparing');
+
+  const missingReasonResponse = await fetch(`${baseUrl}/api/orders/${createdOrder.id}/status`, {
+    method: 'PUT',
+    headers: staffHeaders,
+    body: JSON.stringify({ status: 'Cancelled', reason: '   ' }),
+  });
+  assert.equal(missingReasonResponse.status, 400);
+
+  const cancellationReason = 'Customer could not be reached to confirm delivery';
+  const cancelResponse = await fetch(`${baseUrl}/api/orders/${createdOrder.id}/status`, {
+    method: 'PUT',
+    headers: staffHeaders,
+    body: JSON.stringify({ status: 'Cancelled', reason: cancellationReason }),
+  });
+  assert.equal(cancelResponse.status, 200);
+  const cancelledOrder = await cancelResponse.json();
+  assert.equal(cancelledOrder.orderStatus, 'Cancelled');
+  assert.equal(cancelledOrder.cancellationReason, cancellationReason);
+  assert.equal(cancelledOrder.cancelledByUserId, staffLogin.user.id);
+  assert.ok(cancelledOrder.cancelledAt);
+
+  const duplicateCancelResponse = await fetch(`${baseUrl}/api/orders/${createdOrder.id}/status`, {
+    method: 'PUT',
+    headers: staffHeaders,
+    body: JSON.stringify({ status: 'Cancelled', reason: cancellationReason }),
+  });
+  assert.equal(duplicateCancelResponse.status, 409);
 });
 
 test('inventory can be fetched with the issued token', async () => {

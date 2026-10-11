@@ -15,7 +15,7 @@ export default function StoreOrderSuccessPage() {
           </div>
           <h1 style={{ fontSize: "1.6rem", fontWeight: "900", marginBottom: "0.5rem" }}>Order Placed! 🎉</h1>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: "1.6", marginBottom: "1.5rem" }}>
-            Your order has been recorded and inventory updated. Payment is not collected online; the pharmacy must confirm your order.
+            Your order has been recorded. Payment is not collected online; the pharmacy must confirm your order.
           </p>
 
           <div style={{ background: "var(--bg)", borderRadius: "var(--radius)", padding: "1rem 1.5rem", marginBottom: "2rem", border: "1px solid var(--border)" }}>

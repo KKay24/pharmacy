@@ -247,6 +247,110 @@
   font-size: 0.82rem;
 }
 
+.order-management__cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.order-management__cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.order-management__cancellation-reason {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 7px;
+  background: #fef2f2;
+  color: #7f1d1d;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.order-management__modal-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.order-management__cancel-dialog {
+  display: grid;
+  gap: 0.8rem;
+  width: min(100%, 32rem);
+  padding: 1.35rem;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+}
+
+.order-management__cancel-dialog h3,
+.order-management__cancel-dialog p {
+  margin: 0;
+}
+
+.order-management__cancel-dialog h3 {
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+.order-management__cancel-dialog p {
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.order-management__cancel-dialog label {
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.order-management__cancel-dialog textarea {
+  width: 100%;
+  min-height: 6rem;
+  padding: 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #1e293b;
+  font: inherit;
+  resize: vertical;
+}
+
+.order-management__cancel-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.order-management__cancel-actions button:not(.order-management__cancel) {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .order-management__empty {
   display: grid;
   justify-items: center;

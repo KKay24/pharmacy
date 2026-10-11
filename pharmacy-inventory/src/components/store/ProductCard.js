@@ -5,14 +5,11 @@ import { useStore } from "../../context/StoreContext";
 import { showToast } from "./StoreToast";
 
 export function ProductCard({ product, onCartOpen }) {
-  const { addToCart, cart, toggleWishlist, isWishlisted } = useStore();
+  const { addToCart, toggleWishlist, isWishlisted } = useStore();
   const wished = isWishlisted(product.id);
-  const stockLow = product.stock > 0 && product.stock <= 10;
-  const cartQuantity = cart.find((item) => item.id === product.id)?.quantity || 0;
-  const atStockLimit = cartQuantity >= Number(product.stock);
 
   const handleAdd = () => {
-    if (!product.inStock || product.prescriptionRequired) return;
+    if (product.prescriptionRequired) return;
     addToCart(product);
     showToast(`${product.name} added to cart`, "success");
     onCartOpen?.();
@@ -27,11 +24,6 @@ export function ProductCard({ product, onCartOpen }) {
     <article className="store-product-card">
       {product.prescriptionRequired && (
         <span className="store-product-card__badge store-product-card__badge--rx">Prescription</span>
-      )}
-      {stockLow && (
-        <span className="store-product-card__badge store-product-card__badge--low">
-          Low stock
-        </span>
       )}
       <button
         type="button"
@@ -65,18 +57,15 @@ export function ProductCard({ product, onCartOpen }) {
 
       <div className="store-product-card__footer">
         <div className="store-product-card__price">ZMW {Number(product.price || 0).toFixed(2)}</div>
-        <div className={`store-product-card__availability ${product.inStock ? "available" : "unavailable"}`}>
-          {product.inStock ? `In stock (${product.stock})` : "Out of stock"}
-        </div>
-        {product.inStock && (product.prescriptionRequired ? (
+        {product.prescriptionRequired ? (
           <Link to="/prescription-upload" className="store-product-card__add store-product-card__add--rx">
             <FileText size={14} /> Upload prescription
           </Link>
         ) : (
-          <button type="button" className="store-product-card__add store-product-card__add--primary" onClick={handleAdd} disabled={atStockLimit}>
-            <ShoppingCart size={14} /> {atStockLimit ? "Stock limit reached" : "Add to cart"}
+          <button type="button" className="store-product-card__add store-product-card__add--primary" onClick={handleAdd}>
+            <ShoppingCart size={14} /> Add to cart
           </button>
-        ))}
+        )}
       </div>
     </article>
   );

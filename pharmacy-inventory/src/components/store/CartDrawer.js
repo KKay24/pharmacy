@@ -49,7 +49,7 @@ export default function CartDrawer({ open, onClose }) {
                         <Minus size={12} />
                       </button>
                       <span className="store-cart-item__qty">{item.quantity}</span>
-                      <button className="store-cart-qty-btn" disabled={item.quantity >= Number(item.stock)} onClick={() => updateCartQty(item.id, item.quantity + 1)} aria-label={`Increase ${item.name} quantity`}>
+                      <button className="store-cart-qty-btn" onClick={() => updateCartQty(item.id, item.quantity + 1)} aria-label={`Increase ${item.name} quantity`}>
                         <Plus size={12} />
                       </button>
                     </div>

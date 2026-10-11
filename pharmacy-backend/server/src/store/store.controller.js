@@ -56,8 +56,8 @@ class StoreController {
     return this.service.getOrder(params.id);
   }
 
-  updateOrderStatus(params, body) {
-    return this.service.updateOrderStatus(params.id, body?.status);
+  updateOrderStatus(params, body, req) {
+    return this.service.updateOrderStatus(params.id, body?.status, body?.reason, req?.user || null);
   }
 
   // Prescriptions
@@ -112,6 +112,7 @@ Roles('admin', 'manager')(StoreController.prototype, 'getOrder');
 applyMethodDecorator(Put, StoreController.prototype, 'updateOrderStatus', 'orders/:id/status');
 applyParameterDecorator(Param, StoreController.prototype, 'updateOrderStatus', 0);
 applyParameterDecorator(Body, StoreController.prototype, 'updateOrderStatus', 1);
+applyParameterDecorator(Req, StoreController.prototype, 'updateOrderStatus', 2);
 applyMethodDecorator(UseGuards, StoreController.prototype, 'updateOrderStatus', AuthGuard, RolesGuard);
 Roles('admin', 'manager', 'user')(StoreController.prototype, 'updateOrderStatus');
 

@@ -276,7 +276,7 @@ function WishlistTab() {
                 <div className="store-order-card__items" style={{ fontSize: "0.9rem", fontWeight: "800", color: "var(--brand-blue)" }}>ZMW {(item.price || 0).toFixed(2)}</div>
               </div>
               <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
-                {item.inStock && !item.prescriptionRequired && (
+                {!item.prescriptionRequired && (
                   <button onClick={() => { addToCart(item); showToast("Added to cart", "success"); }}
                     style={{ padding: "0.5rem 0.85rem", background: "var(--brand-blue)", color: "white", border: "none", borderRadius: "var(--radius-sm)", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer" }}>
                     Add to Cart

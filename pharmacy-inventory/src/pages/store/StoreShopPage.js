@@ -26,7 +26,6 @@ export default function StoreShopPage() {
     subcategoryId: searchParams.get("subcategoryId") || "",
     productFormId: searchParams.get("productFormId") || "",
     prescriptionRequired: searchParams.get("prescriptionRequired") || "",
-    inStock: searchParams.get("inStock") || "",
     sort: searchParams.get("sort") || "",
     minPrice: "",
     maxPrice: "",
@@ -52,7 +51,6 @@ export default function StoreShopPage() {
       if (filters.subcategoryId) params.set("subcategoryId", filters.subcategoryId);
       if (filters.productFormId) params.set("productFormId", filters.productFormId);
       if (filters.prescriptionRequired !== "") params.set("prescriptionRequired", filters.prescriptionRequired);
-      if (filters.inStock) params.set("inStock", filters.inStock);
       if (filters.sort) params.set("sort", filters.sort);
       if (filters.minPrice) params.set("minPrice", filters.minPrice);
       if (filters.maxPrice) params.set("maxPrice", filters.maxPrice);
@@ -142,7 +140,7 @@ export default function StoreShopPage() {
         </div>
 
         {/* Active filters */}
-        {(filters.search || filters.category || filters.subcategoryId || filters.productFormId || filters.prescriptionRequired !== "" || filters.inStock) && (
+        {(filters.search || filters.category || filters.subcategoryId || filters.productFormId || filters.prescriptionRequired !== "") && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1.25rem" }}>
             {filters.search && (
               <span style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.3rem 0.75rem", background: "var(--brand-blue-light)", color: "var(--brand-blue)", borderRadius: "999px", fontSize: "0.82rem", fontWeight: 600 }}>
@@ -162,12 +160,6 @@ export default function StoreShopPage() {
                 <button onClick={() => setFilter("prescriptionRequired", "")} style={{ color: "var(--green)", display: "flex" }}><X size={12} /></button>
               </span>
             )}
-            {filters.inStock && (
-              <span style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.3rem 0.75rem", background: "var(--green-light)", color: "var(--green)", borderRadius: "999px", fontSize: "0.82rem", fontWeight: 600 }}>
-                In Stock
-                <button onClick={() => setFilter("inStock", "")} style={{ color: "var(--green)", display: "flex" }}><X size={12} /></button>
-              </span>
-            )}
           </div>
         )}
 
@@ -181,13 +173,6 @@ export default function StoreShopPage() {
                 className="store-price-input" style={{ width: "100%" }}
                 value={filters.search} onChange={e => setFilter("search", e.target.value)}
               />
-            </div>
-            <div className="store-filter-group">
-              <div className="store-filter-group__label">Availability</div>
-              <label className="store-filter-option">
-                <input type="checkbox" checked={filters.inStock === "true"} onChange={e => setFilter("inStock", e.target.checked ? "true" : "")} />
-                <span>In Stock Only</span>
-              </label>
             </div>
             <div className="store-filter-group">
               <div className="store-filter-group__label">Category</div>
@@ -258,7 +243,7 @@ export default function StoreShopPage() {
                   <p style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🔍</p>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem" }}>No products found</h3>
                   <p style={{ fontSize: "0.9rem" }}>Try adjusting your filters or search term.</p>
-                  <button onClick={() => { setFilters({ search: "", category: "", subcategoryId: "", productFormId: "", prescriptionRequired: "", inStock: "", sort: "", minPrice: "", maxPrice: "" }); setPage(1); }}
+                  <button onClick={() => { setFilters({ search: "", category: "", subcategoryId: "", productFormId: "", prescriptionRequired: "", sort: "", minPrice: "", maxPrice: "" }); setPage(1); }}
                     style={{ marginTop: "1rem", padding: "0.6rem 1.25rem", background: "var(--brand-blue)", color: "white", border: "none", borderRadius: "var(--radius)", cursor: "pointer", fontWeight: 600, fontSize: "0.88rem" }}>
                     Clear Filters
                   </button>

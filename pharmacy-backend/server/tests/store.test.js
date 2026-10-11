@@ -49,7 +49,7 @@ describe('Store E-Commerce Endpoints', () => {
     rmSync(tempDirectory, { recursive: true, force: true });
   });
 
-  test('GET /api/products returns paginated products with prices and stock', async () => {
+  test('GET /api/products returns paginated customer products without inventory levels', async () => {
     const res = await request('/api/products?limit=5');
     assert.equal(res.status, 200);
     assert.ok(Array.isArray(res.data.data));
@@ -60,8 +60,9 @@ describe('Store E-Commerce Endpoints', () => {
     const first = res.data.data[0];
     assert.ok(first.name);
     assert.ok(typeof first.price === 'number');
-    assert.ok(typeof first.stock === 'number');
-    assert.ok(typeof first.inStock === 'boolean');
+    assert.equal(first.stock, undefined);
+    assert.equal(first.inStock, undefined);
+    assert.equal(first.batches, undefined);
   });
 
   test('GET /api/products/popular returns top items', async () => {
@@ -70,6 +71,9 @@ describe('Store E-Commerce Endpoints', () => {
     assert.ok(Array.isArray(res.data));
     assert.ok(res.data.length <= 4);
     assert.ok(res.data[0].id);
+    assert.equal(res.data[0].stock, undefined);
+    assert.equal(res.data[0].inStock, undefined);
+    assert.equal(res.data[0].batches, undefined);
   });
 
   test('GET /api/products/categories returns categories', async () => {
@@ -86,11 +90,36 @@ describe('Store E-Commerce Endpoints', () => {
     assert.equal(res.status, 200);
     assert.equal(res.data.id, sampleId);
     assert.ok(res.data.name);
+    assert.equal(res.data.stock, undefined);
+    assert.equal(res.data.inStock, undefined);
+    assert.equal(res.data.batches, undefined);
   });
 
   test('POST /api/orders creates order and deducts inventory', async () => {
     const listRes = await request('/api/products?limit=1');
     const sample = listRes.data.data[0];
+    const { Batch, InventoryMovement, Medicine } = require('../models');
+    const medicine = await Medicine.findByPk(sample.id);
+    const batches = await Batch.findAll({ where: { medicineId: sample.id } });
+    const today = new Date().toISOString().slice(0, 10);
+    const initialStock = batches.length > 0
+      ? batches.filter((batch) => String(batch.expiryDate) >= today)
+        .reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
+      : Number(medicine.totalQuantity || 0);
+    assert.ok(initialStock > 0, 'The selected product has stock for the regular checkout case');
+
+    const overstockOrder = await request('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        customerName: 'Test Customer',
+        customerPhone: '+260971239999',
+        deliveryMethod: 'pickup',
+        items: [{ id: sample.id, quantity: initialStock + 1 }],
+      }),
+    });
+    assert.equal(overstockOrder.status, 201);
+    assert.equal(overstockOrder.data.order.items[0].quantity, initialStock + 1);
+    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 0);
 
     const orderPayload = {
       customerName: 'Test Customer',
@@ -124,22 +153,35 @@ describe('Store E-Commerce Endpoints', () => {
     assert.equal(Number(res.data.order.subtotal), sample.price);
     assert.equal(Number(res.data.order.totalAmount), sample.price + Number(res.data.order.deliveryFee));
 
-    const overstockAttempt = await request('/api/orders', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...orderPayload,
-        items: [{ id: sample.id, quantity: sample.stock + 1, price: 0.01 }],
-      }),
-    });
-    assert.equal(overstockAttempt.status, 400);
-
     // Test tracking the newly created order
     const trackRes = await request(
       `/api/orders?orderNumber=${res.data.order.orderNumber}&phone=0971239999`
     );
     assert.equal(trackRes.status, 200);
-    assert.ok(trackRes.data.data.length >= 1);
-    assert.equal(trackRes.data.data[0].orderNumber, res.data.order.orderNumber);
+    assert.ok(trackRes.data.data.some((order) => order.orderNumber === res.data.order.orderNumber));
+
+    for (const batch of batches) {
+      await batch.update({ quantity: 0 });
+    }
+    await medicine.update({ totalQuantity: 0 });
+    const movementCount = await InventoryMovement.count({
+      where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
+    });
+    const outOfStockOrder = await request('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        customerName: 'Backorder Customer',
+        customerPhone: '+260971230000',
+        deliveryMethod: 'pickup',
+        items: [{ id: sample.id, quantity: 2 }],
+      }),
+    });
+    assert.equal(outOfStockOrder.status, 201);
+    assert.equal(outOfStockOrder.data.order.items[0].quantity, 2);
+    assert.equal(await InventoryMovement.count({
+      where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
+    }), movementCount);
+    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 0);
   });
 
   test('POST /api/prescriptions/upload and GET /api/prescriptions/track/:ref', async () => {

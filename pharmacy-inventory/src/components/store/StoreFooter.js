@@ -15,7 +15,7 @@ export default function StoreFooter() {
             </div>
             <span className="store-footer__logo-text">MediQuick</span>
           </div>
-          <p>Browse customer-visible pharmacy products using the current inventory and stock records.</p>
+          <p>Browse pharmacy products and place orders for pharmacy review.</p>
         </div>
 
         <div className="store-footer__col">
@@ -51,7 +51,7 @@ export default function StoreFooter() {
         <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: "1.25rem" }}>
           {[
           { icon: <Truck size={18} />, label: "Delivery options", sub: "Delivery or pickup at checkout" },
-          { icon: <Shield size={18} />, label: "Pharmacy inventory", sub: "Product stock checked at checkout" },
+          { icon: <Shield size={18} />, label: "Pharmacy care", sub: "Orders reviewed by our pharmacy team" },
           ].map(({ icon, label, sub }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.75rem", color: "rgba(255,255,255,0.75)" }}>
               <div style={{ color: "var(--brand-teal-light)" }}>{icon}</div>

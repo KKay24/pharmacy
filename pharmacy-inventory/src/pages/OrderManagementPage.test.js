@@ -57,5 +57,30 @@ describe("OrderManagementPage", () => {
       });
     });
     expect(await screen.findByText("Order ORD-TEST-12 updated to Preparing.")).toBeTruthy();
+
+    apiFetch.mockResolvedValueOnce(jsonResponse({
+      ...order,
+      orderStatus: "Cancelled",
+      cancellationReason: "Customer unreachable",
+    }));
+    fireEvent.change(screen.getByLabelText("Fulfillment status", { selector: "#order-status-12" }), {
+      target: { value: "Cancelled" },
+    });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Confirm cancellation" }).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Cancellation reason/), {
+      target: { value: "Customer unreachable" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm cancellation" }));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenLastCalledWith("/api/orders/12/status", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Cancelled", reason: "Customer unreachable" }),
+      });
+    });
+    expect(await screen.findByText("Order ORD-TEST-12 updated to Cancelled.")).toBeTruthy();
+    expect(screen.getByText("Cancellation reason:")).toBeTruthy();
   });
 });

@@ -68,6 +68,18 @@ const Order = sequelize.define('Order', {
     type: DataTypes.STRING, // 'Order Placed', 'Confirmed', 'Preparing', 'Ready', 'Out for Delivery', 'Delivered', 'Cancelled'
     defaultValue: 'Order Placed'
   },
+  cancellationReason: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  cancelledByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  cancelledAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
   subtotal: {
     type: DataTypes.FLOAT,
     defaultValue: 0.0

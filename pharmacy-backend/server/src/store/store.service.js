@@ -1,6 +1,7 @@
 const {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -45,25 +46,19 @@ function calculateProductPrice(medicine) {
     if (validBatches.length > 0) {
       return Number(validBatches[0].sellingPrice);
     }
+    const configuredBatch = medicine.Batches
+      .filter((batch) => Number(batch.sellingPrice) > 0)
+      .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)))[0];
+    if (configuredBatch) {
+      return Number(configuredBatch.sellingPrice);
+    }
   }
   return Number(medicine.basePrice || 0);
 }
 
-function calculateProductStock(medicine) {
-  if (Array.isArray(medicine.Batches) && medicine.Batches.length > 0) {
-    const today = new Date().toISOString().slice(0, 10);
-    return medicine.Batches.reduce((sum, batch) => (
-      String(batch.expiryDate) >= today ? sum + Number(batch.quantity || 0) : sum
-    ), 0);
-  }
-  return Number(medicine.totalQuantity || 0);
-}
-
 function formatProduct(medicine) {
   const plain = typeof medicine.get === 'function' ? medicine.get({ plain: true }) : medicine;
-  const stock = calculateProductStock(plain);
   const price = calculateProductPrice(plain);
-  const today = new Date().toISOString().slice(0, 10);
 
   return {
     id: plain.id,
@@ -85,18 +80,7 @@ function formatProduct(medicine) {
     MainCategory: plain.MainCategory,
     Subcategory: plain.Subcategory,
     ProductForm: plain.ProductForm,
-    batches: Array.isArray(plain.Batches)
-      ? plain.Batches.filter((batch) => String(batch.expiryDate) >= today && Number(batch.quantity) > 0)
-        .map((batch) => ({
-          batchNumber: batch.batchNumber,
-          expiryDate: batch.expiryDate,
-          quantity: Number(batch.quantity),
-          sellingPrice: Number(batch.sellingPrice),
-        }))
-      : [],
-    stock,
     price,
-    inStock: stock > 0,
     prescriptionRequired: Boolean(plain.prescriptionRequired),
   };
 }
@@ -183,8 +167,7 @@ class StoreService {
     }
 
     if (clauses.length > 0) where[Op.and] = clauses;
-    const requiresDerivedFiltering = query.inStock === 'true'
-      || (query.minPrice !== undefined && !isNaN(Number(query.minPrice)))
+    const requiresDerivedFiltering = (query.minPrice !== undefined && !isNaN(Number(query.minPrice)))
       || (query.maxPrice !== undefined && !isNaN(Number(query.maxPrice)))
       || query.sort === 'price_asc'
       || query.sort === 'price_desc';
@@ -204,9 +187,6 @@ class StoreService {
 
     let formattedRows = rows.map(formatProduct);
 
-    if (query.inStock === 'true') {
-      formattedRows = formattedRows.filter((p) => p.stock > 0);
-    }
     if (query.minPrice !== undefined && !isNaN(Number(query.minPrice))) {
       formattedRows = formattedRows.filter((p) => p.price >= Number(query.minPrice));
     }
@@ -247,12 +227,10 @@ class StoreService {
     const medicines = await Medicine.findAll({
       where: { isCustomerVisible: true },
       include: [{ model: Batch }],
-      limit: Number(limit) * 2, // Grab extras to ensure we have in-stock items
+      limit: Number(limit),
     });
     const formatted = medicines.map(formatProduct);
-    // Prioritize in-stock products
-    formatted.sort((a, b) => (b.inStock ? 1 : 0) - (a.inStock ? 1 : 0));
-    return formatted.slice(0, Number(limit));
+    return formatted;
   }
 
   async getCategories() {
@@ -340,13 +318,7 @@ class StoreService {
         const availableStock = batches.length > 0
           ? saleableBatches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
           : Number(medicine.totalQuantity || 0);
-        if (availableStock < requestedQuantity) {
-          throw new BadRequestException(
-            `Insufficient stock for ${medicine.name}. Available: ${availableStock}`
-          );
-        }
-
-        // Determine price
+        // Record the full requested order; inventory deductions are limited to saleable stock.
         let itemPrice = calculateProductPrice({
           basePrice: medicine.basePrice,
           Batches: batches,
@@ -360,6 +332,9 @@ class StoreService {
         let remainingToDeduct = requestedQuantity;
         let totalCost = 0;
         const deductions = [];
+        const unbatchedQuantityToDeduct = batches.length === 0
+          ? Math.min(Math.max(availableStock, 0), requestedQuantity)
+          : 0;
 
         for (const batch of saleableBatches) {
           if (remainingToDeduct <= 0) break;
@@ -383,19 +358,21 @@ class StoreService {
           }, { transaction });
         }
         if (batches.length === 0) {
-          await InventoryMovement.create({
-            medicineId: medicine.id,
-            batchId: null,
-            movementType: 'SALE',
-            quantityChange: -requestedQuantity,
-            referenceType: 'ONLINE_ORDER',
-            reason: `Order ${orderNumber}`,
-          }, { transaction });
+          if (unbatchedQuantityToDeduct > 0) {
+            await InventoryMovement.create({
+              medicineId: medicine.id,
+              batchId: null,
+              movementType: 'SALE',
+              quantityChange: -unbatchedQuantityToDeduct,
+              referenceType: 'ONLINE_ORDER',
+              reason: `Order ${orderNumber}`,
+            }, { transaction });
+          }
         }
 
         const newMedicineTotal = batches.length > 0
           ? batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
-          : Math.max(0, Number(medicine.totalQuantity || 0) - requestedQuantity);
+          : Math.max(0, Number(medicine.totalQuantity || 0) - unbatchedQuantityToDeduct);
         await medicine.update({ totalQuantity: newMedicineTotal }, { transaction });
 
         // Record line item in Sales table for unified accounting/reporting
@@ -535,15 +512,39 @@ class StoreService {
     return order;
   }
 
-  async updateOrderStatus(id, status) {
+  async updateOrderStatus(id, status, reason = '', user = null) {
     const validStatuses = ['Order Placed', 'Confirmed', 'Preparing', 'Ready', 'Out for Delivery', 'Delivered', 'Cancelled'];
     if (!validStatuses.includes(status)) {
       throw new BadRequestException('Invalid order status');
     }
-    const order = await Order.findByPk(id);
-    if (!order) throw new NotFoundException('Order not found');
-    await order.update({ orderStatus: status });
-    return order;
+    const cancellationReason = typeof reason === 'string' ? reason.trim() : '';
+    if (status === 'Cancelled' && !cancellationReason) {
+      throw new BadRequestException('A cancellation reason is required');
+    }
+
+    return sequelize.transaction(async (transaction) => {
+      const order = await Order.findByPk(id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!order) throw new NotFoundException('Order not found');
+      if (order.orderStatus === 'Cancelled') {
+        throw new ConflictException('This order has already been cancelled');
+      }
+
+      const updates = { orderStatus: status };
+      if (status === 'Cancelled') {
+        if (!user || !['admin', 'manager', 'user'].includes(user.role)) {
+          throw new ForbiddenException('Staff authorization is required to cancel an order');
+        }
+        updates.cancellationReason = cancellationReason;
+        updates.cancelledByUserId = user.id;
+        updates.cancelledAt = new Date();
+      }
+
+      await order.update(updates, { transaction });
+      return order;
+    });
   }
 
   async uploadPrescription(payload, user = null) {

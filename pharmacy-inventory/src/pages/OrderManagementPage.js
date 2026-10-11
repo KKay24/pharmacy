@@ -29,6 +29,8 @@ export default function OrderManagementPage() {
   const [error, setError] = useState("");
   const [savingOrderId, setSavingOrderId] = useState(null);
   const [notice, setNotice] = useState("");
+  const [cancellationTarget, setCancellationTarget] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState("");
 
   const loadOrders = useCallback(async ({ quiet = false } = {}) => {
     if (quiet) setRefreshing(true);
@@ -58,7 +60,7 @@ export default function OrderManagementPage() {
     loadOrders();
   }, [loadOrders]);
 
-  const updateStatus = async (order, status) => {
+  const updateStatus = async (order, status, reason = "") => {
     if (status === order.orderStatus) return;
     setSavingOrderId(order.id);
     setError("");
@@ -67,7 +69,7 @@ export default function OrderManagementPage() {
       const response = await apiFetch(`/api/orders/${order.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(status === "Cancelled" ? { reason } : {}) }),
       });
       if (!response.ok) {
         throw new Error(await getApiErrorMessage(response, `Could not update order ${order.orderNumber}.`));
@@ -77,11 +79,30 @@ export default function OrderManagementPage() {
         item.id === order.id ? { ...item, ...updated } : item
       )));
       setNotice(`Order ${order.orderNumber} updated to ${updated.orderStatus}.`);
+      return true;
     } catch (updateError) {
       setError(updateError.message || `Could not update order ${order.orderNumber}.`);
       await loadOrders({ quiet: true });
+      return false;
     } finally {
       setSavingOrderId(null);
+    }
+  };
+
+  const requestCancellation = (order) => {
+    setCancellationTarget(order);
+    setCancellationReason("");
+    setError("");
+  };
+
+  const submitCancellation = async (event) => {
+    event.preventDefault();
+    const reason = cancellationReason.trim();
+    if (!reason || !cancellationTarget) return;
+    const cancelled = await updateStatus(cancellationTarget, "Cancelled", reason);
+    if (cancelled) {
+      setCancellationTarget(null);
+      setCancellationReason("");
     }
   };
 
@@ -203,13 +224,31 @@ export default function OrderManagementPage() {
                 <select
                   id={`order-status-${order.id}`}
                   value={order.orderStatus}
-                  disabled={savingOrderId === order.id}
-                  onChange={(event) => updateStatus(order, event.target.value)}
+                  disabled={savingOrderId === order.id || order.orderStatus === "Cancelled"}
+                  onChange={(event) => {
+                    if (event.target.value === "Cancelled") requestCancellation(order);
+                    else updateStatus(order, event.target.value);
+                  }}
                 >
                   {ORDER_STATUSES.map((status) => <option key={status}>{status}</option>)}
                 </select>
                 {savingOrderId === order.id && <span role="status">Saving…</span>}
+                {order.orderStatus !== "Cancelled" && (
+                  <button
+                    type="button"
+                    className="order-management__cancel"
+                    disabled={savingOrderId === order.id}
+                    onClick={() => requestCancellation(order)}
+                  >
+                    Cancel order
+                  </button>
+                )}
               </div>
+              {order.cancellationReason && (
+                <p className="order-management__cancellation-reason">
+                  <strong>Cancellation reason:</strong> {order.cancellationReason}
+                </p>
+              )}
             </article>
           ))}
         </div>
@@ -229,6 +268,43 @@ export default function OrderManagementPage() {
             Next
           </button>
         </nav>
+      )}
+
+      {cancellationTarget && (
+        <div className="order-management__modal-backdrop">
+          <form
+            className="order-management__cancel-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="order-cancel-title"
+            onSubmit={submitCancellation}
+          >
+            <h3 id="order-cancel-title">Cancel order {cancellationTarget.orderNumber}?</h3>
+            <p>Enter the reason for cancellation. This will be saved with the order for staff review.</p>
+            <label htmlFor="order-cancel-reason">Cancellation reason <span aria-hidden="true">*</span></label>
+            <textarea
+              id="order-cancel-reason"
+              value={cancellationReason}
+              onChange={(event) => setCancellationReason(event.target.value)}
+              rows={4}
+              maxLength={2000}
+              required
+              autoFocus
+            />
+            <div className="order-management__cancel-actions">
+              <button type="button" onClick={() => setCancellationTarget(null)} disabled={savingOrderId === cancellationTarget.id}>
+                Keep order
+              </button>
+              <button
+                type="submit"
+                className="order-management__cancel"
+                disabled={savingOrderId === cancellationTarget.id || !cancellationReason.trim()}
+              >
+                {savingOrderId === cancellationTarget.id ? "Cancelling…" : "Confirm cancellation"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </section>
   );

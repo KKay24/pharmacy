@@ -147,14 +147,14 @@ export default function LoginPage({ staffMode = false }) {
           <div className="hp-hero-content">
             <p className="hp-kicker">Your online pharmacy</p>
             <h1>Quality Medicines.<br /><span>Delivered to Your Door.</span></h1>
-            <p className="hp-hero-copy">Browse medicines and health products from the pharmacy's current inventory. Search the catalogue or explore categories below.</p>
+            <p className="hp-hero-copy">Browse medicines and health products from the pharmacy catalogue. Search or explore categories below.</p>
             <form className="hp-search-bar" onSubmit={submitSearch}>
               <Search size={20} />
               <input aria-label="Search medicines" placeholder="Search medicines and health products..." value={search} onChange={(event) => setSearch(event.target.value)} />
               <button type="submit">Search</button>
             </form>
             <div className="hp-hero-benefits">
-              <div><Pill size={24} /><span><strong>Pharmacy Products</strong><small>Browse current inventory.</small></span></div>
+              <div><Pill size={24} /><span><strong>Pharmacy Products</strong><small>Explore the pharmacy catalogue.</small></span></div>
               <div><ShieldCheck size={24} /><span><strong>Prescription Services</strong><small>Submit a prescription for review.</small></span></div>
               <div><Lock size={24} /><span><strong>Order Checkout</strong><small>Orders are verified by the pharmacy.</small></span></div>
             </div>
@@ -163,8 +163,8 @@ export default function LoginPage({ staffMode = false }) {
         </section>
 
         <section className="hp-services" id="services">
-          <div><span className="hp-service-icon"><Pill size={24} /></span><span><strong>Pharmacy Products</strong><small>Browse available items<br />from pharmacy inventory.</small></span></div>
-          <div><span className="hp-service-icon"><Check size={25} /></span><span><strong>Live Availability</strong><small>Stock status is read<br />from the inventory system.</small></span></div>
+          <div><span className="hp-service-icon"><Pill size={24} /></span><span><strong>Pharmacy Products</strong><small>Explore products<br />in the pharmacy catalogue.</small></span></div>
+          <div><span className="hp-service-icon"><Check size={25} /></span><span><strong>Pharmacy Review</strong><small>Orders are reviewed<br />by our pharmacy team.</small></span></div>
           <div><span className="hp-service-icon"><Truck size={24} /></span><span><strong>Delivery or Pickup</strong><small>Choose an option<br />during checkout.</small></span></div>
           <div><span className="hp-service-icon"><HeartPulse size={24} /></span><span><strong>Prescription Support</strong><small>Prescription products<br />require pharmacy review.</small></span></div>
         </section>
@@ -182,14 +182,14 @@ export default function LoginPage({ staffMode = false }) {
                 <span>{category.name}<ChevronRight size={17} /></span>
               </Link>
             ))}
-            {!loadingProducts && !catalogError && categories.length === 0 && <p className="hp-empty-state">No product categories are available yet.</p>}
+            {!loadingProducts && !catalogError && categories.length === 0 && <p className="hp-empty-state">No product categories have been added yet.</p>}
             {loadingProducts && <p className="hp-loading-state">Loading pharmacy categories…</p>}
           </div>
         </section>
 
         <section className="hp-products">
           <div className="hp-section-heading">
-            <div><h2>Available Products</h2><p>Products and availability from the pharmacy inventory.</p></div>
+            <div><h2>Pharmacy Products</h2><p>Browse medicines and health products from our catalogue.</p></div>
             <Link to="/shop">Browse all <ArrowRight size={16} /></Link>
           </div>
           {catalogError ? (
@@ -199,7 +199,7 @@ export default function LoginPage({ staffMode = false }) {
               {loadingProducts
                 ? Array.from({ length: 4 }, (_, index) => <ProductCardSkeleton key={index} />)
                 : featured.map((product) => <ProductCard key={product.id} product={product} onCartOpen={openCart} />)}
-              {!loadingProducts && !catalogError && featured.length === 0 && <p className="hp-empty-state">There are no customer-visible products in stock right now.</p>}
+              {!loadingProducts && !catalogError && featured.length === 0 && <p className="hp-empty-state">No products are currently listed in the catalogue.</p>}
             </div>
           )}
         </section>
@@ -207,7 +207,7 @@ export default function LoginPage({ staffMode = false }) {
         <section className="hp-about" id="about">
           <p className="hp-kicker">MediQuick Pharmacy</p>
           <h2>Your health, made simpler.</h2>
-          <p>Browse pharmacy products, check availability, and send your order to the pharmacy for processing.</p>
+          <p>Browse pharmacy products and send your order to the pharmacy for processing.</p>
           <Link to="/shop" className="hp-about-link">Browse products <ArrowRight size={16} /></Link>
         </section>
       </main>
