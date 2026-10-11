@@ -39,6 +39,7 @@ import AddUserPage from "./pages/AddUserPage";
 import ExpensesPage from "./pages/ExpensesPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import CustomersPage from "./pages/CustomersPage";
+import OrderManagementPage from "./pages/OrderManagementPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // ─── Customer Store ───────────────────────────────────────
@@ -67,6 +68,12 @@ const PAGE_META = [
     title: "POS System",
     subtitle: "Build faster checkouts with a modern cart, customer lookup, and payment flow.",
     icon: ShoppingCart,
+  },
+  {
+    match: (pathname) => pathname.startsWith("/orders"),
+    title: "Online Order Management",
+    subtitle: "Review customer store orders and update fulfillment progress.",
+    icon: ClipboardList,
   },
   {
     match: (pathname) => pathname.startsWith("/inventory"),
@@ -330,6 +337,14 @@ function ShellLayout() {
                 element={
                   <ProtectedRoute allowedRoles={["admin", "manager", "user"]}>
                     <PosPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="orders"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "manager", "user"]}>
+                    <OrderManagementPage />
                   </ProtectedRoute>
                 }
               />

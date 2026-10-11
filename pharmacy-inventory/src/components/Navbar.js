@@ -8,6 +8,7 @@ import {
   PackagePlus,
   PieChart,
   ShoppingCart,
+  ClipboardList,
   TrendingUp,
   UserPlus,
   Wallet,
@@ -44,6 +45,12 @@ function Navbar({ collapsed = false, onToggleCollapsed }) {
       path: "/pos",
       icon: ShoppingCart,
       label: "New Sale",
+    },
+    {
+      show: userRole === "admin" || userRole === "manager" || userRole === "user",
+      path: "/orders",
+      icon: ClipboardList,
+      label: "Online Orders",
     },
     {
       show: userRole === "admin" || userRole === "manager",

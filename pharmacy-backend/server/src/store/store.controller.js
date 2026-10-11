@@ -12,6 +12,7 @@ const {
 } = require('@nestjs/common');
 const StoreService = require('./store.service');
 const AuthGuard = require('../auth/auth.guard');
+const OptionalAuthGuard = require('../auth/optional-auth.guard');
 const Roles = require('../auth/roles.decorator');
 const { RolesGuard } = require('../auth/roles.guard');
 const {
@@ -101,6 +102,7 @@ applyParameterDecorator(Req, StoreController.prototype, 'createOrder', 1);
 applyMethodDecorator(Get, StoreController.prototype, 'listOrders', 'orders');
 applyParameterDecorator(Query, StoreController.prototype, 'listOrders', 0);
 applyParameterDecorator(Req, StoreController.prototype, 'listOrders', 1);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'listOrders', OptionalAuthGuard);
 
 applyMethodDecorator(Get, StoreController.prototype, 'getOrder', 'orders/:id');
 applyParameterDecorator(Param, StoreController.prototype, 'getOrder', 0);
@@ -111,7 +113,7 @@ applyMethodDecorator(Put, StoreController.prototype, 'updateOrderStatus', 'order
 applyParameterDecorator(Param, StoreController.prototype, 'updateOrderStatus', 0);
 applyParameterDecorator(Body, StoreController.prototype, 'updateOrderStatus', 1);
 applyMethodDecorator(UseGuards, StoreController.prototype, 'updateOrderStatus', AuthGuard, RolesGuard);
-Roles('admin', 'manager')(StoreController.prototype, 'updateOrderStatus');
+Roles('admin', 'manager', 'user')(StoreController.prototype, 'updateOrderStatus');
 
 // Prescription customer routes
 applyMethodDecorator(Post, StoreController.prototype, 'uploadPrescription', 'prescriptions/upload');

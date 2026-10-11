@@ -485,11 +485,13 @@ class StoreService {
   async listOrders(query = {}, user = null) {
     const pagination = parsePagination(query);
     const where = {};
+    const isStaff = ['admin', 'manager', 'user'].includes(user?.role);
 
-    // Role-based visibility
-    if (user && user.role === 'customer') {
+    if (isStaff) {
+      // Staff can view the complete fulfillment queue.
+    } else if (user && user.role === 'customer') {
       where.userId = user.id;
-    } else if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
+    } else {
       // Guest tracking by orderNumber & phone
       if (query.orderNumber && query.phone) {
         where.orderNumber = query.orderNumber.trim();
@@ -511,7 +513,7 @@ class StoreService {
       offset: pagination.offset,
     });
 
-    if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
+    if (!isStaff) {
       return paginatedResponse(rows.map((order) => ({
         orderNumber: order.orderNumber,
         orderStatus: order.orderStatus,

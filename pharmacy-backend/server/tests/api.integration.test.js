@@ -316,6 +316,71 @@ test('admins cannot be created through the API', async () => {
   assert.equal(users.filter((user) => user.role === 'admin').length, 1);
 });
 
+test('all staff roles can list full online orders and update fulfillment status', async () => {
+  const headers = {
+    Authorization: `Bearer ${authToken}`,
+    'Content-Type': 'application/json',
+  };
+  const username = `order-staff-${Date.now()}`;
+  const createStaffResponse = await fetch(`${baseUrl}/api/auth/users`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      username,
+      password: 'order-staff-password-test',
+      role: 'user',
+    }),
+  });
+  assert.equal(createStaffResponse.status, 201);
+
+  const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password: 'order-staff-password-test' }),
+  });
+  assert.equal(loginResponse.status, 200);
+  const staffToken = (await loginResponse.json()).token;
+  const staffHeaders = {
+    Authorization: `Bearer ${staffToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  const productsResponse = await fetch(`${baseUrl}/api/products?limit=10`);
+  assert.equal(productsResponse.status, 200);
+  const product = (await productsResponse.json()).data.find((item) => item.inStock);
+  assert.ok(product, 'A customer-orderable product is available');
+  const createOrderResponse = await fetch(`${baseUrl}/api/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      customerName: 'Order Queue Test Customer',
+      customerPhone: '+260971238765',
+      customerEmail: 'order-queue@example.test',
+      deliveryMethod: 'pickup',
+      paymentMethod: 'Cash on Delivery',
+      items: [{ id: product.id, quantity: 1 }],
+    }),
+  });
+  assert.equal(createOrderResponse.status, 201);
+  const createdOrder = (await createOrderResponse.json()).order;
+
+  const listResponse = await fetch(`${baseUrl}/api/orders?limit=100`, { headers: staffHeaders });
+  assert.equal(listResponse.status, 200);
+  const listedOrders = (await listResponse.json()).data;
+  const staffOrder = listedOrders.find((order) => order.orderNumber === createdOrder.orderNumber);
+  assert.ok(staffOrder);
+  assert.equal(staffOrder.customerEmail, 'order-queue@example.test');
+  assert.equal(staffOrder.items.length, 1);
+
+  const updateResponse = await fetch(`${baseUrl}/api/orders/${createdOrder.id}/status`, {
+    method: 'PUT',
+    headers: staffHeaders,
+    body: JSON.stringify({ status: 'Preparing' }),
+  });
+  assert.equal(updateResponse.status, 200);
+  assert.equal((await updateResponse.json()).orderStatus, 'Preparing');
+});
+
 test('inventory can be fetched with the issued token', async () => {
   const response = await fetch(`${baseUrl}/api/inventory`, {
     headers: {
