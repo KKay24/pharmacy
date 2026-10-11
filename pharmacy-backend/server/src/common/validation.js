@@ -5,7 +5,22 @@ const schemas = [
   { method: 'POST', path: '/api/auth/login', schema: z.object({ username: z.string().min(1), password: z.string().min(1) }).passthrough() },
   { method: 'POST', path: '/api/auth/change-password', schema: z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(12) }).passthrough() },
   { method: 'POST', path: '/api/auth/users', schema: z.object({ username: z.string().min(1), password: z.string().min(12), role: z.enum(['admin', 'manager', 'user']).optional(), email: z.string().email().nullable().optional(), locations: z.array(z.string()).optional() }).passthrough() },
-  { method: 'POST', path: '/api/sales', schema: z.union([z.object({ quantity: z.coerce.number().positive(), totalPrice: z.coerce.number().nonnegative() }).passthrough(), z.array(z.object({ quantity: z.coerce.number().positive(), totalPrice: z.coerce.number().nonnegative() }).passthrough()).min(1)]) },
+  { method: 'POST', path: '/api/sales', schema: z.union([
+    z.object({ quantity: z.coerce.number().positive(), totalPrice: z.coerce.number().nonnegative() }).passthrough(),
+    z.object({
+      clientTransactionId: z.string().min(1).max(128),
+      items: z.array(z.object({
+        clientTransactionId: z.string().min(1).max(128),
+        quantity: z.coerce.number().positive(),
+        totalPrice: z.coerce.number().nonnegative(),
+      }).passthrough()).min(1),
+    }).passthrough(),
+    z.array(z.object({
+      clientTransactionId: z.string().min(1).max(128),
+      quantity: z.coerce.number().positive(),
+      totalPrice: z.coerce.number().nonnegative(),
+    }).passthrough()).min(1),
+  ]) },
 ];
 
 function schemaFor(request) {

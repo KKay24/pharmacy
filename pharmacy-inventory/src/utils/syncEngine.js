@@ -165,7 +165,8 @@ class SyncEngine {
         for (const res of results) {
           const { clientTransactionId, status, message } = res;
           if (status === 'synced' || status === 'already_synced') {
-            await updateOfflineSaleStatus(clientTransactionId, 'synced', res.data?.id);
+            const serverSaleIds = Array.isArray(res.data) ? res.data : res.data?.id;
+            await updateOfflineSaleStatus(clientTransactionId, 'synced', serverSaleIds);
             await removePendingOperation(clientTransactionId);
           } else if (status === 'conflict') {
             await updatePendingOperationStatus(clientTransactionId, 'conflict', {

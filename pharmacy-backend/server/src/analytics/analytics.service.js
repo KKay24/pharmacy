@@ -1,5 +1,5 @@
 const { Injectable, InternalServerErrorException } = require('@nestjs/common');
-const { Expense, Sales } = require('../../models');
+const { Expense, Sales, sequelize } = require('../../models');
 const { buildForecastDataset, parseAnalyticsOptions, roundNumber } = require('../../services/analytics/forecast');
 const { buildStockInsights } = require('../../services/analytics/stockout');
 const { buildExpiryRiskReport } = require('../../services/analytics/expiry');
@@ -16,7 +16,13 @@ function serializePrediction(prediction) {
 class AnalyticsService {
   async profitLoss(query) {
     try {
-      const [sales, expenses] = await Promise.all([Sales.findAll({ order: [['date', 'ASC']] }), Expense.findAll({ order: [['date', 'ASC']] })]);
+      const [sales, expenses] = await Promise.all([
+        Sales.findAll({
+          where: { saleStatus: { [sequelize.Sequelize.Op.ne]: 'REVERSED' } },
+          order: [['date', 'ASC']],
+        }),
+        Expense.findAll({ order: [['date', 'ASC']] }),
+      ]);
       const monthlyData = new Map();
       const ensureMonth = (key) => {
         if (!monthlyData.has(key)) monthlyData.set(key, { month: key, revenue: 0, cogs: 0, grossProfit: 0, operatingExpenses: 0, netProfit: 0 });

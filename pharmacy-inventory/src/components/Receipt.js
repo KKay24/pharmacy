@@ -7,23 +7,32 @@ const Receipt = forwardRef(({ transaction }, ref) => {
 
   if (!transaction) return null;
 
-  const { items, paymentMethod, subTotal, totalToPay, date, receiptNo } = transaction;
+  const {
+    items = [],
+    paymentMethod,
+    subTotal = 0,
+    discount = 0,
+    totalToPay = 0,
+    date,
+    receiptNo,
+  } = transaction;
+  const pharmacyName = process.env.REACT_APP_PHARMACY_NAME || "MediQuick Pharmacy";
+  const pharmacyAddress = process.env.REACT_APP_PHARMACY_ADDRESS || "25147, Nationalist Rd, Lusaka";
+  const pharmacyPhone = process.env.REACT_APP_PHARMACY_PHONE || "+260 97 439 2925";
 
   return (
     <div ref={ref} className={styles.receiptContainer}>
       <div className={styles.header}>
-        <h3>Mediquick Pharmacy</h3>
-        <p>123 Health Street, City</p>
-        <p>Tel: +260 97 000 0000</p>
+        <h3>{pharmacyName}</h3>
+        <p>{pharmacyAddress}</p>
+        <p>Tel: {pharmacyPhone}</p>
         <div className={styles.divider}></div>
         <p>Date: {date}</p>
         <p>Receipt #: {receiptNo || 'N/A'}</p>
+        <p>Sold By: {transaction.cashierName || 'Not recorded'}</p>
         {transaction.customerName && <p>Customer: {transaction.customerName}</p>}
-        {transaction.pending && (
-          <p style={{ color: '#d97706', fontSize: '0.75rem', fontWeight: 700, margin: '4px 0' }}>
-            🟠 Saved Locally (Pending Sync)
-          </p>
-        )}
+        {transaction.customerPhone && <p>Phone: {transaction.customerPhone}</p>}
+        {transaction.customerEmail && <p>Email: {transaction.customerEmail}</p>}
       </div>
 
       <div className={styles.items}>
@@ -41,8 +50,8 @@ const Receipt = forwardRef(({ transaction }, ref) => {
               <tr key={idx}>
                 <td>{item.name}</td>
                 <td>{item.quantity}</td>
-                <td>{item.price.toFixed(2)}</td>
-                <td>{(item.price * item.quantity).toFixed(2)}</td>
+                <td>{Number(item.price || 0).toFixed(2)}</td>
+                <td>{Number(item.total ?? item.price * item.quantity ?? 0).toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -54,11 +63,15 @@ const Receipt = forwardRef(({ transaction }, ref) => {
       <div className={styles.totals}>
         <div className={styles.row}>
           <span>Subtotal:</span>
-          <span>K {subTotal.toFixed(2)}</span>
+          <span>K {Number(subTotal || 0).toFixed(2)}</span>
+        </div>
+        <div className={styles.row}>
+          <span>Discount:</span>
+          <span>K {Number(discount || 0).toFixed(2)}</span>
         </div>
         <div className={`${styles.row} ${styles.bold}`}>
           <span>Total:</span>
-          <span>K {totalToPay.toFixed(2)}</span>
+          <span>K {Number(totalToPay || 0).toFixed(2)}</span>
         </div>
       </div>
 
@@ -66,8 +79,8 @@ const Receipt = forwardRef(({ transaction }, ref) => {
 
       <div className={styles.footer}>
         <p>Paid via: {paymentMethod}</p>
-        <p>Thank you for your business!</p>
-        <p>No refunds after 24 hours.</p>
+        <p>Payment amount: K {Number(totalToPay || 0).toFixed(2)}</p>
+        <p>Thank you for shopping with us!</p>
       </div>
     </div>
   );

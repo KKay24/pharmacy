@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { toast } from "react-hot-toast";
 import { 
   Search, ShoppingCart, Trash2, CreditCard, Plus, Minus, 
   ArrowRight, Pause, Tag, Layers, Banknote, Split, Smartphone
@@ -45,7 +46,13 @@ function Pos({
   categories = [],
   handleSale, 
   customers = [],
-  addCustomer
+  addCustomer,
+  cashierName,
+  checkoutPending = false,
+  clearCartToken,
+  checkoutResetToken,
+  pendingNotice,
+  retryPendingSync
 }) {
   const [searchText, setSearchText] = useState("");
   const [selectedItems, setSelectedItems] = useState([]);
@@ -53,6 +60,27 @@ function Pos({
   const [activeSubcategoryId, setActiveSubcategoryId] = useState("");
   const [activeFormId, setActiveFormId] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkoutRetry, setCheckoutRetry] = useState(null);
+  const submissionLock = useRef(false);
+  const checkoutKey = useRef(null);
+  const lastCartSignature = useRef(null);
+
+  useEffect(() => {
+    if (clearCartToken === undefined) return;
+    setSelectedItems([]);
+    setSelectedCustomer(null);
+    checkoutKey.current = null;
+    lastCartSignature.current = null;
+    setCheckoutRetry(null);
+  }, [clearCartToken]);
+
+  useEffect(() => {
+    if (checkoutResetToken === undefined) return;
+    checkoutKey.current = null;
+    lastCartSignature.current = null;
+    setCheckoutRetry(null);
+  }, [checkoutResetToken]);
 
   const selectedCategory = categories.find((category) => String(category.id) === activeCategoryId);
   const selectedSubcategory = selectedCategory?.subcategories.find(
@@ -119,21 +147,59 @@ function Pos({
   const totalToPay = subTotal;
 
   const handlePayment = async (method) => {
-    if (selectedItems.length === 0) return;
-    const saleData = {
-      items: selectedItems,
-      paymentMethod: method,
-      subTotal,
-      totalToPay,
-      customerId: selectedCustomer?.id || null,
-      customerName: selectedCustomer?.name || "Walk-in Customer"
-    };
-    const result = await handleSale(saleData);
-    if (result?.success) {
-      setSelectedItems([]);
-      setSelectedCustomer(null);
+    if (selectedItems.length === 0 || checkoutPending || submissionLock.current) return;
+    if (checkoutRetry && checkoutRetry.paymentMethod !== method) return;
+    submissionLock.current = true;
+    setIsSubmitting(true);
+    try {
+      const signature = JSON.stringify({
+        items: selectedItems.map(({ id, quantity, price }) => [id, quantity, price]),
+        method,
+        customerId: selectedCustomer?.id || null,
+      });
+      if (!checkoutKey.current || lastCartSignature.current !== signature) {
+        const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2);
+        checkoutKey.current = `pos_${Date.now()}_${randomPart}`.slice(0, 128);
+        lastCartSignature.current = signature;
+      }
+      const result = await handleSale({
+        items: selectedItems,
+        paymentMethod: method,
+        subTotal,
+        totalToPay,
+        customerId: selectedCustomer?.id || null,
+        customerName: selectedCustomer?.name || "Walk-in Customer",
+        customerPhone: selectedCustomer?.phone || "",
+        customerEmail: selectedCustomer?.email || "",
+        clientTransactionId: checkoutKey.current,
+      });
+      if (result?.success) {
+        setSelectedItems([]);
+        setSelectedCustomer(null);
+        checkoutKey.current = null;
+        lastCartSignature.current = null;
+        setCheckoutRetry(null);
+      } else if (result?.pending) {
+        setCheckoutRetry({ paymentMethod: method, queued: true });
+      } else if (result?.retryWithSameId) {
+        setCheckoutRetry({ paymentMethod: method, queued: false });
+      } else {
+        setCheckoutRetry(null);
+        checkoutKey.current = null;
+        lastCartSignature.current = null;
+      }
+    } catch (error) {
+      toast.error(error.message || "Checkout could not be completed. Your cart has been preserved.");
+    } finally {
+      submissionLock.current = false;
+      setIsSubmitting(false);
     }
   };
+
+  const cartLocked = checkoutPending || Boolean(checkoutRetry);
+  const checkoutDisabled = selectedItems.length === 0 || isSubmitting || checkoutPending;
 
   return (
     <div className="pos-wrapper">
@@ -142,6 +208,9 @@ function Pos({
         {/* LEFT: Product Selection */}
         <div className="pos-product-section">
           <div className="pos-header">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem', color: '#475569', fontSize: '0.85rem' }}>
+              Sold By: <strong style={{ marginLeft: '0.35rem' }}>{cashierName || 'Current cashier'}</strong>
+            </div>
             <div className="pos-search-wrapper">
               <Search size={20} color="#64748b" />
               <input 
@@ -246,7 +315,7 @@ function Pos({
             {filteredInventory.map((item) => {
               const img = getProductImage(item);
               return (
-                <div key={item.id} className="pos-product-card" onClick={() => addToCart(item)}>
+                <div key={item.id} className="pos-product-card" onClick={() => !cartLocked && !isSubmitting && addToCart(item)}>
                   <div className="pos-product-image">
                     {img ? (
                       <img src={img} alt={item.name} />
@@ -269,7 +338,7 @@ function Pos({
         <div className="pos-cart-section">
           <div className="pos-cart-header">
             <h2>Shopping Cart</h2>
-            <button className="pos-qty-btn" onClick={() => setSelectedItems([])} title="Clear Cart">
+            <button className="pos-qty-btn" onClick={() => setSelectedItems([])} title="Clear Cart" disabled={isSubmitting || cartLocked}>
               <Trash2 size={16} color="#ef4444" />
             </button>
           </div>
@@ -288,12 +357,12 @@ function Pos({
                     <span className="pos-cart-item-price">K{(item.price || 0).toLocaleString()}</span>
                   </div>
                   <div className="pos-cart-controls">
-                    <button className="pos-qty-btn" onClick={() => updateQuantity(item.id, item.quantity - 1)}><Minus size={12} /></button>
+                    <button className="pos-qty-btn" onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={isSubmitting || cartLocked}><Minus size={12} /></button>
                     <span className="pos-qty-val">{item.quantity}</span>
-                    <button className="pos-qty-btn" onClick={() => updateQuantity(item.id, item.quantity + 1)}><Plus size={12} /></button>
+                    <button className="pos-qty-btn" onClick={() => updateQuantity(item.id, item.quantity + 1)} disabled={isSubmitting || cartLocked}><Plus size={12} /></button>
                   </div>
                   <div className="pos-cart-item-total">K{((item.price || 0) * (item.quantity || 0)).toLocaleString()}</div>
-                  <button style={{background:'none', border:'none', color:'#cbd5e1', cursor:'pointer'}} onClick={() => removeItem(item.id)}>
+                  <button style={{background:'none', border:'none', color:'#cbd5e1', cursor:'pointer'}} onClick={() => removeItem(item.id)} disabled={isSubmitting || cartLocked}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -310,21 +379,48 @@ function Pos({
               <span>Total</span>
               <span>K{(totalToPay || 0).toLocaleString()}</span>
             </div>
+            {customers.length > 0 && (
+              <label style={{ display: 'grid', gap: '0.35rem', margin: '0.75rem 0', color: '#475569', fontSize: '0.85rem' }}>
+                Customer
+                <select
+                  aria-label="Customer"
+                  value={selectedCustomer?.id || ''}
+                  disabled={isSubmitting || cartLocked}
+                  onChange={(event) => setSelectedCustomer(customers.find((customer) => String(customer.id) === event.target.value) || null)}
+                  style={{ padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: 'white' }}
+                >
+                  <option value="">Walk-in Customer</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>{customer.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {pendingNotice && (
+              <div role="status" style={{ color: checkoutPending ? '#b45309' : '#b91c1c', fontSize: '0.85rem', margin: '0.5rem 0' }}>
+                <p>{pendingNotice}</p>
+                {checkoutPending && (
+                  <button type="button" className="pos-tool-btn" onClick={retryPendingSync}>
+                    Retry syncing sale
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="pos-payment-methods">
-              <button className="pos-pay-btn cash" onClick={() => handlePayment('Cash')}>
+              <button className="pos-pay-btn cash" disabled={checkoutDisabled || (checkoutRetry && checkoutRetry.paymentMethod !== 'Cash')} onClick={() => handlePayment('Cash')}>
                 <Banknote size={20} />
                 Cash
               </button>
-              <button className="pos-pay-btn airtel" onClick={() => handlePayment('Airtel')}>
+              <button className="pos-pay-btn airtel" disabled={checkoutDisabled || (checkoutRetry && checkoutRetry.paymentMethod !== 'Airtel')} onClick={() => handlePayment('Airtel')}>
                 <Smartphone size={20} />
                 Airtel
               </button>
-              <button className="pos-pay-btn mtn" onClick={() => handlePayment('MTN')}>
+              <button className="pos-pay-btn mtn" disabled={checkoutDisabled || (checkoutRetry && checkoutRetry.paymentMethod !== 'MTN')} onClick={() => handlePayment('MTN')}>
                 <Smartphone size={20} />
                 MTN
               </button>
-              <button className="pos-pay-btn card" onClick={() => handlePayment('Card')}>
+              <button className="pos-pay-btn card" disabled={checkoutDisabled || (checkoutRetry && checkoutRetry.paymentMethod !== 'Card')} onClick={() => handlePayment('Card')}>
                 <CreditCard size={20} />
                 Card
               </button>

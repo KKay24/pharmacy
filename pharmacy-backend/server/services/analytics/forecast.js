@@ -1,4 +1,5 @@
 const { Batch, Medicine, Sales } = require('../../models');
+const { Op } = require('sequelize');
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -341,6 +342,7 @@ async function buildForecastDataset(options = DEFAULT_ANALYTICS_OPTIONS) {
       include: [{ model: Batch }],
     }),
     Sales.findAll({
+      where: { saleStatus: { [Op.ne]: 'REVERSED' } },
       order: [['date', 'ASC']],
     }),
   ]);

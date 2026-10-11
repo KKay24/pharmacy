@@ -19,6 +19,16 @@ const Sales = sequelize.define('Sales', {
     type: DataTypes.INTEGER,
     allowNull: true 
   },
+  soldBy: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  soldByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'Users', key: 'id' },
+    onDelete: 'SET NULL',
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false
@@ -49,6 +59,25 @@ const Sales = sequelize.define('Sales', {
   },
   receiptNumber: {
     type: DataTypes.STRING
+  },
+  saleStatus: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'COMPLETED',
+  },
+  reversedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  reversedByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'Users', key: 'id' },
+    onDelete: 'SET NULL',
+  },
+  reversalReason: {
+    type: DataTypes.TEXT,
+    allowNull: true,
   },
   date: {
     type: DataTypes.DATE,

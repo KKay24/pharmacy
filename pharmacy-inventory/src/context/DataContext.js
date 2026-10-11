@@ -11,6 +11,7 @@ import {
   getOfflineSales,
   saveOfflineSaleRecord,
   enqueuePendingOperation,
+  removePendingOperation,
   getSyncMetadata,
   setSyncMetadata,
 } from "../utils/offlineDb";
@@ -52,6 +53,7 @@ export const DataProvider = ({ children }) => {
   });
   const [userRole, setUserRole] = useState(initialSession?.user?.role || null);
   const [username, setUsername] = useState(initialSession?.user?.username || null);
+  const [userId, setUserId] = useState(initialSession?.user?.id || null);
 
   // Sync state from syncEngine
   const [syncState, setSyncState] = useState(syncEngine.getState());
@@ -60,12 +62,14 @@ export const DataProvider = ({ children }) => {
     const session = saveAuthSession(authPayload);
     setUsername(session?.user?.username || null);
     setUserRole(session?.user?.role || null);
+    setUserId(session?.user?.id || null);
   };
 
   const logoutUser = () => {
     clearAuthSession();
     setUsername(null);
     setUserRole(null);
+    setUserId(null);
     setInventory([]);
     setSales([]);
     setCustomers([]);
@@ -440,16 +444,63 @@ export const DataProvider = ({ children }) => {
      OFFLINE SALES RECORDING WITH IDEMPOTENCY & AUTOMATIC QUEUEING
      ======================================================================== */
   const recordSale = async (saleData) => {
-    const clientTransactionId = `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    const items = Array.isArray(saleData) ? saleData : [saleData];
+    const clientTransactionId = saleData.clientTransactionId || `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const items = Array.isArray(saleData)
+      ? saleData
+      : (Array.isArray(saleData.items) ? saleData.items : [saleData]);
     const now = new Date();
 
     const preparedItems = items.map((item, index) => ({
       ...item,
+      soldBy: username,
+      expectedSellerUserId: userId,
       clientTransactionId: item.clientTransactionId || `${clientTransactionId}_${index}`,
       date: item.date || now.toISOString(),
       syncStatus: syncEngine.isOnline ? 'syncing' : 'pending',
     }));
+
+    if (!syncEngine.isOnline && !userId) {
+      return {
+        success: false,
+        error: "An authenticated cashier session is required before an offline sale can be queued.",
+        clientTransactionId,
+      };
+    }
+
+    if (syncEngine.isOnline) {
+      try {
+        const response = await apiFetch("/api/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(preparedItems.map(({ expectedSellerUserId, soldBy, syncStatus, ...item }) => item)),
+        });
+        if (!response.ok) {
+          const error = new Error(await getApiErrorMessage(response, "Sale could not be completed"));
+          error.status = response.status;
+          throw error;
+        }
+
+        const payload = await response.json();
+        const confirmedSales = Array.isArray(payload) ? payload : (payload ? [payload] : []);
+        if (confirmedSales.length !== preparedItems.length || confirmedSales.some((sale) => !sale?.id)) {
+          throw new Error("The server did not confirm every item in this sale");
+        }
+
+        setSales((previous) => {
+          const existingIds = new Set(previous.map((sale) => sale.id));
+          return [...confirmedSales.filter((sale) => !existingIds.has(sale.id)), ...previous];
+        });
+        await Promise.all([fetchInventory(), fetchSales()]);
+        return { success: true, confirmed: true, sales: confirmedSales, clientTransactionId };
+      } catch (error) {
+        return {
+          success: false,
+          error: error.message || "Unable to confirm the sale. The cart has been preserved.",
+          clientTransactionId,
+          retryWithSameId: !error.status || error.status >= 500,
+        };
+      }
+    }
 
     // 1. Immediately update local inventory stock in IndexedDB and React state
     for (const item of preparedItems) {
@@ -500,27 +551,32 @@ export const DataProvider = ({ children }) => {
 
     await syncEngine.refreshCounts();
 
-    // 4. If online, trigger background sync
-    if (syncEngine.isOnline) {
-      syncEngine.triggerSync().then(() => {
-        if (userRole === "admin" || userRole === "manager") {
-          fetchAnalytics();
-          fetchPredictiveAnalytics();
-          fetchReorderInsights();
-          fetchRiskInsights();
-        }
-      }).catch(console.error);
-
-      return { success: true, pending: false, clientTransactionId };
-    }
-
-    // Offline: transaction is saved locally and safely queued
-    return { success: true, pending: true, clientTransactionId };
+    // Offline sales remain queued and provisional until the authenticated server confirms them.
+    return {
+      success: false,
+      pending: true,
+      clientTransactionId,
+      error: "Sale is queued offline. Keep the cart open until it synchronizes successfully.",
+    };
   };
 
   const triggerManualSync = async () => {
     return syncEngine.triggerSync();
   };
+
+  const discardConflictedSale = useCallback(async (clientTransactionId) => {
+    if (!clientTransactionId) {
+      throw new Error("Cannot clear an offline sale without its transaction ID");
+    }
+    await removePendingOperation(clientTransactionId);
+    await syncEngine.refreshCounts();
+    const inventoryResult = await fetchInventory();
+    if (!inventoryResult?.success || inventoryResult.offline) {
+      throw new Error(inventoryResult?.error || "Unable to refresh inventory after the failed sale");
+    }
+    await fetchSales();
+    return { success: true };
+  }, [fetchInventory, fetchSales]);
 
   return (
     <DataContext.Provider
@@ -536,11 +592,13 @@ export const DataProvider = ({ children }) => {
         deleteInventoryItem,
         recordSale,
         fetchInventory,
+        fetchSales,
         fetchInventoryCategories,
         customers,
         fetchCustomers,
         userRole,
         username,
+        userId,
         loginUser,
         logoutUser,
         analyticsData,
@@ -557,6 +615,7 @@ export const DataProvider = ({ children }) => {
         fetchSuppliers,
         syncState,
         triggerManualSync,
+        discardConflictedSale,
       }}
     >
       {children}

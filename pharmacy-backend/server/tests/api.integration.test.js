@@ -6,12 +6,28 @@ const { join } = require('node:path');
 const { spawn } = require('node:child_process');
 const { execFileSync } = require('node:child_process');
 const net = require('node:net');
+const sqlite3 = require('sqlite3');
 
 let childProcess;
 let baseUrl;
 let authToken;
+let adminUserId;
 let createdSaleId;
 let inventoryTaxonomy = [];
+let testDatabasePath;
+
+function runTestDatabaseStatement(sql) {
+  return new Promise((resolve, reject) => {
+    const database = new sqlite3.Database(testDatabasePath);
+    database.run(sql, (error) => {
+      database.close((closeError) => {
+        if (error) reject(error);
+        else if (closeError) reject(closeError);
+        else resolve();
+      });
+    });
+  });
+}
 
 function taxonomyNode(path) {
   const nodes = [];
@@ -60,6 +76,7 @@ before(async () => {
   const port = await getAvailablePort();
   const tempDirectory = mkdtempSync(join(tmpdir(), 'mediquick-api-test-'));
   const sqlitePath = join(tempDirectory, 'test.sqlite');
+  testDatabasePath = sqlitePath;
 
   baseUrl = `http://127.0.0.1:${port}`;
 
@@ -93,6 +110,8 @@ before(async () => {
       JWT_SECRET: 'integration-test-secret',
       ENABLE_DEMO_SEEDING: 'true',
       ALLOW_LEGACY_DEV_AUTH: 'false',
+      RESEND_API_KEY: '',
+      RECEIPT_FROM_EMAIL: '',
     },
     stdio: 'inherit',
   });
@@ -158,6 +177,7 @@ test('login returns a bearer token', async () => {
   const normalLoginPayload = await normalLoginResponse.json();
   assert.equal(normalLoginPayload.user.mustChangePassword, false);
   authToken = normalLoginPayload.token;
+  adminUserId = normalLoginPayload.user.id;
 });
 
 test('removed seed and debug endpoints are not available', async () => {
@@ -369,6 +389,9 @@ test('a sale can be created through the API', async () => {
       quantity: 1,
       totalPrice: 5,
       paymentMethod: 'Cash',
+      soldBy: 'forged-cashier',
+      soldByUserId: 999999,
+      clientTransactionId: `attribution_${Date.now()}`,
     }),
   });
 
@@ -377,6 +400,9 @@ test('a sale can be created through the API', async () => {
   const sale = await response.json();
   assert.ok(sale.id);
   assert.equal(sale.medicineId, firstItem.id);
+  assert.equal(sale.soldByUserId, adminUserId);
+  assert.notEqual(sale.soldBy, 'forged-cashier');
+  assert.equal(sale.saleStatus, 'COMPLETED');
 
   createdSaleId = sale.id;
 });
@@ -431,6 +457,7 @@ test('predictive analytics expose forecasts, reorder suggestions, and risk signa
       quantity: 100,
       totalPrice: 250,
       paymentMethod: 'Cash',
+      clientTransactionId: `forecast_sale_${Date.now()}`,
     }),
   });
   assert.equal(demandSpikeResponse.status, 201);
@@ -617,7 +644,7 @@ test('inventory persists across refresh/login, rejects duplicate products, and p
   assert.equal(afterDelete.data.some((medicine) => medicine.id === differentStrength.id), false);
 });
 
-test('sales creation is idempotent when clientTransactionId is supplied', async () => {
+test('sales creation is idempotent when clientTransactionId is supplied', async (t) => {
   const headers = {
     Authorization: `Bearer ${authToken}`,
     'Content-Type': 'application/json',
@@ -632,8 +659,20 @@ test('sales creation is idempotent when clientTransactionId is supplied', async 
   const stockBefore = testMed.Batches.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
   const clientTxId = `test_tx_${Date.now()}_sale_idempotency`;
 
+  const missingKeyResponse = await fetch(`${baseUrl}/api/sales`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      medicineId: testMed.id,
+      quantity: 1,
+      totalPrice: 10,
+      paymentMethod: 'Cash',
+    }),
+  });
+  assert.equal(missingKeyResponse.status, 400);
+
   // First request
-  const firstRes = await fetch(`${baseUrl}/api/sales`, {
+  const concurrentResponses = await Promise.all([1, 2].map(() => fetch(`${baseUrl}/api/sales`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -643,9 +682,227 @@ test('sales creation is idempotent when clientTransactionId is supplied', async 
       paymentMethod: 'Cash',
       clientTransactionId: clientTxId,
     }),
+  })));
+
+  await t.test('admin reversal restores exact original batches once and excludes revenue', async () => {
+    const headers = {
+      Authorization: `Bearer ${authToken}`,
+      'Content-Type': 'application/json',
+    };
+    const mainCategory = taxonomyNode('medicines');
+    const subcategory = taxonomyNode('medicines/pain-and-fever');
+    const form = taxonomyNode('medicines/pain-and-fever/tablet');
+    const product = {
+      name: `Reversal Integration Item ${Date.now()}`,
+      genericName: 'Reversal test generic',
+      mainCategoryId: mainCategory.id,
+      subcategoryId: subcategory.id,
+      productFormId: form.id,
+      strength: '10 mg',
+      dosage: 'Tablet',
+    };
+
+    const firstBatchResponse = await fetch(`${baseUrl}/api/inventory`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ...product,
+        batchNumber: 'REVERSAL-BATCH-A',
+        quantity: 2,
+        expiryDate: '2028-01-31',
+        costPrice: 2,
+        sellingPrice: 5,
+      }),
+    });
+    assert.equal(firstBatchResponse.status, 201);
+    const createdMedicine = await firstBatchResponse.json();
+
+    const secondBatchResponse = await fetch(`${baseUrl}/api/inventory`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ...product,
+        batchNumber: 'REVERSAL-BATCH-B',
+        quantity: 5,
+        expiryDate: '2029-01-31',
+        costPrice: 3,
+        sellingPrice: 5,
+      }),
+    });
+    assert.equal(secondBatchResponse.status, 201);
+
+    const beforeResponse = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+    const beforeInventory = await beforeResponse.json();
+    const beforeMedicine = beforeInventory.data.find((medicine) => medicine.id === createdMedicine.id);
+    const quantitiesBefore = new Map(beforeMedicine.Batches.map((batch) => [batch.batchNumber, batch.quantity]));
+    const revenueBeforeResponse = await fetch(`${baseUrl}/api/analytics/profit-loss?page=1&limit=100`, { headers });
+    const revenueBeforePayload = await revenueBeforeResponse.json();
+    const revenueBeforeSale = revenueBeforePayload.data.reduce((sum, month) => sum + month.revenue, 0);
+    const receiptNumber = `REV-${Date.now()}`;
+    const transactionId = `reversal_test_${Date.now()}`;
+
+    const saleResponse = await fetch(`${baseUrl}/api/sales`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify([{
+        medicineId: createdMedicine.id,
+        quantity: 4,
+        totalPrice: 20,
+        paymentMethod: 'Cash',
+        receiptNumber,
+        clientTransactionId: transactionId,
+      }]),
+    });
+    assert.equal(saleResponse.status, 201);
+    const createdSales = await saleResponse.json();
+    assert.equal(createdSales.length, 1);
+    const sale = createdSales[0];
+    assert.equal(sale.soldByUserId, adminUserId);
+
+    const invalidEmailResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/email-receipt`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email: 'not-an-email' }),
+    });
+    assert.equal(invalidEmailResponse.status, 400);
+    const unconfiguredEmailResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/email-receipt`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email: 'customer@example.test' }),
+    });
+    assert.equal(unconfiguredEmailResponse.status, 409);
+
+    const afterSaleResponse = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+    const afterSaleInventory = await afterSaleResponse.json();
+    const afterSaleMedicine = afterSaleInventory.data.find((medicine) => medicine.id === createdMedicine.id);
+    assert.equal(afterSaleMedicine.Batches.find((batch) => batch.batchNumber === 'REVERSAL-BATCH-A').quantity, 0);
+    assert.equal(afterSaleMedicine.Batches.find((batch) => batch.batchNumber === 'REVERSAL-BATCH-B').quantity, 3);
+
+    const previewResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/reversal-preview`, { headers });
+    assert.equal(previewResponse.status, 200);
+    const preview = await previewResponse.json();
+    assert.equal(preview.saleId, sale.id);
+    assert.equal(preview.receiptNumber, receiptNumber);
+    assert.equal(preview.soldBy, sale.soldBy);
+    assert.deepEqual(
+      preview.inventoryImpact.map((impact) => [impact.batchNumber, impact.quantity]),
+      [['REVERSAL-BATCH-A', 2], ['REVERSAL-BATCH-B', 2]]
+    );
+
+    const createUserResponse = await fetch(`${baseUrl}/api/auth/users`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        username: `reversal-user-${Date.now()}`,
+        password: 'regular-password-for-test',
+        role: 'user',
+      }),
+    });
+    assert.equal(createUserResponse.status, 201);
+    const newUser = (await createUserResponse.json()).user;
+    assert.equal(newUser.role, 'user');
+    const userLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: newUser.username, password: 'regular-password-for-test' }),
+    });
+    assert.equal(userLoginResponse.status, 200);
+    const userLogin = await userLoginResponse.json();
+    assert.equal(userLogin.user.role, 'user');
+
+    const forbiddenResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/reverse`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${userLogin.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reason: 'Unauthorized test reversal' }),
+    });
+    assert.equal(forbiddenResponse.status, 403);
+
+    const missingReasonResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/reverse`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ reason: '   ' }),
+    });
+    assert.equal(missingReasonResponse.status, 400);
+
+    await runTestDatabaseStatement(`
+      CREATE TRIGGER fail_sale_reversal
+      BEFORE INSERT ON InventoryMovements
+      WHEN NEW.movementType = 'SALE_REVERSAL'
+      BEGIN
+        SELECT RAISE(ABORT, 'injected reversal failure');
+      END
+    `);
+    try {
+      const failedReversalResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/reverse`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ reason: 'Test transaction rollback' }),
+      });
+      assert.equal(failedReversalResponse.status, 500);
+
+      const unchangedInventoryResponse = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+      const unchangedInventory = await unchangedInventoryResponse.json();
+      const unchangedMedicine = unchangedInventory.data.find((medicine) => medicine.id === createdMedicine.id);
+      assert.deepEqual(
+        unchangedMedicine.Batches.map((batch) => [batch.batchNumber, batch.quantity]),
+        afterSaleMedicine.Batches.map((batch) => [batch.batchNumber, batch.quantity]),
+      );
+
+      const unchangedSaleResponse = await fetch(`${baseUrl}/api/sales?page=1&limit=100`, { headers });
+      const unchangedSales = await unchangedSaleResponse.json();
+      assert.equal(unchangedSales.data.find((item) => item.id === sale.id).saleStatus, 'COMPLETED');
+    } finally {
+      await runTestDatabaseStatement('DROP TRIGGER IF EXISTS fail_sale_reversal');
+    }
+
+    const reversalRequests = await Promise.all([1, 2].map(() => fetch(`${baseUrl}/api/sales/${sale.id}/reverse`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ reason: 'Integration test inventory correction' }),
+    })));
+    assert.equal(reversalRequests.filter((response) => response.status === 200).length, 1);
+    assert.ok(reversalRequests.every((response) => [200, 409, 500].includes(response.status)));
+    const reversal = await reversalRequests.find((response) => response.status === 200).json();
+    assert.equal(reversal.saleStatus, 'REVERSED');
+    assert.equal(reversal.refundProcessed, false);
+
+    const duplicateReversalResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/reverse`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ reason: 'Duplicate integration test attempt' }),
+    });
+    assert.equal(duplicateReversalResponse.status, 409);
+
+    const restoredResponse = await fetch(`${baseUrl}/api/inventory?page=1&limit=100`, { headers });
+    const restoredInventory = await restoredResponse.json();
+    const restoredMedicine = restoredInventory.data.find((medicine) => medicine.id === createdMedicine.id);
+    for (const batch of restoredMedicine.Batches) {
+      assert.equal(batch.quantity, quantitiesBefore.get(batch.batchNumber));
+    }
+
+    const salesResponse = await fetch(`${baseUrl}/api/sales?page=1&limit=100`, { headers });
+    const salesPayload = await salesResponse.json();
+    const reversedSale = salesPayload.data.find((item) => item.id === sale.id);
+    assert.equal(reversedSale.saleStatus, 'REVERSED');
+    assert.equal(reversedSale.reversalReason, 'Integration test inventory correction');
+    assert.equal(reversedSale.ReversedBy.username, 'admin@example.test');
+
+    const reportsResponse = await fetch(`${baseUrl}/api/analytics/profit-loss?page=1&limit=100`, { headers });
+    assert.equal(reportsResponse.status, 200);
+    const reportsPayload = await reportsResponse.json();
+    assert.equal(
+      reportsPayload.data.reduce((sum, month) => sum + month.revenue, 0),
+      revenueBeforeSale,
+      'Reversed sale revenue is excluded from analytics'
+    );
   });
-  assert.equal(firstRes.status, 201);
-  const firstSale = await firstRes.json();
+  assert.ok(concurrentResponses.every((response) => response.status === 201));
+  const concurrentSales = await Promise.all(concurrentResponses.map((response) => response.json()));
+  const firstSale = concurrentSales[0];
+  assert.equal(concurrentSales[1].id, firstSale.id, 'Concurrent duplicate requests return the same sale');
   assert.ok(firstSale.id);
   assert.equal(firstSale.clientTransactionId, clientTxId);
 

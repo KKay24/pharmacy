@@ -64,7 +64,7 @@ class SyncService {
       // 2. Process by type with conflict detection
       try {
         if (type === 'SALE') {
-          const result = await this.syncSale(op, clientTransactionId);
+          const result = await this.syncSale(op, clientTransactionId, user);
           results.push(result);
         } else if (type === 'RESTOCK' || type === 'ADD_BATCH') {
           const result = await this.syncRestock(op, clientTransactionId);
@@ -101,7 +101,23 @@ class SyncService {
     };
   }
 
-  async syncSale(op, clientTransactionId) {
+  async syncSale(op, clientTransactionId, user) {
+    const rawItems = Array.isArray(op.payload)
+      ? op.payload
+      : (Array.isArray(op.payload?.items) ? op.payload.items : [op.payload]);
+    const expectedSellerIds = rawItems
+      .map((item) => item?.expectedSellerUserId)
+      .filter((id) => id !== undefined && id !== null)
+      .map(Number);
+    if (expectedSellerIds.some((id) => id !== Number(user?.id))) {
+      return {
+        clientTransactionId,
+        type: 'SALE',
+        status: 'error',
+        message: 'Sign in as the cashier who recorded this offline sale before syncing it.',
+      };
+    }
+
     // 1. Idempotency check: see if already synced
     const existing = await Sales.findAll({
       where: {
@@ -122,10 +138,6 @@ class SyncService {
     }
 
     // 2. Validate inventory conflict before mutating
-    const rawItems = Array.isArray(op.payload)
-      ? op.payload
-      : (Array.isArray(op.payload?.items) ? op.payload.items : [op.payload]);
-
     const transaction = await sequelize.transaction();
     try {
       // Validate all items have sufficient server stock
@@ -174,7 +186,7 @@ class SyncService {
       ? op.payload.map((item, idx) => ({ ...item, clientTransactionId: `${clientTransactionId}_${idx}`, date: op.clientTimestamp || item.date }))
       : { ...op.payload, clientTransactionId, date: op.clientTimestamp || op.payload?.date };
 
-    const created = await this.salesService.create(payloadWithId);
+    const created = await this.salesService.create(payloadWithId, user);
     return {
       clientTransactionId,
       type: 'SALE',

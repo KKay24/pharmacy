@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { 
     XAxis, YAxis, 
     Tooltip, 
@@ -18,14 +18,24 @@ import {
     Table,
     Calendar,
     Check,
-    FileSpreadsheet
+    FileSpreadsheet,
+    History,
+    ChevronLeft,
+    ChevronRight,
+    RotateCcw
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { DataContext } from '../context/DataContext';
+import { apiFetch, getApiErrorMessage } from '../utils/api';
 import "../styles/reports-modern.css";
 
 const COLORS = ['#039d83', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 const SHORTAGE_STORAGE_KEY = 'mediquick_daily_shortages';
+
+function isCompletedSale(sale) {
+  return (!sale.saleStatus || sale.saleStatus === 'COMPLETED')
+    && !['pending', 'syncing', 'failed', 'conflict'].includes(sale.syncStatus);
+}
 
 function formatDateMMDDYYYY(dateObj) {
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -39,14 +49,113 @@ function formatKwacha(amount) {
   return `k${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function localDateInputValue(date = new Date()) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
+}
+
 export default function ReportsPage() {
-  const { sales = [], expenses = [] } = useContext(DataContext);
+  const { sales = [], expenses = [], userRole, fetchSales } = useContext(DataContext);
   
   // Tabs: 'ledger' (spreadsheet view) vs 'analytics' (BI charts)
   const [activeTab, setActiveTab] = useState('ledger');
   const [ledgerView, setLedgerView] = useState('daily'); // 'daily', 'weekly', 'monthly'
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [period, setPeriod] = useState('30d');
+  const [salesHistoryDate, setSalesHistoryDate] = useState(() => localDateInputValue());
+  const [salesHistoryPage, setSalesHistoryPage] = useState(1);
+  const [salesHistoryRows, setSalesHistoryRows] = useState([]);
+  const [salesHistoryPagination, setSalesHistoryPagination] = useState(null);
+  const [salesHistoryLoading, setSalesHistoryLoading] = useState(false);
+  const [salesHistoryError, setSalesHistoryError] = useState('');
+  const [salesHistoryRefresh, setSalesHistoryRefresh] = useState(0);
+  const [reversalPreview, setReversalPreview] = useState(null);
+  const [reversalReason, setReversalReason] = useState('');
+  const [reversalLoading, setReversalLoading] = useState(false);
+  const [reversalError, setReversalError] = useState('');
+
+  useEffect(() => {
+    if (activeTab !== 'history' || !salesHistoryDate) return undefined;
+
+    let cancelled = false;
+    const dayStart = new Date(`${salesHistoryDate}T00:00:00`);
+    const nextDay = new Date(dayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const query = new URLSearchParams({
+      from: dayStart.toISOString(),
+      to: nextDay.toISOString(),
+      page: String(salesHistoryPage),
+      limit: '100',
+    });
+
+    setSalesHistoryLoading(true);
+    setSalesHistoryError('');
+    apiFetch(`/api/sales?${query}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await getApiErrorMessage(response, 'Could not load item sales history'));
+        }
+        return response.json();
+      })
+      .then((result) => {
+        if (cancelled) return;
+        setSalesHistoryRows(Array.isArray(result.data) ? result.data : (Array.isArray(result) ? result : []));
+        setSalesHistoryPagination(result.pagination || null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setSalesHistoryRows([]);
+        setSalesHistoryPagination(null);
+        setSalesHistoryError(error.message || 'Could not load item sales history');
+      })
+      .finally(() => {
+        if (!cancelled) setSalesHistoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, salesHistoryDate, salesHistoryPage, salesHistoryRefresh]);
+
+  const startSaleReversal = async (saleId) => {
+    setReversalLoading(true);
+    setReversalError('');
+    setReversalReason('');
+    try {
+      const response = await apiFetch(`/api/sales/${saleId}/reversal-preview`);
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Could not load reversal details'));
+      setReversalPreview(await response.json());
+    } catch (error) {
+      toast.error(error.message || 'Could not load reversal details');
+    } finally {
+      setReversalLoading(false);
+    }
+  };
+
+  const confirmSaleReversal = async (event) => {
+    event.preventDefault();
+    if (!reversalPreview || !reversalReason.trim()) return;
+    setReversalLoading(true);
+    setReversalError('');
+    try {
+      const response = await apiFetch(`/api/sales/${reversalPreview.saleId}/reverse`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reversalReason }),
+      });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Sale reversal failed'));
+      const result = await response.json();
+      setReversalPreview(null);
+      setReversalReason('');
+      setSalesHistoryRefresh((value) => value + 1);
+      await fetchSales?.();
+      toast.success(`Receipt ${result.receiptNumber || ''} reversed. No refund was processed.`);
+    } catch (error) {
+      setReversalError(error.message || 'Sale reversal failed');
+    } finally {
+      setReversalLoading(false);
+    }
+  };
   
   // Daily Shortages state (persisted in localStorage)
   const [shortages, setShortages] = useState(() => {
@@ -79,6 +188,7 @@ export default function ReportsPage() {
     const map = {};
 
     sales.forEach(sale => {
+      if (!isCompletedSale(sale)) return;
       if (!sale.date && !sale.createdAt) return;
       const rawDate = sale.date || sale.createdAt;
       const dateObj = new Date(rawDate);
@@ -337,7 +447,7 @@ export default function ReportsPage() {
     else if (period === '30d') filterDate.setDate(now.getDate() - 30);
     else filterDate.setFullYear(now.getFullYear() - 1);
 
-    const filteredSales = sales.filter(s => new Date(s.date) >= filterDate);
+    const filteredSales = sales.filter(s => isCompletedSale(s) && new Date(s.date) >= filterDate);
     const filteredExpenses = expenses.filter(e => new Date(e.date) >= filterDate);
 
     const revenue = filteredSales.reduce((acc, s) => acc + (s.totalPrice || 0), 0);
@@ -368,6 +478,7 @@ export default function ReportsPage() {
     }
 
     sales.forEach(s => {
+        if (!isCompletedSale(s)) return;
         const d = new Date(s.date);
         let key = d.toLocaleDateString('default', { month: 'short', day: 'numeric' });
         if (period === '1y') key = d.toLocaleString('default', { month: 'short' });
@@ -391,6 +502,7 @@ export default function ReportsPage() {
   const categoryData = useMemo(() => {
     const counts = {};
     sales.forEach(s => {
+        if (!isCompletedSale(s)) return;
         const cat = s.category || 'General';
         counts[cat] = (counts[cat] || 0) + (s.totalPrice || 0);
     });
@@ -416,6 +528,13 @@ export default function ReportsPage() {
           >
             <BarChart3 size={16} /> Visual Analytics &amp; KPIs
           </button>
+          <button
+            type="button"
+            className={`ri-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
+          >
+            <History size={16} /> Item Sales History
+          </button>
         </div>
 
         {activeTab === 'ledger' && (
@@ -428,6 +547,161 @@ export default function ReportsPage() {
           </button>
         )}
       </div>
+
+      {activeTab === 'history' && (
+        <div className="ri-ledger-card">
+          <div className="ri-ledger-toolbar">
+            <div className="ri-ledger-toolbar-left">
+              <span className="ri-ledger-title">
+                <History size={20} color="#166534" />
+                Sold Items by Day
+              </span>
+              <label htmlFor="sales-history-date">Sale date</label>
+              <input
+                id="sales-history-date"
+                className="ri-select-input"
+                type="date"
+                value={salesHistoryDate}
+                onChange={(event) => {
+                  setSalesHistoryDate(event.target.value);
+                  setSalesHistoryPage(1);
+                }}
+              />
+            </div>
+          </div>
+
+          {salesHistoryError && (
+            <p role="alert" style={{ padding: '0 1.5rem', color: '#b91c1c' }}>{salesHistoryError}</p>
+          )}
+          <div className="ri-ledger-table-wrap">
+            <table className="ri-ledger-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Item</th>
+                  <th>Quantity</th>
+                  <th>Sale Total</th>
+                  <th>Payment</th>
+                  <th>Sold By</th>
+                  <th>Receipt</th>
+                  <th>Status</th>
+                  {userRole === 'admin' && <th>Action</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {salesHistoryLoading ? (
+                  <tr><td colSpan={userRole === 'admin' ? 9 : 8}>Loading sales history…</td></tr>
+                ) : salesHistoryRows.length === 0 ? (
+                  <tr><td colSpan={userRole === 'admin' ? 9 : 8}>{salesHistoryError ? 'Sales history could not be loaded.' : 'No items were recorded as sold on this day.'}</td></tr>
+                ) : salesHistoryRows.map((sale) => (
+                  <tr key={sale.id} className="ri-ledger-row">
+                    <td>{sale.date && !Number.isNaN(new Date(sale.date).getTime()) ? new Date(sale.date).toLocaleTimeString() : '—'}</td>
+                    <td>{sale.name || 'Unknown item'}</td>
+                    <td>{Number(sale.quantity || 0)}</td>
+                    <td>{formatKwacha(sale.totalPrice)}</td>
+                    <td>{sale.paymentMethod || '—'}</td>
+                    <td>{sale.soldBy || 'Not recorded'}</td>
+                    <td>{sale.receiptNumber || '—'}</td>
+                    <td>
+                      <span style={{ color: sale.saleStatus === 'REVERSED' ? '#b91c1c' : '#15803d', fontWeight: 700 }}>
+                        {sale.saleStatus || 'COMPLETED'}
+                      </span>
+                      {sale.saleStatus === 'REVERSED' && (
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          {sale.ReversedBy?.username || (sale.reversedByUserId ? `Admin #${sale.reversedByUserId}` : 'Admin')}
+                          {sale.reversedAt ? ` · ${new Date(sale.reversedAt).toLocaleString()}` : ''}
+                          {' · '}{sale.reversalReason || 'No reason recorded'}
+                        </div>
+                      )}
+                    </td>
+                    {userRole === 'admin' && (
+                      <td>
+                        {(sale.saleStatus || 'COMPLETED') === 'COMPLETED' ? (
+                          <button
+                            type="button"
+                            className="ri-period-btn"
+                            disabled={reversalLoading}
+                            onClick={() => startSaleReversal(sale.id)}
+                          >
+                            <RotateCcw size={14} /> Reverse Sale
+                          </button>
+                        ) : '—'}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {salesHistoryPagination?.totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.5rem' }}>
+              <button
+                type="button"
+                className="ri-period-btn"
+                disabled={salesHistoryPage <= 1 || salesHistoryLoading}
+                onClick={() => setSalesHistoryPage((page) => Math.max(1, page - 1))}
+              >
+                <ChevronLeft size={16} /> Previous
+              </button>
+              <span>Page {salesHistoryPagination.page} of {salesHistoryPagination.totalPages} ({salesHistoryPagination.total} items)</span>
+              <button
+                type="button"
+                className="ri-period-btn"
+                disabled={salesHistoryPage >= salesHistoryPagination.totalPages || salesHistoryLoading}
+                onClick={() => setSalesHistoryPage((page) => page + 1)}
+              >
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+
+          {reversalPreview && (
+            <div className="modal-overlay" role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 2100, background: 'rgba(15,23,42,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+              <form
+                className="modal-content"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="sale-reversal-heading"
+                onSubmit={confirmSaleReversal}
+                style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', width: 'min(100%, 620px)', maxHeight: '90vh', overflowY: 'auto' }}
+              >
+                <h2 id="sale-reversal-heading">Reverse {reversalPreview.receiptNumber || 'Sale'}</h2>
+                <p>Sale date: {new Date(reversalPreview.date).toLocaleString()}</p>
+                <p>Sold by: {reversalPreview.soldBy || 'Not recorded'}</p>
+                <p>Original items and total: {reversalPreview.items.map((item) => `${item.name} × ${item.quantity}`).join(', ')} — {formatKwacha(reversalPreview.total)}</p>
+                <h3>Inventory that will be restored</h3>
+                <ul>
+                  {reversalPreview.inventoryImpact.map((impact, index) => (
+                    <li key={`${impact.batchNumber}-${index}`}>
+                      {impact.itemName}: +{impact.quantity} to batch {impact.batchNumber} (expiry {impact.expiryDate})
+                    </li>
+                  ))}
+                </ul>
+                <p role="note" style={{ color: '#b45309', fontWeight: 700 }}>
+                  This reverses the sale and restores inventory only. It does not automatically refund the customer.
+                </p>
+                {reversalError && <p role="alert" style={{ color: '#b91c1c' }}>{reversalError}</p>}
+                <label style={{ display: 'grid', gap: '0.4rem' }}>
+                  Mandatory reversal reason
+                  <textarea
+                    required
+                    minLength={3}
+                    value={reversalReason}
+                    onChange={(event) => setReversalReason(event.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                  <button type="button" className="ri-period-btn" disabled={reversalLoading} onClick={() => setReversalPreview(null)}>Cancel</button>
+                  <button type="submit" className="ri-export-btn" disabled={reversalLoading || !reversalReason.trim()}>
+                    {reversalLoading ? 'Reversing…' : 'Confirm Reversal'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ============================================================== */}
       {/* TAB 1: SPREADSHEET SALES LEDGER (Table8 style)                 */}

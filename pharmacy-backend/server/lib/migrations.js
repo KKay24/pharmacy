@@ -13,6 +13,8 @@ const migrationDefinitions = [
   require('../migrations/010-add-idempotency-and-sync'),
   require('../migrations/011-add-product-taxonomy'),
   require('../migrations/012-add-customer-ecom-and-orders'),
+  require('../migrations/013-add-sales-attribution'),
+  require('../migrations/014-add-sale-reversal-audit'),
 ];
 
 function normalizeTableName(table) {

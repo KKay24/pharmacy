@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, FlatList, Pressable, TextInput, Alert, Modal, ScrollView } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import apiClient from '@/api/client';
+import { useAuth } from '@/context/AuthContext';
 import { Search, ShoppingCart, Plus, Minus, Trash2, CheckCircle2 } from 'lucide-react-native';
 import { getMedicineBatches, getMedicineCurrentPrice, getMedicineTotalQuantity } from '@/utils/inventory';
 
@@ -17,7 +18,17 @@ interface CartItem extends Medicine {
   quantity: number;
 }
 
+interface ConfirmedReceipt {
+  receiptNumber: string;
+  date: string;
+  cashierName: string;
+  items: Array<{ name: string; quantity: number; price: number; total: number }>;
+  paymentMethod: string;
+  total: number;
+}
+
 export default function PosScreen() {
+  const { user } = useAuth();
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [filteredMedicines, setFilteredMedicines] = useState<Medicine[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,6 +36,9 @@ export default function PosScreen() {
   const [showCart, setShowCart] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
+  const [confirmedReceipt, setConfirmedReceipt] = useState<ConfirmedReceipt | null>(null);
+  const checkoutRef = React.useRef<{ signature: string; transactionId: string } | null>(null);
+  const submissionLock = React.useRef(false);
 
   const fetchInventory = async () => {
     try {
@@ -111,34 +125,69 @@ export default function PosScreen() {
   const calculateTotal = () => calculateSubtotal();
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || submissionLock.current) return;
 
+    submissionLock.current = true;
     setLoading(true);
     try {
-      const salesData = cart.map(item => ({
+      const signature = JSON.stringify(cart.map(({ id, quantity, price }) => [id, quantity, price]));
+      if (!checkoutRef.current || checkoutRef.current.signature !== signature) {
+        const randomId = typeof globalThis.crypto?.randomUUID === 'function'
+          ? globalThis.crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        checkoutRef.current = { signature, transactionId: `mobile_${randomId}`.slice(0, 128) };
+      }
+      const { transactionId } = checkoutRef.current;
+      const receiptNumber = `MQ-${transactionId.replace(/[^a-z0-9]/gi, '').slice(-14).toUpperCase()}`;
+      const date = new Date().toISOString();
+      const salesData = cart.map((item, index) => ({
         medicineId: item.id,
         name: item.name,
         quantity: item.quantity,
         totalPrice: item.price * item.quantity,
         paymentMethod: 'Cash', // Default for mobile POS for now
-        date: new Date().toISOString()
+        date,
+        receiptNumber,
+        clientTransactionId: `${transactionId}_${index}`,
       }));
 
-      const response = await apiClient.post('/api/sales', salesData);
+      const response = await apiClient.post('/api/sales', {
+        clientTransactionId: transactionId,
+        items: salesData,
+      });
       
       if (response.status >= 200 && response.status < 300) {
+        const confirmedSales = Array.isArray(response.data) ? response.data : [response.data];
+        if (confirmedSales.length !== salesData.length || confirmedSales.some((sale) => !sale?.id)) {
+          throw new Error('The server did not confirm every item in this sale.');
+        }
+        setConfirmedReceipt({
+          receiptNumber: confirmedSales[0]?.receiptNumber || receiptNumber,
+          date: confirmedSales[0]?.date || date,
+          cashierName: confirmedSales[0]?.soldBy || 'Not recorded',
+          items: confirmedSales.map((sale) => ({
+            name: sale.name,
+            quantity: Number(sale.quantity),
+            price: Number(sale.pricePerUnit || 0),
+            total: Number(sale.totalPrice || 0),
+          })),
+          paymentMethod: confirmedSales[0]?.paymentMethod || 'Cash',
+          total: confirmedSales.reduce((sum, sale) => sum + Number(sale.totalPrice || 0), 0),
+        });
         setCart([]);
         setShowCart(false);
         setSuccessModal(true);
-        fetchInventory(); // Refresh stock
+        checkoutRef.current = null;
+        await fetchInventory();
       } else {
         Alert.alert('Error', 'Failed to record sale.');
       }
     } catch (err: any) {
       console.error('Checkout error:', err);
-      const errorMessage = err.response?.data?.error || 'Failed to connect to server.';
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to connect to server.';
       Alert.alert('Error', errorMessage);
     } finally {
+      submissionLock.current = false;
       setLoading(false);
     }
   };
@@ -147,6 +196,7 @@ export default function PosScreen() {
     <View style={styles.container}>
       {/* Search Header */}
       <View style={styles.header}>
+        <Text style={styles.cashierLabel}>Sold By: {user?.username || 'Not recorded'}</Text>
         <View style={styles.searchContainer}>
           <Search size={20} color="#64748b" style={styles.searchIcon} />
           <TextInput
@@ -257,7 +307,17 @@ export default function PosScreen() {
           <View style={styles.successContent}>
             <CheckCircle2 size={60} color="#059669" />
             <Text style={styles.successTitle}>Sale Recorded!</Text>
-            <Text style={styles.successText}>The transaction has been successfully processed.</Text>
+            <Text style={styles.successText}>Receipt: {confirmedReceipt?.receiptNumber}</Text>
+            <Text style={styles.receiptDetail}>Date: {confirmedReceipt?.date ? new Date(confirmedReceipt.date).toLocaleString() : '—'}</Text>
+            <Text style={styles.receiptDetail}>Sold By: {confirmedReceipt?.cashierName || 'Not recorded'}</Text>
+            {confirmedReceipt?.items?.map((item, index) => (
+              <Text style={styles.receiptDetail} key={`${item.name}-${index}`}>
+                {item.name} × {item.quantity} · K {item.price.toFixed(2)} ea · K {item.total.toFixed(2)}
+              </Text>
+            ))}
+            <Text style={styles.receiptDetail}>Payment: {confirmedReceipt?.paymentMethod}</Text>
+            <Text style={styles.receiptTotal}>Total: K {Number(confirmedReceipt?.total || 0).toFixed(2)}</Text>
+            <Text style={styles.receiptDetail}>Thank you for shopping with MediQuick Pharmacy.</Text>
             <Pressable style={styles.successBtn} onPress={() => setSuccessModal(false)}>
               <Text style={styles.successBtnText}>Done</Text>
             </Pressable>
@@ -278,6 +338,13 @@ const styles = StyleSheet.create({
     paddingBottom: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+  },
+  cashierLabel: {
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -530,6 +597,18 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 30,
     lineHeight: 20,
+  },
+  receiptDetail: {
+    textAlign: 'center',
+    color: '#475569',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  receiptTotal: {
+    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 12,
   },
   successBtn: {
     backgroundColor: '#059669',

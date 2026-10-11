@@ -32,6 +32,8 @@ Sales.belongsTo(Medicine, { foreignKey: 'medicineId' });
 // Customer Associations
 Customer.hasMany(Sales, { foreignKey: 'customerId' });
 Sales.belongsTo(Customer, { foreignKey: 'customerId' });
+Sales.belongsTo(User, { as: 'Cashier', foreignKey: 'soldByUserId' });
+Sales.belongsTo(User, { as: 'ReversedBy', foreignKey: 'reversedByUserId' });
 
 Customer.hasMany(Prescription, { foreignKey: 'customerId' });
 Prescription.belongsTo(Customer, { foreignKey: 'customerId' });
