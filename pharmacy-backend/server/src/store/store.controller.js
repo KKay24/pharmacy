@@ -57,7 +57,7 @@ class StoreController {
   }
 
   updateOrderStatus(params, body) {
-    return this.service.updateOrderStatus(params.id, body.status);
+    return this.service.updateOrderStatus(params.id, body?.status);
   }
 
   // Prescriptions

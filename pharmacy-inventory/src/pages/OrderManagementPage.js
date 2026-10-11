@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Check, Clock3, Package, RefreshCw, Search } from "lucide-react";
-import { apiFetch } from "../utils/api";
+import { apiFetch, getApiErrorMessage } from "../utils/api";
 import "../styles/orderManagement.css";
 
 const ORDER_STATUSES = [
@@ -38,8 +38,12 @@ export default function OrderManagementPage() {
       const query = new URLSearchParams({ page: String(page), limit: "100" });
       if (statusFilter) query.set("status", statusFilter);
       const response = await apiFetch(`/api/orders?${query}`);
-      setOrders(response.data || []);
-      setPagination(response.pagination || null);
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, "Could not load online store orders."));
+      }
+      const payload = await response.json();
+      setOrders(payload.data || []);
+      setPagination(payload.pagination || null);
     } catch (loadError) {
       setOrders([]);
       setPagination(null);
@@ -60,10 +64,15 @@ export default function OrderManagementPage() {
     setError("");
     setNotice("");
     try {
-      const updated = await apiFetch(`/api/orders/${order.id}/status`, {
+      const response = await apiFetch(`/api/orders/${order.id}/status`, {
         method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, `Could not update order ${order.orderNumber}.`));
+      }
+      const updated = await response.json();
       setOrders((current) => current.map((item) => (
         item.id === order.id ? { ...item, ...updated } : item
       )));

@@ -22,13 +22,18 @@ const order = {
   items: [{ id: 4, name: "Test medicine", quantity: 2, price: 25, total: 50 }],
 };
 
+const jsonResponse = (payload, ok = true) => ({
+  ok,
+  json: jest.fn().mockResolvedValue(payload),
+});
+
 describe("OrderManagementPage", () => {
   beforeEach(() => {
     apiFetch.mockReset();
-    apiFetch.mockResolvedValue({
+    apiFetch.mockResolvedValue(jsonResponse({
       data: [order],
       pagination: { page: 1, totalPages: 1, total: 1 },
-    });
+    }));
   });
 
   it("loads staff order details and updates fulfillment status", async () => {
@@ -39,7 +44,7 @@ describe("OrderManagementPage", () => {
     expect(screen.getByText("Mobile Money · Pending")).toBeTruthy();
     expect(screen.getByText(/does not confirm or collect payment/i)).toBeTruthy();
 
-    apiFetch.mockResolvedValueOnce({ ...order, orderStatus: "Preparing" });
+    apiFetch.mockResolvedValueOnce(jsonResponse({ ...order, orderStatus: "Preparing" }));
     fireEvent.change(screen.getByLabelText("Fulfillment status", { selector: "#order-status-12" }), {
       target: { value: "Preparing" },
     });
@@ -47,6 +52,7 @@ describe("OrderManagementPage", () => {
     await waitFor(() => {
       expect(apiFetch).toHaveBeenLastCalledWith("/api/orders/12/status", {
         method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "Preparing" }),
       });
     });

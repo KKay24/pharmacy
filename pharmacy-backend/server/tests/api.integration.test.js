@@ -372,6 +372,13 @@ test('all staff roles can list full online orders and update fulfillment status'
   assert.equal(staffOrder.customerEmail, 'order-queue@example.test');
   assert.equal(staffOrder.items.length, 1);
 
+  const missingContentTypeResponse = await fetch(`${baseUrl}/api/orders/${createdOrder.id}/status`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${staffToken}` },
+    body: JSON.stringify({ status: 'Preparing' }),
+  });
+  assert.equal(missingContentTypeResponse.status, 400);
+
   const updateResponse = await fetch(`${baseUrl}/api/orders/${createdOrder.id}/status`, {
     method: 'PUT',
     headers: staffHeaders,
