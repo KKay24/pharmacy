@@ -2,9 +2,21 @@ import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { 
   Search, ShoppingCart, Trash2, CreditCard, Plus, Minus, 
-  ArrowRight, Pause, Tag, Layers, Banknote, Split, Smartphone
+  ArrowRight, Pause, Tag, Banknote, Smartphone
 } from "lucide-react";
 import "../styles/posStyles.css";
+
+const PAYMENT_METHODS = ["Cash", "Airtel Money", "MTN Mobile Money", "Card"];
+
+function formatZmw(minorUnits) {
+  return `K${(minorUnits / 100).toFixed(2)}`;
+}
+
+function parseAmountMinor(value) {
+  if (!/^\d+(?:\.\d{1,2})?$/.test(String(value).trim())) return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : null;
+}
 
 const PRODUCT_IMAGES = {
   pill: { label: "TAB", background: "#dbeafe", foreground: "#1d4ed8" },
@@ -62,6 +74,9 @@ function Pos({
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkoutRetry, setCheckoutRetry] = useState(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentMode, setPaymentMode] = useState("single");
+  const [paymentEntries, setPaymentEntries] = useState([]);
   const submissionLock = useRef(false);
   const checkoutKey = useRef(null);
   const lastCartSignature = useRef(null);
@@ -70,6 +85,9 @@ function Pos({
     if (clearCartToken === undefined) return;
     setSelectedItems([]);
     setSelectedCustomer(null);
+    setPaymentEntries([]);
+    setPaymentMode("single");
+    setPaymentDialogOpen(false);
     checkoutKey.current = null;
     lastCartSignature.current = null;
     setCheckoutRetry(null);
@@ -143,20 +161,67 @@ function Pos({
   const removeItem = (id) => setSelectedItems(selectedItems.filter(item => item.id !== id));
 
   // 3. Totals
-  const subTotal = selectedItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
+  const subTotalMinor = selectedItems.reduce(
+    (sum, item) => sum + Math.round(Number(item.quantity) * Number(item.price) * 100),
+    0,
+  );
+  const subTotal = subTotalMinor / 100;
   const totalToPay = subTotal;
+  const paymentEntryMinor = paymentEntries.map((entry) => parseAmountMinor(entry.amount));
+  const allocatedMinor = paymentEntryMinor.reduce((sum, amount) => sum + (amount || 0), 0);
+  const remainingMinor = subTotalMinor - allocatedMinor;
+  const paymentEntriesValid = paymentEntries.length >= (paymentMode === "split" ? 2 : 1)
+    && paymentEntryMinor.every((amount) => amount !== null && amount > 0)
+    && remainingMinor === 0
+    && paymentEntries.every((entry) => (
+      !PAYMENT_METHODS.slice(1).includes(entry.method)
+      || (entry.transactionReference.trim().length > 0 && entry.cashierConfirmed)
+    ));
 
-  const handlePayment = async (method) => {
+  const selectPaymentMethod = (method) => {
+    if (method === "Split Payment") {
+      const firstAmount = Math.floor(subTotalMinor / 2);
+      setPaymentMode("split");
+      setPaymentEntries([
+        { method: "Cash", amount: formatZmw(firstAmount).slice(1), transactionReference: "", cashierConfirmed: false },
+        { method: "Cash", amount: formatZmw(subTotalMinor - firstAmount).slice(1), transactionReference: "", cashierConfirmed: false },
+      ]);
+      return;
+    }
+    setPaymentMode("single");
+    setPaymentEntries([{
+      method,
+      amount: (subTotalMinor / 100).toFixed(2),
+      transactionReference: "",
+      cashierConfirmed: false,
+    }]);
+  };
+
+  const updatePaymentEntry = (index, changes) => {
+    setPaymentEntries((entries) => entries.map((entry, entryIndex) => (
+      entryIndex === index ? { ...entry, ...changes } : entry
+    )));
+  };
+
+  const handlePayment = async () => {
     if (selectedItems.length === 0 || checkoutPending || submissionLock.current) return;
-    if (checkoutRetry && checkoutRetry.paymentMethod !== method) return;
+    if (!paymentEntriesValid) return;
+    const payments = paymentEntries.map(({ method, amount, transactionReference, cashierConfirmed }) => ({
+      method,
+      amount: Number(amount),
+      ...(transactionReference.trim() ? { transactionReference: transactionReference.trim() } : {}),
+      ...(cashierConfirmed ? { cashierConfirmed: true } : {}),
+    }));
+    const method = payments.length > 1 ? "Split Payment" : payments[0].method;
+    const signature = JSON.stringify({
+      items: selectedItems.map(({ id, quantity, price }) => [id, quantity, price]),
+      payments,
+      customerId: selectedCustomer?.id || null,
+    });
+    if (checkoutRetry && checkoutRetry.signature !== signature) return;
     submissionLock.current = true;
     setIsSubmitting(true);
     try {
-      const signature = JSON.stringify({
-        items: selectedItems.map(({ id, quantity, price }) => [id, quantity, price]),
-        method,
-        customerId: selectedCustomer?.id || null,
-      });
       if (!checkoutKey.current || lastCartSignature.current !== signature) {
         const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID
           ? crypto.randomUUID()
@@ -167,6 +232,7 @@ function Pos({
       const result = await handleSale({
         items: selectedItems,
         paymentMethod: method,
+        payments,
         subTotal,
         totalToPay,
         customerId: selectedCustomer?.id || null,
@@ -181,10 +247,11 @@ function Pos({
         checkoutKey.current = null;
         lastCartSignature.current = null;
         setCheckoutRetry(null);
+        setPaymentDialogOpen(false);
       } else if (result?.pending) {
-        setCheckoutRetry({ paymentMethod: method, queued: true });
+        setCheckoutRetry({ signature, queued: true });
       } else if (result?.retryWithSameId) {
-        setCheckoutRetry({ paymentMethod: method, queued: false });
+        setCheckoutRetry({ signature, queued: false });
       } else {
         setCheckoutRetry(null);
         checkoutKey.current = null;
@@ -373,29 +440,12 @@ function Pos({
           <div className="pos-checkout-footer">
             <div className="pos-summary-row">
               <span>Subtotal</span>
-              <span>K{(subTotal || 0).toLocaleString()}</span>
+              <span>{formatZmw(subTotalMinor)}</span>
             </div>
             <div className="pos-summary-total">
               <span>Total</span>
-              <span>K{(totalToPay || 0).toLocaleString()}</span>
+              <span>{formatZmw(subTotalMinor)}</span>
             </div>
-            {customers.length > 0 && (
-              <label style={{ display: 'grid', gap: '0.35rem', margin: '0.75rem 0', color: '#475569', fontSize: '0.85rem' }}>
-                Customer
-                <select
-                  aria-label="Customer"
-                  value={selectedCustomer?.id || ''}
-                  disabled={isSubmitting || cartLocked}
-                  onChange={(event) => setSelectedCustomer(customers.find((customer) => String(customer.id) === event.target.value) || null)}
-                  style={{ padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: 'white' }}
-                >
-                  <option value="">Walk-in Customer</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>{customer.name}</option>
-                  ))}
-                </select>
-              </label>
-            )}
             {pendingNotice && (
               <div role="status" style={{ color: checkoutPending ? '#b45309' : '#b91c1c', fontSize: '0.85rem', margin: '0.5rem 0' }}>
                 <p>{pendingNotice}</p>
@@ -407,32 +457,159 @@ function Pos({
               </div>
             )}
 
-            <div className="pos-payment-methods">
-              <button className="pos-pay-btn cash" disabled={checkoutDisabled || (checkoutRetry && checkoutRetry.paymentMethod !== 'Cash')} onClick={() => handlePayment('Cash')}>
-                <Banknote size={20} />
-                Cash
-              </button>
-              <button className="pos-pay-btn airtel" disabled={checkoutDisabled || (checkoutRetry && checkoutRetry.paymentMethod !== 'Airtel')} onClick={() => handlePayment('Airtel')}>
-                <Smartphone size={20} />
-                Airtel
-              </button>
-              <button className="pos-pay-btn mtn" disabled={checkoutDisabled || (checkoutRetry && checkoutRetry.paymentMethod !== 'MTN')} onClick={() => handlePayment('MTN')}>
-                <Smartphone size={20} />
-                MTN
-              </button>
-              <button className="pos-pay-btn card" disabled={checkoutDisabled || (checkoutRetry && checkoutRetry.paymentMethod !== 'Card')} onClick={() => handlePayment('Card')}>
-                <CreditCard size={20} />
-                Card
-              </button>
-            </div>
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem'}}>
-                <button className="pos-category-tab" style={{width:'100%', padding:'0.6rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', fontSize:'0.8rem'}} disabled title="Split payments are unavailable">
-                  <Split size={14} /> Split (Unavailable)
-                </button>
-                <button className="pos-category-tab" style={{width:'100%', padding:'0.6rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', fontSize:'0.8rem'}} disabled title="Additional payment methods are unavailable">
-                  <Layers size={14} /> Other (Unavailable)
-                </button>
-            </div>
+            <button
+              type="button"
+              className="pos-payment-trigger"
+              disabled={checkoutDisabled || Boolean(checkoutRetry?.queued)}
+              onClick={() => setPaymentDialogOpen(true)}
+            >
+              <CreditCard size={18} />
+              Payment Method
+            </button>
+            {paymentDialogOpen && (
+              <div className="pos-payment-backdrop" onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !isSubmitting) setPaymentDialogOpen(false);
+              }}>
+                <section className="pos-payment-dialog" role="dialog" aria-modal="true" aria-labelledby="pos-payment-title">
+                  <div className="pos-payment-dialog-heading">
+                    <h3 id="pos-payment-title">Choose payment method</h3>
+                    <button type="button" onClick={() => setPaymentDialogOpen(false)} disabled={isSubmitting} aria-label="Close payment dialog">×</button>
+                  </div>
+                  {!paymentEntries.length ? (
+                    <div className="pos-payment-options">
+                      {PAYMENT_METHODS.map((method) => (
+                        <button type="button" key={method} onClick={() => selectPaymentMethod(method)}>
+                          {method === "Cash" ? <Banknote size={18} /> : <Smartphone size={18} />}
+                          {method}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={subTotalMinor < 2}
+                        title={subTotalMinor < 2 ? "A split payment requires at least K0.02" : undefined}
+                        onClick={() => selectPaymentMethod("Split Payment")}
+                      >
+                        <CreditCard size={18} /> Split Payment
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pos-payment-form">
+                      <p className="pos-payment-total">Sale total: <strong>{formatZmw(subTotalMinor)}</strong></p>
+                      <p className="pos-payment-guidance">
+                        Complete mobile money or card payment with the provider first. Enter its reference and confirm only after verifying that it succeeded.
+                      </p>
+                      {paymentEntries.map((entry, index) => (
+                        <fieldset className="pos-payment-entry" key={index}>
+                          <legend>Payment {index + 1}</legend>
+                          <label>
+                            Method
+                            <select
+                              aria-label={`Payment method ${index + 1}`}
+                              value={entry.method}
+                              disabled={isSubmitting}
+                              onChange={(event) => updatePaymentEntry(index, {
+                                method: event.target.value,
+                                transactionReference: "",
+                                cashierConfirmed: false,
+                              })}
+                            >
+                              {PAYMENT_METHODS.map((methodName) => <option key={methodName} value={methodName}>{methodName}</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            Amount (ZMW)
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              inputMode="decimal"
+                              aria-label={`Payment amount ${index + 1}`}
+                              value={entry.amount}
+                              disabled={isSubmitting}
+                              onChange={(event) => updatePaymentEntry(index, { amount: event.target.value })}
+                            />
+                          </label>
+                          {PAYMENT_METHODS.slice(1).includes(entry.method) && (
+                            <>
+                              <label>
+                                Transaction reference
+                                <input
+                                  type="text"
+                                  maxLength={120}
+                                  value={entry.transactionReference}
+                                  disabled={isSubmitting}
+                                  onChange={(event) => updatePaymentEntry(index, { transactionReference: event.target.value })}
+                                  required
+                                />
+                              </label>
+                              <label className="pos-payment-confirmation">
+                                <input
+                                  type="checkbox"
+                                  checked={entry.cashierConfirmed}
+                                  disabled={isSubmitting}
+                                  onChange={(event) => updatePaymentEntry(index, { cashierConfirmed: event.target.checked })}
+                                />
+                                I verified this payment succeeded
+                              </label>
+                            </>
+                          )}
+                          {paymentMode === "split" && paymentEntries.length > 2 && (
+                            <button
+                              type="button"
+                              className="pos-payment-remove"
+                              disabled={isSubmitting}
+                              onClick={() => setPaymentEntries((entries) => entries.filter((_, entryIndex) => entryIndex !== index))}
+                            >
+                              Remove payment
+                            </button>
+                          )}
+                        </fieldset>
+                      ))}
+                      {paymentMode === "split" && (
+                        <button
+                          type="button"
+                          className="pos-payment-add"
+                          disabled={isSubmitting || paymentEntries.length >= 10}
+                          onClick={() => setPaymentEntries((entries) => [...entries, {
+                            method: "Cash",
+                            amount: "0.00",
+                            transactionReference: "",
+                            cashierConfirmed: false,
+                          }])}
+                        >
+                          <Plus size={15} /> Add payment
+                        </button>
+                      )}
+                      <div className="pos-payment-balance" aria-live="polite">
+                        <span>Allocated: {formatZmw(allocatedMinor)}</span>
+                        <span className={remainingMinor < 0 ? "is-overpaid" : ""}>
+                          {remainingMinor >= 0 ? "Remaining" : "Over by"}: {formatZmw(Math.abs(remainingMinor))}
+                        </span>
+                      </div>
+                      {!paymentEntriesValid && (
+                        <p className="pos-payment-validation" role="alert">
+                          Enter valid payment amounts that exactly equal the sale total. Electronic payments need a reference and cashier confirmation.
+                        </p>
+                      )}
+                      <div className="pos-payment-dialog-actions">
+                        <button type="button" onClick={() => {
+                          setPaymentEntries([]);
+                          setPaymentMode("single");
+                        }} disabled={isSubmitting}>Back</button>
+                        <button
+                          type="button"
+                          className="pos-payment-confirm"
+                          onClick={handlePayment}
+                          disabled={checkoutDisabled || !paymentEntriesValid}
+                        >
+                          {isSubmitting ? "Recording…" : "Confirm Payment"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
           </div>
         </div>
       </div>

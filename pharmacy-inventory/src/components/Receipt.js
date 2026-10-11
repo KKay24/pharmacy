@@ -10,6 +10,7 @@ const Receipt = forwardRef(({ transaction }, ref) => {
   const {
     items = [],
     paymentMethod,
+    payments = [],
     subTotal = 0,
     discount = 0,
     totalToPay = 0,
@@ -78,8 +79,17 @@ const Receipt = forwardRef(({ transaction }, ref) => {
       <div className={styles.divider}></div>
 
       <div className={styles.footer}>
-        <p>Paid via: {paymentMethod}</p>
-        <p>Payment amount: K {Number(totalToPay || 0).toFixed(2)}</p>
+        {payments.length > 0 ? payments.map((payment, index) => (
+          <p key={`${payment.method}-${index}`}>
+            Paid via {payment.method}: K {Number(payment.amount || 0).toFixed(2)}
+            {payment.status === "CASHIER_CONFIRMED" ? " (cashier-confirmed)" : ""}
+          </p>
+        )) : (
+          <>
+            <p>Paid via: {paymentMethod}</p>
+            <p>Payment amount: K {Number(totalToPay || 0).toFixed(2)}</p>
+          </>
+        )}
         <p>Thank you for shopping with us!</p>
       </div>
     </div>

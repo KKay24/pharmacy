@@ -32,6 +32,7 @@
   }
   .pos-cart-section {
     max-height: 600px;
+    min-height: 420px;
   }
 }
 
@@ -258,7 +259,8 @@
 }
 
 .pos-cart-list {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 1rem;
   display: flex;
@@ -336,12 +338,13 @@
 
 /* Checkout Area */
 .pos-checkout-footer {
-  padding: 1.5rem;
+  flex: 0 0 auto;
+  padding: 1rem;
   background: white;
   border-top: 1px solid #f1f5f9;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.55rem;
 }
 
 .pos-summary-row {
@@ -357,13 +360,223 @@
   font-size: 1.5rem;
   font-weight: 800;
   color: #10b981;
-  margin: 0.5rem 0;
+  margin: 0.15rem 0;
 }
 
 .pos-payment-methods {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
+}
+
+.pos-payment-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pos-payment-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pos-payment-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.pos-payment-dialog {
+  width: min(100%, 520px);
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+  padding: 1.25rem;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.25);
+}
+
+.pos-payment-dialog-heading,
+.pos-payment-dialog-actions,
+.pos-payment-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pos-payment-dialog-heading {
+  margin-bottom: 1rem;
+}
+
+.pos-payment-dialog-heading h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.15rem;
+}
+
+.pos-payment-dialog-heading button {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 7px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.pos-payment-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.pos-payment-options button,
+.pos-payment-dialog-actions button,
+.pos-payment-add,
+.pos-payment-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+  color: #1e293b;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pos-payment-options button:hover,
+.pos-payment-add:hover {
+  border-color: var(--primary);
+  background: #f8fafc;
+}
+
+.pos-payment-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.pos-payment-total {
+  margin: 0;
+  color: #475569;
+}
+
+.pos-payment-guidance {
+  margin: 0;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.pos-payment-entry {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.9rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+}
+
+.pos-payment-entry legend {
+  padding: 0 0.3rem;
+  color: #334155;
+  font-weight: 700;
+}
+
+.pos-payment-entry label {
+  display: grid;
+  gap: 0.35rem;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.pos-payment-entry select,
+.pos-payment-entry input:not([type="checkbox"]) {
+  width: 100%;
+  min-height: 2.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+  color: #1e293b;
+  font: inherit;
+}
+
+.pos-payment-confirmation {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem !important;
+  font-weight: 500 !important;
+}
+
+.pos-payment-confirmation input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.pos-payment-remove {
+  min-height: 2.2rem;
+  justify-self: start;
+  padding: 0.35rem 0.6rem;
+  color: #b91c1c;
+}
+
+.pos-payment-add {
+  justify-self: start;
+}
+
+.pos-payment-balance {
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.pos-payment-balance .is-overpaid,
+.pos-payment-validation {
+  color: #b91c1c;
+}
+
+.pos-payment-validation {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.pos-payment-dialog-actions button:disabled,
+.pos-payment-add:disabled,
+.pos-payment-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pos-payment-dialog-actions .pos-payment-confirm {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
 }
 
 .pos-pay-btn {
@@ -446,5 +659,23 @@
 @media (max-width: 1200px) {
   .pos-container {
     grid-template-columns: 1fr 340px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pos-payment-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .pos-payment-dialog {
+    width: 100%;
+    max-height: 92vh;
+    padding: 1rem;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .pos-payment-options {
+    grid-template-columns: 1fr;
   }
 }

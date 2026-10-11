@@ -4,7 +4,7 @@ const {
   Injectable,
   InternalServerErrorException,
 } = require('@nestjs/common');
-const { Batch, InventoryMovement, Medicine, Sales, sequelize } = require('../../models');
+const { Batch, InventoryMovement, Medicine, SalePayment, Sales, sequelize } = require('../../models');
 const SalesService = require('../sales/sales.service');
 const InventoryService = require('../inventory/inventory.service');
 const { ROLE_PERMISSIONS, Permissions } = require('../auth/permissions');
@@ -129,11 +129,26 @@ class SyncService {
     });
 
     if (existing.length > 0) {
+      const paymentRows = existing[0]
+        ? await SalePayment.findAll({ where: { saleId: existing[0].id }, order: [['id', 'ASC']] })
+        : [];
+      const responseRows = existing.map((row) => row.toJSON());
+      if (responseRows[0]) {
+        responseRows.forEach((row) => {
+          row.saleId = responseRows[0].id;
+        });
+        responseRows[0].payments = paymentRows.map((payment) => ({
+          method: payment.method,
+          amount: Number(payment.amountMinor) / 100,
+          status: payment.status,
+          transactionReference: payment.transactionReference,
+        }));
+      }
       return {
         clientTransactionId,
         type: 'SALE',
         status: 'already_synced',
-        data: existing,
+        data: responseRows,
       };
     }
 

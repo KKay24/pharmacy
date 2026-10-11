@@ -197,7 +197,13 @@ export default function ReportsPage() {
       const dateKey = formatDateMMDDYYYY(dateObj);
       const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
       const amount = Number(sale.totalPrice || 0);
-      const method = String(sale.paymentMethod || 'cash').toLowerCase();
+      const payments = sale.Payments || sale.payments || [];
+      const allocations = payments.length > 0
+        ? payments.map((payment) => ({
+          amount: Number(payment.amount ?? Number(payment.amountMinor || 0) / 100),
+          method: String(payment.method || '').toLowerCase(),
+        }))
+        : [{ amount, method: String(sale.paymentMethod || 'cash').toLowerCase() }];
 
       if (!map[dateKey]) {
         map[dateKey] = {
@@ -214,15 +220,17 @@ export default function ReportsPage() {
       }
 
       map[dateKey].count += 1;
-      if (method.includes('airtel')) {
-        map[dateKey].airtel += amount;
-      } else if (method.includes('mtn')) {
-        map[dateKey].mtn += amount;
-      } else if (method.includes('card')) {
-        map[dateKey].card += amount;
-      } else {
-        map[dateKey].cash += amount;
-      }
+      allocations.forEach((payment) => {
+        if (payment.method.includes('airtel')) {
+          map[dateKey].airtel += payment.amount;
+        } else if (payment.method.includes('mtn')) {
+          map[dateKey].mtn += payment.amount;
+        } else if (payment.method.includes('card')) {
+          map[dateKey].card += payment.amount;
+        } else {
+          map[dateKey].cash += payment.amount;
+        }
+      });
     });
 
     // Sort by date ascending (chronological)
@@ -599,7 +607,9 @@ export default function ReportsPage() {
                     <td>{sale.name || 'Unknown item'}</td>
                     <td>{Number(sale.quantity || 0)}</td>
                     <td>{formatKwacha(sale.totalPrice)}</td>
-                    <td>{sale.paymentMethod || '—'}</td>
+                    <td>{sale.Payments?.length
+                      ? sale.Payments.map((payment) => `${payment.method}: K${Number(payment.amount ?? Number(payment.amountMinor || 0) / 100).toFixed(2)}`).join(' + ')
+                      : (sale.paymentMethod || '—')}</td>
                     <td>{sale.soldBy || 'Not recorded'}</td>
                     <td>{sale.receiptNumber || '—'}</td>
                     <td>

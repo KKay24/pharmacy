@@ -6,11 +6,90 @@ const {
   InternalServerErrorException,
   NotFoundException,
 } = require('@nestjs/common');
-const { Batch, Customer, InventoryMovement, Medicine, Sales, User, sequelize } = require('../../models');
+const { Batch, Customer, InventoryMovement, Medicine, SalePayment, Sales, User, sequelize } = require('../../models');
 const { Op } = require('sequelize');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
 const { normalizeIdentityValue } = require('../inventory/product-identity');
 const { buildReceiptEmailHtml, sendReceiptEmail } = require('./receipt-email');
+
+const PAYMENT_METHODS = new Set(['Cash', 'Airtel Money', 'MTN Mobile Money', 'Card']);
+const ELECTRONIC_PAYMENT_METHODS = new Set(['Airtel Money', 'MTN Mobile Money', 'Card']);
+
+function amountToMinorUnits(value, label, requireNgweePrecision = false) {
+  if (typeof value === 'string' && !/^\d+(?:\.\d{1,2})?$/.test(value.trim())) {
+    throw new BadRequestException(`${label} must be a non-negative amount with at most two decimal places`);
+  }
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new BadRequestException(`${label} must be a non-negative amount`);
+  }
+  const minorUnits = Math.round(amount * 100);
+  if (requireNgweePrecision && Math.abs(amount * 100 - minorUnits) > 1e-7) {
+    throw new BadRequestException(`${label} must be rounded to the nearest ngwee`);
+  }
+  return minorUnits;
+}
+
+function normalizePaymentMethod(method) {
+  const aliases = { Airtel: 'Airtel Money', MTN: 'MTN Mobile Money' };
+  const normalized = aliases[method] || method;
+  if (!PAYMENT_METHODS.has(normalized)) throw new BadRequestException('Unsupported POS payment method');
+  return normalized;
+}
+
+function validateSalePayments(rawPayments, rawItems) {
+  const totalDueMinor = rawItems.reduce(
+    (sum, item) => sum + amountToMinorUnits(item.totalPrice, 'Sale total'),
+    0,
+  );
+  const payments = rawPayments || (() => {
+    const byMethod = new Map();
+    for (const item of rawItems) {
+      const method = normalizePaymentMethod(item.paymentMethod || 'Cash');
+      byMethod.set(method, (byMethod.get(method) || 0) + amountToMinorUnits(item.totalPrice, 'Sale total'));
+    }
+    return [...byMethod].map(([method, amountMinor]) => ({ method, amount: amountMinor / 100 }));
+  })();
+
+  if (!Array.isArray(payments) || payments.length < 1 || payments.length > 10) {
+    throw new BadRequestException('Provide between one and ten payment entries');
+  }
+
+  const normalizedPayments = payments.map((payment) => {
+    const method = normalizePaymentMethod(payment?.method);
+    const amountMinor = amountToMinorUnits(payment?.amount, 'Payment amount', true);
+    if (amountMinor <= 0) throw new BadRequestException('Each payment amount must be greater than zero');
+    if (payment.status !== undefined) {
+      throw new BadRequestException('Payment status is assigned by the backend after cashier confirmation');
+    }
+
+    let status = 'CONFIRMED';
+    let transactionReference = null;
+    if (ELECTRONIC_PAYMENT_METHODS.has(method)) {
+      transactionReference = typeof payment.transactionReference === 'string'
+        ? payment.transactionReference.trim()
+        : '';
+      if (!transactionReference || transactionReference.length > 120) {
+        throw new BadRequestException(`${method} requires a transaction reference of 1 to 120 characters`);
+      }
+      if (payment.cashierConfirmed !== true) {
+        throw new BadRequestException(`${method} must be manually verified by the cashier before checkout`);
+      }
+      status = 'CASHIER_CONFIRMED';
+    }
+
+    return { method, amountMinor, status, transactionReference };
+  });
+  const allocatedMinor = normalizedPayments.reduce((sum, payment) => sum + payment.amountMinor, 0);
+  if (allocatedMinor !== totalDueMinor) {
+    throw new BadRequestException(
+      allocatedMinor < totalDueMinor
+        ? 'Payment amounts do not cover the full sale total'
+        : 'Payment amounts exceed the sale total',
+    );
+  }
+  return normalizedPayments;
+}
 
 function rethrowSalesPersistenceError(error) {
   if (error instanceof HttpException) throw error;
@@ -32,7 +111,16 @@ class SalesService {
     }
     const result = await Sales.findAndCountAll({
       where,
-      include: [{ model: User, as: 'ReversedBy', attributes: ['username'], required: false }],
+      include: [
+        { model: User, as: 'ReversedBy', attributes: ['username'], required: false },
+        {
+          model: SalePayment,
+          as: 'Payments',
+          attributes: ['id', 'method', 'amountMinor', 'amount', 'status', 'transactionReference'],
+          required: false,
+        },
+      ],
+      distinct: true,
       order: [['date', 'DESC']],
       limit: pagination.limit,
       offset: pagination.offset,
@@ -234,12 +322,17 @@ class SalesService {
       throw new ConflictException('A receipt cannot be emailed for a reversed sale');
     }
     const customer = rows[0].customerId ? await Customer.findByPk(rows[0].customerId) : null;
+    const paymentRows = await SalePayment.findAll({ where: { saleId: rows[0].id }, order: [['id', 'ASC']] });
     const pharmacyName = process.env.PHARMACY_NAME || 'MediQuick Pharmacy';
     const pharmacyAddress = process.env.PHARMACY_ADDRESS || '';
     const pharmacyPhone = process.env.PHARMACY_PHONE || '';
     const html = buildReceiptEmailHtml({
       rows,
       customer,
+      payments: paymentRows.map((payment) => ({
+        method: payment.method,
+        amount: Number(payment.amountMinor) / 100,
+      })),
       pharmacyName,
       pharmacyAddress,
       pharmacyPhone,
@@ -274,8 +367,14 @@ class SalesService {
     const batchTxId = !Array.isArray(payload) ? (payload?.clientTransactionId || null) : null;
     const items = rawItems.map((item, index) => {
       const txId = item.clientTransactionId || (batchTxId ? `${batchTxId}_${index}` : null);
-      return { ...item, clientTransactionId: txId };
+      return {
+        ...item,
+        totalPrice: amountToMinorUnits(item.totalPrice, 'Sale total') / 100,
+        clientTransactionId: txId,
+      };
     });
+    const rawPayments = !Array.isArray(payload) ? (payload?.payments || rawItems[0]?.payments) : null;
+    const payments = validateSalePayments(rawPayments, items);
 
     if (items.length === 0 || items.some((item) => (
       typeof item.clientTransactionId !== 'string'
@@ -290,10 +389,25 @@ class SalesService {
       throw new BadRequestException('Each sale item must have a unique clientTransactionId');
     }
 
-    const returnRows = (rows) => {
+    const returnRows = async (rows) => {
       const rowsByClientTxId = new Map(rows.map((row) => [row.clientTransactionId, row]));
       const orderedRows = clientTxIds.map((clientTransactionId) => rowsByClientTxId.get(clientTransactionId));
-      return Array.isArray(payload) || Array.isArray(payload?.items) ? orderedRows : orderedRows[0];
+      const paymentRows = orderedRows[0]
+        ? await SalePayment.findAll({ where: { saleId: orderedRows[0].id }, order: [['id', 'ASC']] })
+        : [];
+      const responseRows = orderedRows.map((row) => row?.toJSON?.() || row);
+      if (responseRows[0]) {
+        responseRows.forEach((row) => {
+          row.saleId = responseRows[0].id;
+        });
+        responseRows[0].payments = paymentRows.map((payment) => ({
+          method: payment.method,
+          amount: Number(payment.amountMinor) / 100,
+          status: payment.status,
+          transactionReference: payment.transactionReference,
+        }));
+      }
+      return Array.isArray(payload) || Array.isArray(payload?.items) ? responseRows : responseRows[0];
     };
     const findExistingRows = () => Sales.findAll({
       where: { clientTransactionId: clientTxIds },
@@ -385,7 +499,7 @@ class SalesService {
           totalPrice,
           discount,
           totalCost,
-          paymentMethod: item.paymentMethod || 'Cash',
+          paymentMethod: payments.length > 1 ? 'Split Payment' : payments[0].method,
           receiptNumber: item.receiptNumber || null,
           date: saleDate,
           clientTransactionId: item.clientTransactionId || null,
@@ -408,8 +522,30 @@ class SalesService {
         createdSales.push(sale);
       }
 
+      for (const payment of payments) {
+        await SalePayment.create({
+          saleId: createdSales[0].id,
+          method: payment.method,
+          amountMinor: payment.amountMinor,
+          status: payment.status,
+          transactionReference: payment.transactionReference,
+          confirmedByUserId: actor.id,
+          confirmedAt: new Date(),
+        }, { transaction });
+      }
+
       await transaction.commit();
-      return Array.isArray(payload) || Array.isArray(payload?.items) ? createdSales : createdSales[0];
+      const responseRows = createdSales.map((sale) => sale.toJSON());
+      responseRows.forEach((row) => {
+        row.saleId = responseRows[0].id;
+      });
+      responseRows[0].payments = payments.map((payment) => ({
+        method: payment.method,
+        amount: payment.amountMinor / 100,
+        status: payment.status,
+        transactionReference: payment.transactionReference,
+      }));
+      return Array.isArray(payload) || Array.isArray(payload?.items) ? responseRows : responseRows[0];
     } catch (error) {
       await transaction.rollback();
 

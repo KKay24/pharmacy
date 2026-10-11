@@ -9,10 +9,10 @@ const inventory = [{
   price: 12,
 }];
 
-function renderPos(handleSale) {
+function renderPos(handleSale, products = inventory) {
   return render(
     <Pos
-      inventory={inventory}
+      inventory={products}
       categories={[]}
       handleSale={handleSale}
       cashierName="cashier-a"
@@ -27,9 +27,12 @@ describe("POS checkout", () => {
 
     expect(screen.getByText("cashier-a")).toBeTruthy();
     fireEvent.click(screen.getByText("Test Paracetamol").closest(".pos-product-card"));
-    fireEvent.click(screen.getByRole("button", { name: /cash/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Payment Method" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Payment" }));
 
     await waitFor(() => expect(handleSale).toHaveBeenCalledTimes(1));
+    expect(handleSale.mock.calls[0][0].payments).toEqual([{ method: "Cash", amount: 12 }]);
     expect(await screen.findByText("Cart is currently empty")).toBeTruthy();
   });
 
@@ -38,7 +41,9 @@ describe("POS checkout", () => {
     renderPos(handleSale);
 
     fireEvent.click(screen.getByText("Test Paracetamol").closest(".pos-product-card"));
-    fireEvent.click(screen.getByRole("button", { name: /cash/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Payment Method" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Payment" }));
 
     await waitFor(() => expect(handleSale).toHaveBeenCalledTimes(1));
     expect(screen.queryByText("Cart is currently empty")).toBeNull();
@@ -51,12 +56,65 @@ describe("POS checkout", () => {
     renderPos(handleSale);
 
     fireEvent.click(screen.getByText("Test Paracetamol").closest(".pos-product-card"));
-    const cashButton = screen.getByRole("button", { name: /cash/i });
-    fireEvent.click(cashButton);
-    fireEvent.click(cashButton);
+    fireEvent.click(screen.getByRole("button", { name: "Payment Method" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cash" }));
+    const confirmButton = screen.getByRole("button", { name: "Confirm Payment" });
+    fireEvent.click(confirmButton);
+    fireEvent.click(confirmButton);
     expect(handleSale).toHaveBeenCalledTimes(1);
 
     finishCheckout({ success: true, confirmed: true });
     expect(await screen.findByText("Cart is currently empty")).toBeTruthy();
+  });
+
+  it("submits split cash and manually verified mobile money against one rounded sale total", async () => {
+    const handleSale = jest.fn().mockResolvedValue({ success: true, confirmed: true });
+    renderPos(handleSale, [{ ...inventory[0], price: 0.105 }]);
+
+    fireEvent.click(screen.getByText("Test Paracetamol").closest(".pos-product-card"));
+    fireEvent.click(screen.getByRole("button", { name: "Payment Method" }));
+    fireEvent.click(screen.getByRole("button", { name: "Split Payment" }));
+    expect(screen.getByText("Sale total:")).toBeTruthy();
+    expect(screen.getAllByText("K0.11").length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Payment method 2" }), {
+      target: { value: "Airtel Money" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Transaction reference" }), {
+      target: { value: "AIR-TEST-123" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "I verified this payment succeeded" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Payment" }));
+
+    await waitFor(() => expect(handleSale).toHaveBeenCalledTimes(1));
+    expect(handleSale.mock.calls[0][0].payments).toEqual([
+      { method: "Cash", amount: 0.05 },
+      {
+        method: "Airtel Money",
+        amount: 0.06,
+        transactionReference: "AIR-TEST-123",
+        cashierConfirmed: true,
+      },
+    ]);
+  });
+
+  it("rejects underpayment and overpayment without calling checkout", () => {
+    const handleSale = jest.fn();
+    renderPos(handleSale);
+    fireEvent.click(screen.getByText("Test Paracetamol").closest(".pos-product-card"));
+    fireEvent.click(screen.getByRole("button", { name: "Payment Method" }));
+    fireEvent.click(screen.getByRole("button", { name: "Split Payment" }));
+
+    const amount1 = screen.getByRole("spinbutton", { name: "Payment amount 1" });
+    const amount2 = screen.getByRole("spinbutton", { name: "Payment amount 2" });
+    const confirmButton = screen.getByRole("button", { name: "Confirm Payment" });
+    fireEvent.change(amount1, { target: { value: "-1" } });
+    expect(confirmButton.disabled).toBe(true);
+    fireEvent.change(amount1, { target: { value: "6.00" } });
+    fireEvent.change(amount2, { target: { value: "5.99" } });
+    expect(confirmButton.disabled).toBe(true);
+    fireEvent.change(amount2, { target: { value: "6.01" } });
+    expect(confirmButton.disabled).toBe(true);
+    expect(handleSale).not.toHaveBeenCalled();
   });
 });

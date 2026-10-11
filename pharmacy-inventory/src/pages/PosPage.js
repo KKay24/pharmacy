@@ -29,6 +29,7 @@ function buildConfirmedReceipt(sales, checkout) {
   return {
     items,
     paymentMethod: rows[0]?.paymentMethod || checkout.paymentMethod,
+    payments: rows[0]?.payments || checkout.payments || [],
     subTotal,
     discount,
     totalToPay: rows.reduce((sum, sale) => sum + Number(sale.totalPrice || 0), 0),
@@ -38,7 +39,7 @@ function buildConfirmedReceipt(sales, checkout) {
     cashierName: rows[0]?.soldBy || "Not recorded",
     date: rows[0]?.date ? new Date(rows[0].date).toLocaleString() : new Date().toLocaleString(),
     receiptNo: rows[0]?.receiptNumber || checkout.receiptNo,
-    saleId: rows[0]?.id || null,
+    saleId: rows[0]?.saleId || rows[0]?.id || null,
     saleStatus: rows[0]?.saleStatus || "COMPLETED",
   };
 }
@@ -125,6 +126,7 @@ export default function PosPage() {
   const handleSale = async ({
     items,
     paymentMethod,
+    payments,
     customerId,
     customerName,
     customerPhone,
@@ -135,6 +137,7 @@ export default function PosPage() {
     const receiptNo = makeReceiptNo(clientTransactionId);
     const checkout = {
       paymentMethod,
+      payments,
       customerName,
       customerPhone,
       customerEmail,
@@ -161,6 +164,7 @@ export default function PosPage() {
 
     const result = await recordSale({
       items: saleItems,
+      payments,
       clientTransactionId,
     });
 

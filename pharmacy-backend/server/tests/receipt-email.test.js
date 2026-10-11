@@ -7,6 +7,10 @@ test('receipt email content includes sale and customer details safely', () => {
     pharmacyName: 'MediQuick',
     pharmacyAddress: 'Lusaka',
     pharmacyPhone: '+260 97 000 0000',
+    payments: [
+      { method: 'Cash', amount: 4.5 },
+      { method: 'Airtel Money', amount: 4.5 },
+    ],
     rows: [{
       id: 9,
       receiptNumber: 'MQ-009',
@@ -28,7 +32,8 @@ test('receipt email content includes sale and customer details safely', () => {
   assert.match(html, /Vitamin C &amp; Zinc/);
   assert.match(html, /Subtotal: K10\.00/);
   assert.match(html, /Discount: K1\.00/);
-  assert.match(html, /Payment method: Cash/);
+  assert.match(html, /Payment method: Cash — K4\.50/);
+  assert.match(html, /Payment method: Airtel Money — K4\.50/);
   assert.match(html, /Amount paid: K9\.00/);
   assert.match(html, /customer@example\.test/);
 });

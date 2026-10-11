@@ -1,6 +1,14 @@
 const { BadRequestException, Injectable } = require('@nestjs/common');
 const { z } = require('zod');
 
+const paymentSchema = z.object({
+  method: z.string().min(1),
+  amount: z.coerce.number().nonnegative(),
+  transactionReference: z.string().max(120).optional(),
+  cashierConfirmed: z.boolean().optional(),
+  status: z.string().optional(),
+}).passthrough();
+
 const schemas = [
   { method: 'POST', path: '/api/auth/login', schema: z.object({ username: z.string().min(1), password: z.string().min(1) }).passthrough() },
   { method: 'POST', path: '/api/auth/change-password', schema: z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(12) }).passthrough() },
@@ -14,6 +22,7 @@ const schemas = [
         quantity: z.coerce.number().positive(),
         totalPrice: z.coerce.number().nonnegative(),
       }).passthrough()).min(1),
+      payments: z.array(paymentSchema).optional(),
     }).passthrough(),
     z.array(z.object({
       clientTransactionId: z.string().min(1).max(128),

@@ -2,6 +2,7 @@ const sequelize = require('../config/db');
 const Medicine = require('./Medicine');
 const Batch = require('./Batch');
 const Sales = require('./Sales');
+const SalePayment = require('./SalePayment');
 const User = require('./User');
 const Customer = require('./Customer');
 const Prescription = require('./Prescription');
@@ -34,6 +35,9 @@ Customer.hasMany(Sales, { foreignKey: 'customerId' });
 Sales.belongsTo(Customer, { foreignKey: 'customerId' });
 Sales.belongsTo(User, { as: 'Cashier', foreignKey: 'soldByUserId' });
 Sales.belongsTo(User, { as: 'ReversedBy', foreignKey: 'reversedByUserId' });
+Sales.hasMany(SalePayment, { as: 'Payments', foreignKey: 'saleId', onDelete: 'CASCADE' });
+SalePayment.belongsTo(Sales, { foreignKey: 'saleId' });
+SalePayment.belongsTo(User, { as: 'ConfirmedBy', foreignKey: 'confirmedByUserId' });
 
 Customer.hasMany(Prescription, { foreignKey: 'customerId' });
 Prescription.belongsTo(Customer, { foreignKey: 'customerId' });
@@ -58,6 +62,7 @@ module.exports = {
   Medicine,
   Batch,
   Sales,
+  SalePayment,
   User,
   Customer,
   Prescription,

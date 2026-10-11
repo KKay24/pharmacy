@@ -7,6 +7,10 @@ describe("createReceiptWhatsAppUrl", () => {
       date: "10 Oct 2026",
       cashierName: "cashier-a",
       items: [{ name: "Vitamin C & Zinc", quantity: 2, price: 5, total: 10 }],
+      payments: [
+        { method: "Cash", amount: 4 },
+        { method: "Airtel Money", amount: 6 },
+      ],
       totalToPay: 10,
     }, "+260 977 000 000");
 
@@ -14,6 +18,8 @@ describe("createReceiptWhatsAppUrl", () => {
     const message = decodeURIComponent(url.split("?text=")[1]);
     expect(message).toContain("Vitamin C & Zinc x2");
     expect(message).toContain("Receipt: MQ-001");
+    expect(message).toContain("Paid via Cash: K4.00");
+    expect(message).toContain("Paid via Airtel Money: K6.00");
     expect(message).toContain("Attach the PDF manually");
   });
 });

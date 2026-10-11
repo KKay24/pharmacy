@@ -458,6 +458,10 @@ export const DataProvider = ({ children }) => {
       date: item.date || now.toISOString(),
       syncStatus: syncEngine.isOnline ? 'syncing' : 'pending',
     }));
+    const payments = saleData.payments || [{
+      method: saleData.paymentMethod || items[0]?.paymentMethod || 'Cash',
+      amount: items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0),
+    }];
 
     if (!syncEngine.isOnline && !userId) {
       return {
@@ -467,12 +471,24 @@ export const DataProvider = ({ children }) => {
       };
     }
 
+    if (!syncEngine.isOnline && payments.some((payment) => payment.method !== 'Cash')) {
+      return {
+        success: false,
+        error: "Mobile money and card payments cannot be recorded while offline. Reconnect and verify payment before checkout.",
+        clientTransactionId,
+      };
+    }
+
     if (syncEngine.isOnline) {
       try {
         const response = await apiFetch("/api/sales", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(preparedItems.map(({ expectedSellerUserId, soldBy, syncStatus, ...item }) => item)),
+          body: JSON.stringify({
+            clientTransactionId,
+            items: preparedItems.map(({ expectedSellerUserId, soldBy, syncStatus, ...item }) => item),
+            payments,
+          }),
         });
         if (!response.ok) {
           const error = new Error(await getApiErrorMessage(response, "Sale could not be completed"));
@@ -545,7 +561,7 @@ export const DataProvider = ({ children }) => {
     await enqueuePendingOperation({
       clientTransactionId,
       type: 'SALE',
-      payload: preparedItems,
+      payload: { items: preparedItems, payments },
       clientTimestamp: now.toISOString(),
     });
 

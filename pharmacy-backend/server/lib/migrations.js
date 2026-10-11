@@ -15,6 +15,7 @@ const migrationDefinitions = [
   require('../migrations/012-add-customer-ecom-and-orders'),
   require('../migrations/013-add-sales-attribution'),
   require('../migrations/014-add-sale-reversal-audit'),
+  require('../migrations/015-add-sale-payments'),
 ];
 
 function normalizeTableName(table) {

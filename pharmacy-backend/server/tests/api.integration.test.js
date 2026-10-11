@@ -956,7 +956,7 @@ test('sync endpoint processes offline operations, enforces idempotency, and dete
           medicineId: testMed.id,
           quantity: 1,
           totalPrice: 15,
-          paymentMethod: 'Mobile',
+          paymentMethod: 'Cash',
           receiptNumber: 'REC-OFFLINE-001',
         },
       },
@@ -1038,3 +1038,134 @@ test('sync endpoint processes offline operations, enforces idempotency, and dete
   const adjData = await adjRes.json();
   assert.equal(adjData.results[0].status, 'synced');
 });
+
+  test('split payments are rounded, confirmed, persisted to one sale, and idempotent', async () => {
+    const headers = { Authorization: `Bearer ${authToken}` };
+    const inventoryResponse = await fetch(`${baseUrl}/api/inventory`, {
+      headers,
+    });
+    const inventory = (await inventoryResponse.json()).data;
+    const product = inventory.find((item) => (
+      (item.Batches || []).reduce((sum, batch) => sum + Number(batch.quantity || 0), 0) >= 4
+    ));
+    assert.ok(product, 'Found a product with stock for split payment tests');
+    const stockBefore = product.Batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+
+    const clientTransactionId = `split_payment_${Date.now()}`;
+    const salePayload = {
+      clientTransactionId,
+      items: [0, 1].map((index) => ({
+        clientTransactionId: `${clientTransactionId}_${index}`,
+        medicineId: product.id,
+        quantity: 1,
+        pricePerUnit: 0.105,
+        totalPrice: 0.105,
+        paymentMethod: 'Split Payment',
+        receiptNumber: `REC-${clientTransactionId}`,
+      })),
+      payments: [
+        { method: 'Cash', amount: 0.11 },
+        {
+          method: 'Airtel Money',
+          amount: 0.11,
+          transactionReference: `AIR-${clientTransactionId}`,
+          cashierConfirmed: true,
+        },
+      ],
+    };
+
+    const firstResponse = await fetch(`${baseUrl}/api/sales`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(salePayload),
+    });
+    assert.equal(firstResponse.status, 201);
+    const firstRows = await firstResponse.json();
+    assert.equal(firstRows.length, 2);
+    assert.equal(firstRows[0].totalPrice, 0.11);
+    assert.equal(firstRows[0].paymentMethod, 'Split Payment');
+    assert.equal(firstRows[0].saleId, firstRows[0].id);
+    assert.ok(firstRows.every((row) => row.saleId === firstRows[0].saleId));
+    assert.deepEqual(firstRows[0].payments.map(({ method, amount, status }) => ({ method, amount, status })), [
+      { method: 'Cash', amount: 0.11, status: 'CONFIRMED' },
+      { method: 'Airtel Money', amount: 0.11, status: 'CASHIER_CONFIRMED' },
+    ]);
+    assert.equal(firstRows[1].payments, undefined);
+
+    const historyResponse = await fetch(`${baseUrl}/api/sales?limit=100`, { headers });
+    assert.equal(historyResponse.status, 200);
+    const history = (await historyResponse.json()).data;
+    const historySale = history.find((sale) => sale.id === firstRows[0].saleId);
+    assert.ok(historySale);
+    assert.deepEqual(historySale.Payments.map(({ method, amount, status }) => ({ method, amount, status })), [
+      { method: 'Cash', amount: 0.11, status: 'CONFIRMED' },
+      { method: 'Airtel Money', amount: 0.11, status: 'CASHIER_CONFIRMED' },
+    ]);
+
+    const retryResponse = await fetch(`${baseUrl}/api/sales`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(salePayload),
+    });
+    assert.equal(retryResponse.status, 201);
+    const retryRows = await retryResponse.json();
+    assert.deepEqual(retryRows.map((row) => row.id), firstRows.map((row) => row.id));
+    assert.ok(retryRows.every((row) => row.saleId === firstRows[0].saleId));
+    assert.deepEqual(retryRows[0].payments, firstRows[0].payments);
+
+    const refreshedResponse = await fetch(`${baseUrl}/api/inventory`, { headers });
+    const refreshedInventory = (await refreshedResponse.json()).data;
+    const refreshedProduct = refreshedInventory.find((item) => item.id === product.id);
+    const stockAfter = refreshedProduct.Batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+    assert.equal(stockAfter, stockBefore - 2, 'A split-sale retry does not deduct stock twice');
+  });
+
+test('underpayment, overpayment, pending and failed electronic payments are rejected before stock changes', async () => {
+  const headers = { Authorization: `Bearer ${authToken}` };
+    const inventoryResponse = await fetch(`${baseUrl}/api/inventory`, {
+      headers,
+    });
+    const inventory = (await inventoryResponse.json()).data;
+    const product = inventory.find((item) => (
+      (item.Batches || []).reduce((sum, batch) => sum + Number(batch.quantity || 0), 0) >= 3
+    ));
+    assert.ok(product, 'Found a product with stock for payment validation tests');
+
+    const stockBefore = product.Batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+    const invalidPayments = [
+      [{ method: 'Cash', amount: 4.99 }],
+      [{ method: 'Cash', amount: 5.01 }],
+      [{ method: 'Airtel Money', amount: 5, transactionReference: 'PENDING-REF', status: 'PENDING', cashierConfirmed: true }],
+      [{ method: 'Card', amount: 5, transactionReference: 'FAILED-REF', status: 'FAILED', cashierConfirmed: true }],
+      [{ method: 'MTN Mobile Money', amount: 5, transactionReference: 'NO-CONFIRMATION' }],
+    ];
+
+    for (const [index, payments] of invalidPayments.entries()) {
+      const transactionId = `invalid_payment_${Date.now()}_${index}`;
+      const response = await fetch(`${baseUrl}/api/sales`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientTransactionId: transactionId,
+          items: [{
+            clientTransactionId: `${transactionId}_0`,
+            medicineId: product.id,
+            quantity: 1,
+            totalPrice: 5,
+            paymentMethod: 'Cash',
+            receiptNumber: `REC-${transactionId}`,
+          }],
+          payments,
+        }),
+      });
+      assert.equal(response.status, 400);
+    }
+
+    const refreshedResponse = await fetch(`${baseUrl}/api/inventory`, {
+      headers,
+    });
+    const refreshedInventory = (await refreshedResponse.json()).data;
+    const refreshedProduct = refreshedInventory.find((item) => item.id === product.id);
+    const stockAfter = refreshedProduct.Batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+    assert.equal(stockAfter, stockBefore);
+  });
