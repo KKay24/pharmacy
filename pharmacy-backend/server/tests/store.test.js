@@ -206,6 +206,37 @@ describe('Store E-Commerce Endpoints', () => {
     assert.equal(await InventoryMovement.count({
       where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
     }), movementCount + 1);
+
+    const cancellationReason = 'Customer changed their mind';
+    const cancelledOrder = await storeService.updateOrderStatus(
+      outOfStockOrder.data.order.id,
+      'Cancelled',
+      cancellationReason,
+      { id: 1, role: 'user' }
+    );
+    assert.equal(cancelledOrder.orderStatus, 'Cancelled');
+    assert.equal(cancelledOrder.cancellationReason, cancellationReason);
+    assert.equal(Number((await Batch.findByPk(batches[0].id)).quantity), 2);
+    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 2);
+    assert.equal(await InventoryMovement.count({
+      where: {
+        medicineId: sample.id,
+        referenceType: 'ONLINE_ORDER_CANCELLATION',
+        referenceId: cancelledOrder.id,
+        quantityChange: 2,
+      },
+    }), 1);
+
+    await assert.rejects(
+      storeService.updateOrderStatus(
+        cancelledOrder.id,
+        'Cancelled',
+        'Repeat cancellation',
+        { id: 1, role: 'user' }
+      ),
+      (error) => error.getStatus() === 409
+    );
+    assert.equal(Number((await Batch.findByPk(batches[0].id)).quantity), 2);
   });
 
   test('POST /api/prescriptions/upload and GET /api/prescriptions/track/:ref', async () => {

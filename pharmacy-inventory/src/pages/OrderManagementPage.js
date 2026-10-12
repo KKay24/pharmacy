@@ -141,7 +141,7 @@ export default function OrderManagementPage() {
         <span>
           Orders can be confirmed only when the full requested quantity is allocated from saleable stock.
           Out-of-stock orders remain at Order Placed until stock is available. Payment remains pending until separately confirmed.
-          Cancelling an order does not automatically restore its stock.
+          Cancelling an order returns quantities already deducted for that order to their original inventory batches.
         </span>
       </div>
 

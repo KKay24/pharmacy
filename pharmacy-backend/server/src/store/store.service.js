@@ -649,6 +649,90 @@ class StoreService {
         if (!user || !['admin', 'manager', 'user'].includes(user.role)) {
           throw new ForbiddenException('Staff authorization is required to cancel an order');
         }
+        const orderMovements = await InventoryMovement.findAll({
+          where: {
+            referenceType: 'ONLINE_ORDER',
+            reason: `Order ${order.orderNumber}`,
+          },
+          order: [['id', 'ASC']],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        const restoredTotals = new Map();
+
+        for (const movement of orderMovements) {
+          const quantityToRestore = Math.abs(Number(movement.quantityChange || 0));
+          if (Number(movement.quantityChange) >= 0 || quantityToRestore === 0) continue;
+          if (!Number.isInteger(quantityToRestore)) {
+            throw new ConflictException('Order inventory movements contain an invalid quantity');
+          }
+
+          const medicine = await Medicine.findByPk(movement.medicineId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          if (!medicine) {
+            throw new ConflictException('An original order product is missing; inventory was not restored');
+          }
+
+          if (movement.batchId !== null) {
+            const batch = await Batch.findByPk(movement.batchId, {
+              transaction,
+              lock: transaction.LOCK.UPDATE,
+            });
+            if (!batch || Number(batch.medicineId) !== Number(medicine.id)) {
+              throw new ConflictException('An original inventory batch is missing; inventory was not restored');
+            }
+            await batch.update({
+              quantity: Number(batch.quantity || 0) + quantityToRestore,
+            }, { transaction });
+          } else {
+            restoredTotals.set(
+              medicine.id,
+              (restoredTotals.get(medicine.id) || 0) + quantityToRestore
+            );
+          }
+
+          await InventoryMovement.create({
+            medicineId: medicine.id,
+            batchId: movement.batchId,
+            movementType: 'RETURN',
+            quantityChange: quantityToRestore,
+            referenceType: 'ONLINE_ORDER_CANCELLATION',
+            referenceId: order.id,
+            reason: `Cancellation of order ${order.orderNumber}: ${cancellationReason}`,
+          }, { transaction });
+        }
+
+        for (const [medicineId, quantityToRestore] of restoredTotals) {
+          const medicine = await Medicine.findByPk(medicineId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          await medicine.update({
+            totalQuantity: Math.max(0, Number(medicine.totalQuantity || 0)) + quantityToRestore,
+          }, { transaction });
+        }
+
+        const batchedMedicineIds = new Set(
+          orderMovements
+            .filter((movement) => (
+              Number(movement.quantityChange) < 0 && movement.batchId !== null
+            ))
+            .map((movement) => Number(movement.medicineId))
+        );
+        for (const medicineId of batchedMedicineIds) {
+          const medicine = await Medicine.findByPk(medicineId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          const batches = await Batch.findAll({ where: { medicineId }, transaction });
+          await medicine.update({
+            totalQuantity: batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
+              + (restoredTotals.get(medicineId) || 0),
+          }, { transaction });
+        }
+
         updates.cancellationReason = cancellationReason;
         updates.cancelledByUserId = user.id;
         updates.cancelledAt = new Date();
