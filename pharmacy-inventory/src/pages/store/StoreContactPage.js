@@ -47,7 +47,7 @@ export default function StoreContactPage() {
             {[
               { icon: <Phone size={20} />, title: "Phone / WhatsApp", info: "+260 97 700 0000", sub: "Mon–Sat, 8 AM – 8 PM" },
               { icon: <Mail size={20} />, title: "Email", info: "pharmacy@mediquick.co.zm", sub: "We reply within 2–4 hours" },
-              { icon: <MapPin size={20} />, title: "Store Location", info: "Cairo Road, Lusaka", sub: "Mon–Sat 8 AM – 8 PM · Sun 9 AM – 5 PM" },
+              { icon: <MapPin size={20} />, title: "Store Location", info: "Nationalist Road, 25147", sub: "Mon–Sat 8 AM – 8 PM · Sun 9 AM – 5 PM" },
               { icon: <Clock size={20} />, title: "Online Support", info: "24/7 via WhatsApp", sub: "Leave a message any time" },
             ].map(({ icon, title, info, sub }) => (
               <div key={title} style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>

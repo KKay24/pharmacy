@@ -10,9 +10,9 @@ describe("StoreAboutPage", () => {
 
     expect(screen.getByRole("heading", { name: "MediQuick Pharmacy" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /everything you need for better health/i })).toBeTruthy();
-    expect(screen.getByText("Cairo Road, Lusaka")).toBeTruthy();
+    expect(screen.getByText("Nationalist Road, 25147")).toBeTruthy();
     expect(screen.getByRole("link", { name: /get directions/i }).getAttribute("href"))
-      .toContain("Cairo+Road");
+      .toContain("Nationalist+Road");
     expect(screen.getByText("Prescription & OTC Medicines").closest("a")).toBeTruthy();
   });
 });

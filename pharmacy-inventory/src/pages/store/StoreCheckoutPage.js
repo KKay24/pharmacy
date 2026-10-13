@@ -159,7 +159,7 @@ export default function StoreCheckoutPage() {
                 {form.deliveryMethod === "pickup" && (
                   <div style={{ background: "var(--bg)", borderRadius: "var(--radius-sm)", padding: "1rem", fontSize: "0.88rem", color: "var(--text-secondary)" }}>
                     📍 <strong style={{ color: "var(--text-primary)" }}>MediQuick Pharmacy</strong><br />
-                    Cairo Road, Lusaka | Mon–Sat 8 AM – 8 PM | Sun 9 AM – 5 PM
+                    Nationalist Road, 25147 | Mon–Sat 8 AM – 8 PM | Sun 9 AM – 5 PM
                   </div>
                 )}
               </div>

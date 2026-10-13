@@ -188,14 +188,14 @@ export default function StoreAboutPage() {
           <h2 id="about-visit-title">We’re here for you</h2>
           <p>Contact the pharmacy team for help with products, orders, or prescriptions.</p>
           <div className="about-visit__details">
-            <span><MapPin size={19} /><span><strong>Cairo Road, Lusaka</strong><small>Store location listed in contact details</small></span></span>
+            <span><MapPin size={19} /><span><strong>Nationalist Road, 25147</strong><small>Store location listed in contact details</small></span></span>
             <a href="tel:+260977000000"><Truck size={19} /><span><strong>+260 97 700 0000</strong><small>Phone / WhatsApp</small></span></a>
             <span><Clock3 size={19} /><span><strong>Mon–Sat, 8 AM–8 PM</strong><small>Sunday: 9 AM–5 PM</small></span></span>
           </div>
           <div className="about-visit__actions">
             <a
               className="about-directions-button"
-              href="https://www.google.com/maps/search/?api=1&query=Cairo+Road%2C+Lusaka"
+              href="https://www.google.com/maps/search/?api=1&query=Nationalist+Road%2C+25147"
               target="_blank"
               rel="noopener noreferrer"
             >
