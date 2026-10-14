@@ -127,6 +127,10 @@ The web POS builds sale data and submits it to `/api/sales`. The backend validat
 
 The web PWA can store supported pending `SALE` operations locally and replay them at `/api/sync`. Sync requires a client transaction ID and checks operation permissions, idempotency and server stock; conflicts/failures are returned per operation. Local optimistic data is not authoritative.
 
+## 8.1 Customer support workflow
+
+Customers can submit a support inquiry through the storefront using `POST /api/support/inquiries`. The staff Support Center reads inquiries through the authenticated, staff-role-restricted `GET /api/support/inquiries` endpoint, which supports pagination, status filtering and search. Staff can update an inquiry to `New`, `Contacted` or `Resolved` through `PUT /api/support/inquiries/:id/status`. The web client provides phone and email links for contacting the customer; message delivery and conversation history are not handled by this workflow.
+
 ## 9. Batch and expiry workflow
 
 Batches belong to a medicine and contain `batchNumber`, quantity, expiry date, cost/selling price and optional supplier, warehouse, invoice and received-date data. The migration adds a unique `(medicineId, batchNumber)` key. Sales consume batches in ascending expiry-date order. The repository confirms expiry-risk analytics, but it does not prove a universal prohibition against selling expired stock; do not claim one.

@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { before, after, test } = require('node:test');
+const { before, after, beforeEach, test } = require('node:test');
 const { mkdtempSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
@@ -125,6 +125,68 @@ after(async () => {
   }
 });
 
+async function ensureAdminAuth() {
+  if (authToken) {
+    return authToken;
+  }
+
+  const normalLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      username: 'admin@example.test',
+      password: 'normal-password-for-tests',
+    }),
+  });
+
+  if (normalLoginResponse.status === 200) {
+    const normalLoginPayload = await normalLoginResponse.json();
+    authToken = normalLoginPayload.token;
+    adminUserId = normalLoginPayload.user.id;
+    return authToken;
+  }
+
+  const response = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      username: 'admin@example.test',
+      password: 'bootstrap-password-for-tests',
+    }),
+  });
+
+  const payload = await response.json();
+  const changePasswordResponse = await fetch(`${baseUrl}/api/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${payload.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      currentPassword: 'bootstrap-password-for-tests',
+      newPassword: 'normal-password-for-tests',
+    }),
+  });
+
+  const changedPasswordPayload = await changePasswordResponse.json();
+  authToken = changedPasswordPayload.token || payload.token;
+  adminUserId = (changedPasswordPayload.user || payload.user).id;
+  return authToken;
+}
+
+beforeEach(async (t) => {
+  if (t?.name === 'login returns a bearer token') {
+    return;
+  }
+  if (!authToken) {
+    await ensureAdminAuth();
+  }
+});
+
 test('login returns a bearer token', async () => {
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
@@ -178,6 +240,57 @@ test('login returns a bearer token', async () => {
   assert.equal(normalLoginPayload.user.mustChangePassword, false);
   authToken = normalLoginPayload.token;
   adminUserId = normalLoginPayload.user.id;
+});
+
+test('staff support inbox is authenticated, searchable, paginated, and tracks inquiry status', async () => {
+  const submission = await fetch(`${baseUrl}/api/support/inquiries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Support Inbox Test Customer',
+      phone: '+260977123456',
+      email: 'support-inbox-test@example.test',
+      inquiryType: 'Order issue',
+      message: 'Please check my test order.',
+    }),
+  });
+  assert.equal(submission.status, 201);
+  const submitted = await submission.json();
+
+  const anonymousResponse = await fetch(`${baseUrl}/api/support/inquiries`);
+  assert.equal(anonymousResponse.status, 401);
+
+  const headers = { Authorization: `Bearer ${authToken}` };
+  const inboxResponse = await fetch(
+    `${baseUrl}/api/support/inquiries?search=Support%20Inbox%20Test%20Customer&status=New&page=1&limit=5`,
+    { headers }
+  );
+  assert.equal(inboxResponse.status, 200);
+  const inbox = await inboxResponse.json();
+  assert.equal(inbox.pagination.total, 1);
+  assert.equal(inbox.data[0].id, submitted.inquiry.id);
+  assert.equal(inbox.data[0].status, 'New');
+
+  const updateResponse = await fetch(
+    `${baseUrl}/api/support/inquiries/${submitted.inquiry.id}/status`,
+    {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Contacted' }),
+    }
+  );
+  assert.equal(updateResponse.status, 200);
+  assert.equal((await updateResponse.json()).status, 'Contacted');
+
+  const invalidStatusResponse = await fetch(
+    `${baseUrl}/api/support/inquiries/${submitted.inquiry.id}/status`,
+    {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Ignored' }),
+    }
+  );
+  assert.equal(invalidStatusResponse.status, 400);
 });
 
 test('removed seed and debug endpoints are not available', async () => {

@@ -822,6 +822,59 @@ class StoreService {
     });
     return { success: true, inquiry };
   }
+
+  async listSupportInquiries(query = {}) {
+    const pagination = parsePagination(query);
+    const where = {};
+    const statuses = ['New', 'Contacted', 'Resolved'];
+
+    if (query.status) {
+      if (!statuses.includes(query.status)) {
+        throw new BadRequestException('Status must be New, Contacted, or Resolved');
+      }
+      where.status = query.status;
+    }
+
+    if (query.search !== undefined && String(query.search).trim().length > 200) {
+      throw new BadRequestException('Search must be 200 characters or fewer');
+    }
+    const search = String(query.search || '').trim();
+    if (search) {
+      const pattern = `%${search}%`;
+      where[Op.or] = [
+        { name: { [Op.like]: pattern } },
+        { phone: { [Op.like]: pattern } },
+        { email: { [Op.like]: pattern } },
+        { inquiryType: { [Op.like]: pattern } },
+        { message: { [Op.like]: pattern } },
+      ];
+    }
+
+    const { rows, count } = await SupportInquiry.findAndCountAll({
+      where,
+      order: [['date', 'DESC'], ['id', 'DESC']],
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+    return paginatedResponse(rows, count, pagination);
+  }
+
+  async updateSupportInquiryStatus(id, status) {
+    const inquiryId = Number(id);
+    if (!Number.isInteger(inquiryId) || inquiryId <= 0) {
+      throw new BadRequestException('Inquiry ID must be a positive integer');
+    }
+    if (!['New', 'Contacted', 'Resolved'].includes(status)) {
+      throw new BadRequestException('Status must be New, Contacted, or Resolved');
+    }
+
+    const inquiry = await SupportInquiry.findByPk(inquiryId);
+    if (!inquiry) {
+      throw new NotFoundException('Support inquiry not found');
+    }
+    await inquiry.update({ status });
+    return inquiry;
+  }
 }
 
 Injectable()(StoreService);

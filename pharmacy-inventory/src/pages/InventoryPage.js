@@ -11,26 +11,38 @@ import {
 import { DataContext } from "../context/DataContext";
 import InventoryTable from "../components/InventoryTable";
 import StockCardSidebar from "../components/StockCardSidebar";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import "../styles/inventory-modern.css";
 import { getInventoryStockValue } from "../utils/inventoryValuation";
 
 export default function InventoryPage() {
-  const { inventory, inventoryCategories = [], updateInventoryItem, deleteInventoryItem, userRole } = useContext(DataContext);
+  const {
+    inventory,
+    inventoryCategories = [],
+    updateInventoryItem,
+    deleteInventoryItem,
+    userRole,
+    riskInsights = {},
+  } = useContext(DataContext);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMedicine, setSelectedMedicine] = useState(null);
-  const [filters, setFilters] = useState({
+  const requestedStockStatus = searchParams.get("stockStatus");
+  const requestedExpiryStatus = searchParams.get("expiryStatus");
+  const requestedRiskStatus = searchParams.get("riskStatus");
+  const [filters, setFilters] = useState(() => ({
     mainCategoryId: "",
     subcategoryId: "",
     productFormId: "",
     genericName: "",
     brandName: "",
     supplier: "",
-    stockStatus: "",
-    expiryStatus: "",
-  });
+    stockStatus: ["in", "low", "out"].includes(requestedStockStatus) ? requestedStockStatus : "",
+    expiryStatus: ["valid", "near-expiry", "expired"].includes(requestedExpiryStatus) ? requestedExpiryStatus : "",
+    riskStatus: ["stockout-risk", "dead-stock"].includes(requestedRiskStatus) ? requestedRiskStatus : "",
+  }));
   const LOW_STOCK_THRESHOLD = 10;
   const selectedCategory = inventoryCategories.find((category) =>
     String(category.id) === filters.mainCategoryId
@@ -97,6 +109,13 @@ export default function InventoryPage() {
         return expiry > warningDate;
       }));
     }
+    if (filters.riskStatus) {
+      const riskItems = filters.riskStatus === "stockout-risk"
+        ? riskInsights.stockoutRisk || []
+        : riskInsights.deadStock || [];
+      const riskMedicineIds = new Set(riskItems.map((item) => String(item.medicineId)));
+      result = result.filter((medicine) => riskMedicineIds.has(String(medicine.id)));
+    }
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -110,7 +129,7 @@ export default function InventoryPage() {
     }
 
     return result;
-  }, [inventory, filters, searchQuery]);
+  }, [inventory, filters, searchQuery, riskInsights]);
 
   return (
     <div className="inv-container">
@@ -205,6 +224,11 @@ export default function InventoryPage() {
           <option value="valid">Not near expiry</option>
           <option value="near-expiry">Near expiry (30 days)</option>
           <option value="expired">Expired</option>
+        </select>
+        <select className="asm-input" aria-label="Filter risk status" value={filters.riskStatus} onChange={e => setFilters(current => ({ ...current, riskStatus: e.target.value }))}>
+          <option value="">All risk statuses</option>
+          <option value="stockout-risk">Stockout risk</option>
+          <option value="dead-stock">Dead stock</option>
         </select>
         <div className="inv-search-field">
           <Search size={18} aria-hidden="true" />

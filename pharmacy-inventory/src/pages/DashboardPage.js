@@ -1,4 +1,5 @@
 import React, { useContext, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { DataContext } from "../context/DataContext";
 import {
   BarChart,
@@ -164,6 +165,17 @@ export default function DashboardPage() {
     }, { expiredUnits: 0, nearExpiryUnits: 0 });
   }, [inventory]);
 
+  const expiredProductCount = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return inventory.filter((item) =>
+      (item.Batches || []).some((batch) => {
+        const expiryDate = batch.expiryDate ? new Date(batch.expiryDate) : null;
+        return Number(batch.quantity || 0) > 0 && expiryDate && expiryDate < today;
+      })
+    ).length;
+  }, [inventory]);
+
   const inventoryBreakdown = useMemo(() => {
     const groups = new Map();
     for (const item of inventory) {
@@ -241,6 +253,7 @@ export default function DashboardPage() {
       accentClass: "",
       sparkColor: "#3b82f6",
       sparkValue: totalProducts,
+      to: "/inventory",
     },
     {
       title: "Stock Value",
@@ -248,6 +261,7 @@ export default function DashboardPage() {
       accentClass: "",
       sparkColor: "#10b981",
       sparkValue: stockValue,
+      to: "/inventory",
     },
     {
       title: "Low Stock Items",
@@ -255,6 +269,15 @@ export default function DashboardPage() {
       accentClass: "color-blue",
       sparkColor: "#2563eb",
       sparkValue: lowStockItems.length,
+      to: "/inventory?stockStatus=low",
+    },
+    {
+      title: "Out of Stock",
+      value: outOfStockItems.length,
+      accentClass: "color-red",
+      sparkColor: "#dc2626",
+      sparkValue: outOfStockItems.length,
+      to: "/inventory?stockStatus=out",
     },
     {
       title: "Stockout Risk",
@@ -262,6 +285,7 @@ export default function DashboardPage() {
       accentClass: "color-orange",
       sparkColor: "#f97316",
       sparkValue: stockoutRiskCount,
+      to: "/inventory?riskStatus=stockout-risk",
     },
     {
       title: "Expiring Soon",
@@ -269,13 +293,15 @@ export default function DashboardPage() {
       accentClass: "color-red",
       sparkColor: "#ef4444",
       sparkValue: expiringProductCount,
+      to: "/inventory?expiryStatus=near-expiry",
     },
     {
-      title: "Expired Stock Units",
-      value: expiryStockTotals.expiredUnits.toLocaleString(),
+      title: "Expired Products",
+      value: expiredProductCount,
       accentClass: "color-red",
       sparkColor: "#b91c1c",
-      sparkValue: expiryStockTotals.expiredUnits,
+      sparkValue: expiredProductCount,
+      to: "/inventory?expiryStatus=expired",
     },
     {
       title: "Near-Expiry Units",
@@ -283,6 +309,7 @@ export default function DashboardPage() {
       accentClass: "color-orange",
       sparkColor: "#f97316",
       sparkValue: expiryStockTotals.nearExpiryUnits,
+      to: "/inventory?expiryStatus=near-expiry",
     },
     {
       title: "Dead Stock",
@@ -290,6 +317,7 @@ export default function DashboardPage() {
       accentClass: "color-slate",
       sparkColor: "#475569",
       sparkValue: deadStockCount,
+      to: "/inventory?riskStatus=dead-stock",
     },
   ];
 
@@ -297,7 +325,12 @@ export default function DashboardPage() {
     <div className="dashboard-grid">
       <div className="metrics-row">
         {metricCards.map((card) => (
-          <div key={card.title} className="metric-card">
+          <Link
+            key={card.title}
+            to={card.to}
+            className="metric-card"
+            aria-label={`${card.title}: ${card.value}. Open Inventory Control.`}
+          >
             <div className="metric-info">
               <span className="metric-title">{card.title}</span>
               <span className={`metric-value ${card.accentClass}`}>{card.value}</span>
@@ -315,7 +348,7 @@ export default function DashboardPage() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 

@@ -14,6 +14,7 @@ import {
   Wallet,
   Truck,
   Heart,
+  Headset,
   Home,
   ChevronLeft,
   ChevronRight,
@@ -51,6 +52,12 @@ function Navbar({ collapsed = false, onToggleCollapsed }) {
       path: "/orders",
       icon: ClipboardList,
       label: "Online Orders",
+    },
+    {
+      show: userRole === "admin" || userRole === "manager" || userRole === "user",
+      path: "/support-center",
+      icon: Headset,
+      label: "Support Center",
     },
     {
       show: userRole === "admin" || userRole === "manager",
@@ -193,6 +200,10 @@ function Navbar({ collapsed = false, onToggleCollapsed }) {
       <Link to="/inventory" className={`mobile-nav-item ${isActive("/inventory") ? "active" : ""}`}>
         <Boxes size={20} />
         <span>Inv</span>
+      </Link>
+      <Link to="/support-center" className={`mobile-nav-item ${isActive("/support-center") ? "active" : ""}`}>
+        <Headset size={20} />
+        <span>Support</span>
       </Link>
       <Link to="/profit-loss" className={`mobile-nav-item ${isActive("/profit-loss") ? "active" : ""}`}>
         <TrendingUp size={20} />

@@ -42,6 +42,7 @@ Web automated coverage includes:
 - Sync queue reconciliation/status behavior.
 - Sync status indicator rendering and user-visible states.
 - Dependent stock-entry category/subcategory/form selectors, POS main-category → subcategory → form filtering, and inventory taxonomy, generic-name and brand filters.
+- Staff support inbox rendering, contact links, status updates, API error handling, and authenticated backend inquiry listing/status transitions.
 
 The inventory of test files may change; inspect the package before relying on this list.
 
@@ -57,6 +58,7 @@ The inventory of test files may change; inspect the package before relying on th
 | Sales/POS | Cart payload, quantity/total validation, insufficient stock, batch deduction, movement creation, customer association, payment label and sale/movement transaction atomicity. |
 | Offline PWA/sync | Data available from cache, enqueue and persistence across reload, online retry, duplicate idempotency, permission failures, server stock conflicts, failed-operation visibility and queue removal only after success. |
 | Customers/prescriptions | Customer required/optional fields, list/search/detail/create, customer associations, prescription create/list/status validation and sensitive data handling. |
+| Customer support | Public inquiry submission; authenticated staff-only inbox listing with pagination/search/status filtering; valid and invalid status changes; customer contact links and visible API error states. |
 | Reports/analytics | Empty and representative datasets, time windows, monthly totals, COGS/expenses, forecast input, stockout/expiry results, pagination and no sensitive-field leakage. |
 | UI components/pages | Loading/error/empty states, keyboard/accessible interactions where established, API failure messaging and role-based display. |
 | Mobile client | API URL resolution, SecureStore session behavior, login redirect, inventory loading/search and category → subcategory → form filters, online POS success/error and `npm run typecheck`. |

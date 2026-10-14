@@ -15,6 +15,7 @@ The system centralizes pharmacy product and batch inventory, stock movements, po
 | Authentication and role/permission checks | **Implemented** | The API issues bearer tokens and checks active accounts, roles and permissions. |
 | Web PWA offline cache and sync queue | **Implemented** | The web client caches selected data in IndexedDB and submits queued sales, restocks and adjustments to `/api/sync`. |
 | Prescription records/status workflow | **Partially implemented** | The API stores and lists prescription records and updates status. A complete prescription fulfillment/e-prescribing workflow is not verified. |
+| Customer support inbox | **Implemented** | Staff can review customer inquiries, search/filter/paginate the inbox, contact customers using their phone/email links, and track New/Contacted/Resolved status. Replies are handled outside the application; an in-app conversation history is not implemented. |
 | Reports and analytics | **Partially implemented** | The API provides monthly profit/loss, forecast, reorder, stockout and expiry-risk data. Some daily-ledger reporting is calculated in the browser. |
 | Mobile application | **Partially implemented** | Expo includes login, searchable inventory with hierarchical category filters, POS checkout and profile tabs. It does not implement the web client's offline queue, and mobile checkout currently uses cash. |
 | Product categories, subcategories and forms | **Implemented** | Product classification uses seeded main-category, subcategory and product-form references. New products require a main category; subcategory and form are optional, dependent selections. Legacy values are retained; unrecognized historical products can remain unclassified. |
@@ -30,6 +31,7 @@ This status describes repository code and configuration, not production availabi
 - Inventory movement history and low-stock queries.
 - Web POS with customer lookup/association, receipts, payment-method fields and offline queueing in the PWA.
 - Customer records, including optional contact and health-related fields.
+- Staff support center for customer inquiries submitted through the pharmacy store.
 - Prescription records with patient/prescriber, medication text, due date, optional image path and status.
 - Expense and supplier management.
 - Monthly profit/loss and sales/inventory risk analytics.

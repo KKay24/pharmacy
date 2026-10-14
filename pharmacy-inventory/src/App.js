@@ -1,5 +1,5 @@
 import React, { useContext, useState, useRef, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate, Link } from "react-router-dom";
 import {
   Bell,
   Boxes,
@@ -40,6 +40,7 @@ import ExpensesPage from "./pages/ExpensesPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import CustomersPage from "./pages/CustomersPage";
 import OrderManagementPage from "./pages/OrderManagementPage";
+import SupportCenterPage from "./pages/SupportCenterPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // ─── Customer Store ───────────────────────────────────────
@@ -74,6 +75,12 @@ const PAGE_META = [
     title: "Online Order Management",
     subtitle: "Review customer store orders and update fulfillment progress.",
     icon: ClipboardList,
+  },
+  {
+    match: (pathname) => pathname.startsWith("/support-center"),
+    title: "Pharmacy Support Center",
+    subtitle: "Review customer inquiries, contact customers, and track support progress.",
+    icon: Headset,
   },
   {
     match: (pathname) => pathname.startsWith("/inventory"),
@@ -184,9 +191,9 @@ function ShellLayout() {
           <button type="button" className="shell-icon-btn" aria-label="Tasks">
             <ClipboardList size={19} />
           </button>
-          <button type="button" className="shell-icon-btn" aria-label="Support">
+          <Link to="/support-center" className="shell-icon-btn" aria-label="Support Center" title="Support Center">
             <Headset size={19} />
-          </button>
+          </Link>
 
           <div className="shell-profile-container" ref={dropdownRef}>
             <button 
@@ -345,6 +352,14 @@ function ShellLayout() {
                 element={
                   <ProtectedRoute allowedRoles={["admin", "manager", "user"]}>
                     <OrderManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="support-center"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "manager", "user"]}>
+                    <SupportCenterPage />
                   </ProtectedRoute>
                 }
               />

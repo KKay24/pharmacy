@@ -4,12 +4,15 @@ import "@testing-library/jest-dom";
 import AddStock from "./AddStock";
 import InventoryPage from "../pages/InventoryPage";
 import DashboardPage from "../pages/DashboardPage";
+import CommandOverviewPage from "../pages/Home";
 import Pos from "./POS";
 import { DataContext } from "../context/DataContext";
 import { getInventoryStockValue } from "../utils/inventoryValuation";
 
 jest.mock("react-router-dom", () => ({
   useNavigate: () => jest.fn(),
+  useSearchParams: () => [new URLSearchParams(globalThis.location.search)],
+  Link: ({ to, children, ...props }) => <a href={to} {...props}>{children}</a>,
 }), { virtual: true });
 jest.mock("pdfjs-dist", () => ({ GlobalWorkerOptions: {} }), { virtual: true });
 jest.mock("tesseract.js", () => ({ recognize: jest.fn() }), { virtual: true });
@@ -123,9 +126,32 @@ test("stock value uses batch costs with first-batch fallback consistently", () =
   const stockValueCard = Array.from(document.querySelectorAll(".metric-card"))
     .find(card => card.querySelector(".metric-title")?.textContent === "Stock Value");
   expect(stockValueCard).toHaveTextContent("K190");
+  const dashboardMetricCards = Array.from(document.querySelectorAll(".metrics-row a.metric-card"));
+  expect(dashboardMetricCards).toHaveLength(9);
+  expect(dashboardMetricCards.every(card => card.getAttribute("href").startsWith("/inventory"))).toBe(true);
+  expect(dashboardMetricCards.find(card => card.textContent.includes("Low Stock Items")))
+    .toHaveAttribute("href", "/inventory?stockStatus=low");
+  expect(dashboardMetricCards.find(card => card.textContent.includes("Out of Stock")))
+    .toHaveAttribute("href", "/inventory?stockStatus=out");
+  expect(dashboardMetricCards.find(card => card.textContent.includes("Expired Products")))
+    .toHaveAttribute("href", "/inventory?expiryStatus=expired");
+  expect(dashboardMetricCards.find(card => card.textContent.includes("Stockout Risk")))
+    .toHaveAttribute("href", "/inventory?riskStatus=stockout-risk");
+  expect(dashboardMetricCards.find(card => card.textContent.includes("Dead Stock")))
+    .toHaveAttribute("href", "/inventory?riskStatus=dead-stock");
   const classificationTable = Array.from(document.querySelectorAll("table"))
     .find(table => Array.from(table.querySelectorAll("th")).some(header => header.textContent === "Stock Value"));
   expect(classificationTable.querySelector("tbody")).toHaveTextContent("K190");
+});
+
+test("dashboard Inventory Control card opens the inventory page", () => {
+  render(
+    <DataContext.Provider value={{ username: "Pharmacy Staff", inventory: [], sales: [], customers: [] }}>
+      <CommandOverviewPage />
+    </DataContext.Provider>
+  );
+
+  expect(screen.getByRole("link", { name: /Inventory Control/ })).toHaveAttribute("href", "/inventory");
 });
 
 test("stock entry scopes subcategories and product forms to the selected category", () => {
@@ -236,6 +262,96 @@ test("inventory filters cascade through taxonomy and filter generic name and bra
     target: { value: "Amoxi" },
   });
   expect(screen.getByTestId("inventory-results")).toHaveTextContent("Amoxicillin");
+});
+
+test.each([
+  {
+    query: "?stockStatus=low",
+    filterName: "Filter stock status",
+    filterValue: "low",
+    riskInsights: {},
+    inventory: [
+      { id: 1, name: "Low-stock medicine", Batches: [{ quantity: 5 }] },
+      { id: 2, name: "In-stock medicine", Batches: [{ quantity: 20 }] },
+    ],
+    expectedName: "Low-stock medicine",
+    excludedName: "In-stock medicine",
+  },
+  {
+    query: "?stockStatus=out",
+    filterName: "Filter stock status",
+    filterValue: "out",
+    riskInsights: {},
+    inventory: [
+      { id: 1, name: "Out-of-stock medicine", Batches: [{ quantity: 0 }] },
+      { id: 2, name: "In-stock medicine", Batches: [{ quantity: 20 }] },
+    ],
+    expectedName: "Out-of-stock medicine",
+    excludedName: "In-stock medicine",
+  },
+  {
+    query: "?expiryStatus=expired",
+    filterName: "Filter expiry status",
+    filterValue: "expired",
+    riskInsights: {},
+    inventory: [
+      { id: 1, name: "Expired medicine", Batches: [{ quantity: 5, expiryDate: "2020-01-01" }] },
+      { id: 2, name: "Valid medicine", Batches: [{ quantity: 20, expiryDate: "2030-01-01" }] },
+    ],
+    expectedName: "Expired medicine",
+    excludedName: "Valid medicine",
+  },
+  {
+    query: "?riskStatus=stockout-risk",
+    filterName: "Filter risk status",
+    filterValue: "stockout-risk",
+    riskInsights: { stockoutRisk: [{ medicineId: 1 }], deadStock: [] },
+    inventory: [
+      { id: 1, name: "At-risk medicine", Batches: [{ quantity: 5 }] },
+      { id: 2, name: "Other medicine", Batches: [{ quantity: 20 }] },
+    ],
+    expectedName: "At-risk medicine",
+    excludedName: "Other medicine",
+  },
+  {
+    query: "?riskStatus=dead-stock",
+    filterName: "Filter risk status",
+    filterValue: "dead-stock",
+    riskInsights: { stockoutRisk: [], deadStock: [{ medicineId: 2 }] },
+    inventory: [
+      { id: 1, name: "Active medicine", Batches: [{ quantity: 5 }] },
+      { id: 2, name: "Dead-stock medicine", Batches: [{ quantity: 20 }] },
+    ],
+    expectedName: "Dead-stock medicine",
+    excludedName: "Active medicine",
+  },
+])("inventory applies a dashboard filter from $query", ({
+  query,
+  filterName,
+  filterValue,
+  riskInsights,
+  inventory,
+  expectedName,
+  excludedName,
+}) => {
+  window.history.pushState({}, "", `/inventory${query}`);
+  render(
+    <DataContext.Provider value={{
+      inventory,
+      inventoryCategories: [],
+      updateInventoryItem: jest.fn(),
+      deleteInventoryItem: jest.fn(),
+      userRole: "admin",
+      riskInsights,
+    }}>
+      <InventoryPage />
+    </DataContext.Provider>
+  );
+
+  expect(screen.getByRole("combobox", { name: filterName })).toHaveValue(filterValue);
+  expect(screen.getByTestId("inventory-results")).toHaveTextContent(expectedName);
+  expect(screen.getByTestId("inventory-results")).not.toHaveTextContent(excludedName);
+  window.history.replaceState({}, "", "/");
 });
 
 test("POS category filters show the hierarchy instead of dosage forms as main categories", () => {

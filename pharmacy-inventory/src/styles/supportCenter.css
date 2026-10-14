@@ -1,0 +1,347 @@
+.support-center {
+  display: grid;
+  gap: 1.15rem;
+  padding: clamp(1rem, 2vw, 1.75rem);
+  color: #1e293b;
+}
+
+.support-center__header,
+.support-center__card-heading,
+.support-center__card-footer,
+.support-center__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.support-center__header h2 {
+  margin: 0.15rem 0 0.3rem;
+  font-size: clamp(1.3rem, 2vw, 1.75rem);
+}
+
+.support-center__header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.support-center__eyebrow {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.support-center__refresh,
+.support-center__pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.55rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.support-center__refresh:disabled,
+.support-center__pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.support-center__summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.support-center__total,
+.support-center__count {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 4rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.support-center__total {
+  color: #2563eb;
+}
+
+.support-center__total span,
+.support-center__count span {
+  display: grid;
+  gap: 0.1rem;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.support-center__total strong,
+.support-center__count strong {
+  color: #1e293b;
+  font-size: 1.15rem;
+}
+
+.support-center__count {
+  justify-content: space-between;
+}
+
+.support-center__count--new {
+  border-left: 3px solid #f59e0b;
+}
+
+.support-center__count--contacted {
+  border-left: 3px solid #2563eb;
+}
+
+.support-center__count--resolved {
+  border-left: 3px solid #16a34a;
+}
+
+.support-center__filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.support-center__search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 280px;
+  min-height: 2.65rem;
+  padding: 0 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  background: #fff;
+}
+
+.support-center__search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #1e293b;
+  font: inherit;
+}
+
+.support-center__status-filter,
+.support-center__card-footer label {
+  display: grid;
+  gap: 0.35rem;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.support-center__status-filter {
+  min-width: 190px;
+}
+
+.support-center__status-filter select,
+.support-center__card-footer select {
+  min-height: 2.55rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+}
+
+.support-center__message {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 7px;
+}
+
+.support-center__message--error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.support-center__message--success {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.support-center__list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.support-center__card,
+.support-center__empty {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+}
+
+.support-center__card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.support-center__card-heading > div {
+  display: grid;
+  justify-items: start;
+  gap: 0.25rem;
+}
+
+.support-center__card-heading h3 {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+}
+
+.support-center__card-heading time,
+.support-center__card-footer > span {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.support-center__customer-name {
+  color: #0f172a;
+}
+
+.support-center__badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.support-center__badge--new {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.support-center__badge--contacted {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.support-center__badge--resolved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.support-center__message-body {
+  margin: 0;
+  padding: 0.85rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.support-center__contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+}
+
+.support-center__contact-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #1d4ed8;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.support-center__contact-actions a:hover {
+  text-decoration: underline;
+}
+
+.support-center__card-footer {
+  flex-wrap: wrap;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.support-center__card-footer label {
+  grid-template-columns: auto minmax(130px, 180px);
+  align-items: center;
+}
+
+.support-center__empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.support-center__empty svg {
+  color: #94a3b8;
+}
+
+.support-center__empty strong {
+  color: #334155;
+}
+
+.support-center__pagination {
+  justify-content: center;
+  flex-wrap: wrap;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.support-center__spinning {
+  animation: support-center-spin 1s linear infinite;
+}
+
+@keyframes support-center-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 760px) {
+  .support-center__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .support-center__header {
+    align-items: flex-start;
+  }
+
+  .support-center__card-heading,
+  .support-center__card-footer {
+    align-items: flex-start;
+  }
+
+  .support-center__card-heading {
+    flex-direction: column;
+  }
+
+  .support-center__card-footer {
+    flex-direction: column;
+  }
+
+  .support-center__card-footer label {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+}

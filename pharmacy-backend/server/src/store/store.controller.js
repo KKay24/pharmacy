@@ -77,6 +77,14 @@ class StoreController {
   createSupportInquiry(body) {
     return this.service.createSupportInquiry(body);
   }
+
+  listSupportInquiries(query) {
+    return this.service.listSupportInquiries(query);
+  }
+
+  updateSupportInquiryStatus(params, body) {
+    return this.service.updateSupportInquiryStatus(params.id, body?.status);
+  }
 }
 
 applyClassDecorator(Controller, StoreController, 'api');
@@ -131,5 +139,16 @@ applyMethodDecorator(UseGuards, StoreController.prototype, 'getMyPrescriptions',
 // Support inquiry
 applyMethodDecorator(Post, StoreController.prototype, 'createSupportInquiry', 'support/inquiries');
 applyParameterDecorator(Body, StoreController.prototype, 'createSupportInquiry', 0);
+
+applyMethodDecorator(Get, StoreController.prototype, 'listSupportInquiries', 'support/inquiries');
+applyParameterDecorator(Query, StoreController.prototype, 'listSupportInquiries', 0);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'listSupportInquiries', AuthGuard, RolesGuard);
+Roles('admin', 'manager', 'user')(StoreController.prototype, 'listSupportInquiries');
+
+applyMethodDecorator(Put, StoreController.prototype, 'updateSupportInquiryStatus', 'support/inquiries/:id/status');
+applyParameterDecorator(Param, StoreController.prototype, 'updateSupportInquiryStatus', 0);
+applyParameterDecorator(Body, StoreController.prototype, 'updateSupportInquiryStatus', 1);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'updateSupportInquiryStatus', AuthGuard, RolesGuard);
+Roles('admin', 'manager', 'user')(StoreController.prototype, 'updateSupportInquiryStatus');
 
 module.exports = StoreController;
