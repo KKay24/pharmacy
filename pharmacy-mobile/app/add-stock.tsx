@@ -26,6 +26,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 interface Supplier {
   id: number;
@@ -223,219 +224,221 @@ export default function AddStockScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
-    >
-      {/* Top Header */}
-      <View style={styles.topHeader}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-          <ArrowLeft size={22} color={theme.text} />
-        </Pressable>
-        <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-            Restock & Add Stock
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-            Receive medicine batches into pharmacy inventory
-          </Text>
-        </View>
-      </View>
-
-      {/* Shipment Metadata Card */}
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.cardTitle, { color: theme.text }]}>Batch Metadata</Text>
-
-        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Supplier Partner</Text>
-        <TextInput
-          value={selectedSupplier}
-          onChangeText={setSelectedSupplier}
-          placeholder="e.g. Lusaka Pharma Distributors"
-          placeholderTextColor={theme.mutedText}
-          style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-        />
-
-        <View style={styles.formRow}>
-          <View style={styles.formCol}>
-            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Warehouse</Text>
-            <TextInput
-              value={warehouse}
-              onChangeText={setWarehouse}
-              style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-            />
-          </View>
-          <View style={styles.formCol}>
-            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Invoice Number</Text>
-            <TextInput
-              value={invoiceNumber}
-              onChangeText={setInvoiceNumber}
-              style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-            />
-          </View>
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Date Received</Text>
-        <TextInput
-          value={receivedDate}
-          onChangeText={setReceivedDate}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={theme.mutedText}
-          style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-        />
-      </View>
-
-      {/* Line Items List */}
-      <View style={styles.sectionHeadingRow}>
-        <Text style={[styles.sectionHeading, { color: theme.mutedText }]}>
-          RESTOCK LINE ITEMS ({items.length})
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={addItemRow}
-          style={[styles.addItemBtn, { backgroundColor: theme.primarySoft }]}
-        >
-          <Plus size={15} color={theme.primary} />
-          <Text style={[styles.addItemBtnText, { color: theme.primary }]}>Add Line Item</Text>
-        </Pressable>
-      </View>
-
-      {items.map((item, index) => (
-        <View
-          key={item.id}
-          style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, marginBottom: 14 }]}
-        >
-          <View style={styles.itemHeader}>
-            <Text style={[styles.itemHeaderTitle, { color: theme.navigation }]}>
-              Item #{index + 1}
+    <RoleGuard page="add-stock">
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.content}
+      >
+        {/* Top Header */}
+        <View style={styles.topHeader}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+            <ArrowLeft size={22} color={theme.text} />
+          </Pressable>
+          <View style={styles.headerTitleWrap}>
+            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+              Restock & Add Stock
             </Text>
-            {items.length > 1 ? (
-              <Pressable
-                accessibilityLabel="Remove item"
-                hitSlop={8}
-                onPress={() => removeItemRow(item.id)}
-              >
-                <Trash2 size={18} color={theme.danger} />
-              </Pressable>
-            ) : null}
+            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+              Receive medicine batches into pharmacy inventory
+            </Text>
           </View>
-
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Medicine Name *</Text>
+        </View>
+  
+        {/* Shipment Metadata Card */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Batch Metadata</Text>
+  
+          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Supplier Partner</Text>
           <TextInput
-            value={item.name}
-            onChangeText={(val) => updateItem(item.id, 'name', val)}
-            placeholder="e.g. Amoxicillin 500mg"
+            value={selectedSupplier}
+            onChangeText={setSelectedSupplier}
+            placeholder="e.g. Lusaka Pharma Distributors"
             placeholderTextColor={theme.mutedText}
             style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
           />
-
+  
           <View style={styles.formRow}>
             <View style={styles.formCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Generic Name</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Warehouse</Text>
               <TextInput
-                value={item.genericName}
-                onChangeText={(val) => updateItem(item.id, 'genericName', val)}
-                placeholder="e.g. Amoxicillin"
-                placeholderTextColor={theme.mutedText}
+                value={warehouse}
+                onChangeText={setWarehouse}
                 style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
               />
             </View>
             <View style={styles.formCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Strength</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Invoice Number</Text>
               <TextInput
-                value={item.strength}
-                onChangeText={(val) => updateItem(item.id, 'strength', val)}
-                placeholder="e.g. 500mg"
-                placeholderTextColor={theme.mutedText}
+                value={invoiceNumber}
+                onChangeText={setInvoiceNumber}
                 style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
               />
             </View>
           </View>
-
-          <View style={styles.formRow}>
-            <View style={styles.formCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Batch Number</Text>
-              <TextInput
-                value={item.batchNumber}
-                onChangeText={(val) => updateItem(item.id, 'batchNumber', val)}
-                placeholder="Auto if blank"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-            </View>
-            <View style={styles.formCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Quantity *</Text>
-              <TextInput
-                value={item.quantity}
-                onChangeText={(val) => updateItem(item.id, 'quantity', val)}
-                placeholder="e.g. 100"
-                keyboardType="numeric"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-            </View>
-          </View>
-
-          <View style={styles.formRow}>
-            <View style={styles.formCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Cost Price (K) *</Text>
-              <TextInput
-                value={item.costPrice}
-                onChangeText={(val) => updateItem(item.id, 'costPrice', val)}
-                placeholder="e.g. 12.50"
-                keyboardType="decimal-pad"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-            </View>
-            <View style={styles.formCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Selling Price (K) *</Text>
-              <TextInput
-                value={item.sellingPrice}
-                onChangeText={(val) => updateItem(item.id, 'sellingPrice', val)}
-                placeholder="e.g. 20.00"
-                keyboardType="decimal-pad"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-            </View>
-          </View>
-
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Expiry Date (YYYY-MM-DD)</Text>
+  
+          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Date Received</Text>
           <TextInput
-            value={item.expiryDate}
-            onChangeText={(val) => updateItem(item.id, 'expiryDate', val)}
-            placeholder="e.g. 2027-12-31"
+            value={receivedDate}
+            onChangeText={setReceivedDate}
+            placeholder="YYYY-MM-DD"
             placeholderTextColor={theme.mutedText}
             style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
           />
         </View>
-      ))}
-
-      {/* Totals Summary & Submit Button */}
-      <View style={[styles.summaryCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <View style={styles.summaryLine}>
-          <Text style={[styles.summaryLabel, { color: theme.mutedText }]}>Total Units Receiving:</Text>
-          <Text style={[styles.summaryVal, { color: theme.text }]}>{totals.totalUnits} units</Text>
-        </View>
-        <View style={styles.summaryLine}>
-          <Text style={[styles.summaryLabel, { color: theme.mutedText }]}>Total Shipment Cost:</Text>
-          <Text style={[styles.summaryVal, { color: theme.primary }]}>
-            K {totals.totalCost.toFixed(2)}
+  
+        {/* Line Items List */}
+        <View style={styles.sectionHeadingRow}>
+          <Text style={[styles.sectionHeading, { color: theme.mutedText }]}>
+            RESTOCK LINE ITEMS ({items.length})
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={addItemRow}
+            style={[styles.addItemBtn, { backgroundColor: theme.primarySoft }]}
+          >
+            <Plus size={15} color={theme.primary} />
+            <Text style={[styles.addItemBtnText, { color: theme.primary }]}>Add Line Item</Text>
+          </Pressable>
         </View>
-        <Button
-          title={submitting ? 'Recording Batch...' : 'Record & Receive Inventory'}
-          onPress={handleSubmit}
-          loading={submitting}
-          variant="primary"
-          size="lg"
-          fullWidth
-          style={{ marginTop: 12 }}
-        />
-      </View>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+  
+        {items.map((item, index) => (
+          <View
+            key={item.id}
+            style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, marginBottom: 14 }]}
+          >
+            <View style={styles.itemHeader}>
+              <Text style={[styles.itemHeaderTitle, { color: theme.navigation }]}>
+                Item #{index + 1}
+              </Text>
+              {items.length > 1 ? (
+                <Pressable
+                  accessibilityLabel="Remove item"
+                  hitSlop={8}
+                  onPress={() => removeItemRow(item.id)}
+                >
+                  <Trash2 size={18} color={theme.danger} />
+                </Pressable>
+              ) : null}
+            </View>
+  
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Medicine Name *</Text>
+            <TextInput
+              value={item.name}
+              onChangeText={(val) => updateItem(item.id, 'name', val)}
+              placeholder="e.g. Amoxicillin 500mg"
+              placeholderTextColor={theme.mutedText}
+              style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+            />
+  
+            <View style={styles.formRow}>
+              <View style={styles.formCol}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Generic Name</Text>
+                <TextInput
+                  value={item.genericName}
+                  onChangeText={(val) => updateItem(item.id, 'genericName', val)}
+                  placeholder="e.g. Amoxicillin"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+              </View>
+              <View style={styles.formCol}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Strength</Text>
+                <TextInput
+                  value={item.strength}
+                  onChangeText={(val) => updateItem(item.id, 'strength', val)}
+                  placeholder="e.g. 500mg"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+              </View>
+            </View>
+  
+            <View style={styles.formRow}>
+              <View style={styles.formCol}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Batch Number</Text>
+                <TextInput
+                  value={item.batchNumber}
+                  onChangeText={(val) => updateItem(item.id, 'batchNumber', val)}
+                  placeholder="Auto if blank"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+              </View>
+              <View style={styles.formCol}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Quantity *</Text>
+                <TextInput
+                  value={item.quantity}
+                  onChangeText={(val) => updateItem(item.id, 'quantity', val)}
+                  placeholder="e.g. 100"
+                  keyboardType="numeric"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+              </View>
+            </View>
+  
+            <View style={styles.formRow}>
+              <View style={styles.formCol}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Cost Price (K) *</Text>
+                <TextInput
+                  value={item.costPrice}
+                  onChangeText={(val) => updateItem(item.id, 'costPrice', val)}
+                  placeholder="e.g. 12.50"
+                  keyboardType="decimal-pad"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+              </View>
+              <View style={styles.formCol}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Selling Price (K) *</Text>
+                <TextInput
+                  value={item.sellingPrice}
+                  onChangeText={(val) => updateItem(item.id, 'sellingPrice', val)}
+                  placeholder="e.g. 20.00"
+                  keyboardType="decimal-pad"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+              </View>
+            </View>
+  
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Expiry Date (YYYY-MM-DD)</Text>
+            <TextInput
+              value={item.expiryDate}
+              onChangeText={(val) => updateItem(item.id, 'expiryDate', val)}
+              placeholder="e.g. 2027-12-31"
+              placeholderTextColor={theme.mutedText}
+              style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+            />
+          </View>
+        ))}
+  
+        {/* Totals Summary & Submit Button */}
+        <View style={[styles.summaryCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.summaryLine}>
+            <Text style={[styles.summaryLabel, { color: theme.mutedText }]}>Total Units Receiving:</Text>
+            <Text style={[styles.summaryVal, { color: theme.text }]}>{totals.totalUnits} units</Text>
+          </View>
+          <View style={styles.summaryLine}>
+            <Text style={[styles.summaryLabel, { color: theme.mutedText }]}>Total Shipment Cost:</Text>
+            <Text style={[styles.summaryVal, { color: theme.primary }]}>
+              K {totals.totalCost.toFixed(2)}
+            </Text>
+          </View>
+          <Button
+            title={submitting ? 'Recording Batch...' : 'Record & Receive Inventory'}
+            onPress={handleSubmit}
+            loading={submitting}
+            variant="primary"
+            size="lg"
+            fullWidth
+            style={{ marginTop: 12 }}
+          />
+        </View>
+  
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </RoleGuard>
   );
 }
 

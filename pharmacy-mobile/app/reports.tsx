@@ -27,6 +27,7 @@ import { layout } from '@/constants/theme';
 import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 export default function ReportsScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -109,169 +110,171 @@ export default function ReportsScreen() {
   }, [filteredSales]);
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            loadSales();
-          }}
-          tintColor={theme.primary}
-        />
-      }
-    >
-      {/* Top Header */}
-      <View style={styles.topHeader}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-          <ArrowLeft size={22} color={theme.text} />
-        </Pressable>
-        <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-            Reports & Analytics
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-            Sales ledger, payment distribution & top performers
-          </Text>
+    <RoleGuard page="reports">
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadSales();
+            }}
+            tintColor={theme.primary}
+          />
+        }
+      >
+        {/* Top Header */}
+        <View style={styles.topHeader}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+            <ArrowLeft size={22} color={theme.text} />
+          </Pressable>
+          <View style={styles.headerTitleWrap}>
+            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+              Reports & Analytics
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+              Sales ledger, payment distribution & top performers
+            </Text>
+          </View>
         </View>
-      </View>
-
-      {/* Time Range Pills */}
-      <View style={styles.periodRow}>
-        {(['today', '7d', '30d', 'all'] as const).map((period) => {
-          const active = selectedPeriod === period;
-          const labels = { today: 'Today', '7d': 'Last 7 Days', '30d': 'Last 30 Days', all: 'All Time' };
-          return (
-            <Pressable
-              key={period}
-              style={[
-                styles.periodPill,
-                {
-                  backgroundColor: active ? theme.navigation : theme.surface,
-                  borderColor: active ? theme.navigation : theme.border,
-                },
-              ]}
-              onPress={() => setSelectedPeriod(period)}
-            >
-              <Text
+  
+        {/* Time Range Pills */}
+        <View style={styles.periodRow}>
+          {(['today', '7d', '30d', 'all'] as const).map((period) => {
+            const active = selectedPeriod === period;
+            const labels = { today: 'Today', '7d': 'Last 7 Days', '30d': 'Last 30 Days', all: 'All Time' };
+            return (
+              <Pressable
+                key={period}
                 style={[
-                  styles.periodPillText,
-                  { color: active ? '#ffffff' : theme.textSecondary },
+                  styles.periodPill,
+                  {
+                    backgroundColor: active ? theme.navigation : theme.surface,
+                    borderColor: active ? theme.navigation : theme.border,
+                  },
                 ]}
+                onPress={() => setSelectedPeriod(period)}
               >
-                {labels[period]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* KPI Stats Grid */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statsRow}>
-          <StatCard
-            style={styles.statCard}
-            label="Recorded Sales"
-            value={`K ${Math.round(summary.totalRevenue).toLocaleString()}`}
-            icon={<DollarSign size={20} color={theme.primary} />}
-            iconBg={theme.primarySoft}
-          />
-          <StatCard
-            style={styles.statCard}
-            label="Total Transactions"
-            value={summary.totalTransactions}
-            subValue={`Avg: K ${summary.avgSale.toFixed(1)}`}
-            icon={<Receipt size={20} color="#10b981" />}
-            iconBg="#ecfdf5"
-          />
+                <Text
+                  style={[
+                    styles.periodPillText,
+                    { color: active ? '#ffffff' : theme.textSecondary },
+                  ]}
+                >
+                  {labels[period]}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
-      </View>
-
-      {/* Payment Methods Breakdown */}
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.cardTitle, { color: theme.navigation }]}>
-          Payment Method Distribution
-        </Text>
-        <Text style={[styles.cardSubtitle, { color: theme.mutedText }]}>
-          Revenue split by tender type
-        </Text>
-
-        <View style={styles.paymentList}>
-          {Object.entries(summary.payments).map(([method, val]) => (
+  
+        {/* KPI Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statsRow}>
+            <StatCard
+              style={styles.statCard}
+              label="Recorded Sales"
+              value={`K ${Math.round(summary.totalRevenue).toLocaleString()}`}
+              icon={<DollarSign size={20} color={theme.primary} />}
+              iconBg={theme.primarySoft}
+            />
+            <StatCard
+              style={styles.statCard}
+              label="Total Transactions"
+              value={summary.totalTransactions}
+              subValue={`Avg: K ${summary.avgSale.toFixed(1)}`}
+              icon={<Receipt size={20} color="#10b981" />}
+              iconBg="#ecfdf5"
+            />
+          </View>
+        </View>
+  
+        {/* Payment Methods Breakdown */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.cardTitle, { color: theme.navigation }]}>
+            Payment Method Distribution
+          </Text>
+          <Text style={[styles.cardSubtitle, { color: theme.mutedText }]}>
+            Revenue split by tender type
+          </Text>
+  
+          <View style={styles.paymentList}>
+            {Object.entries(summary.payments).map(([method, val]) => (
+              <View
+                key={method}
+                style={[styles.paymentRow, { borderBottomColor: theme.borderLight }]}
+              >
+                <View style={styles.paymentLeft}>
+                  {method.toLowerCase().includes('card') ? (
+                    <CreditCard size={18} color={theme.primary} />
+                  ) : method.toLowerCase().includes('money') ? (
+                    <Smartphone size={18} color="#10b981" />
+                  ) : (
+                    <Banknote size={18} color="#f59e0b" />
+                  )}
+                  <Text style={[styles.paymentMethodName, { color: theme.text }]}>{method}</Text>
+                </View>
+                <View style={styles.paymentRight}>
+                  <Text style={[styles.paymentTotal, { color: theme.navigation }]}>
+                    K {val.total.toFixed(2)}
+                  </Text>
+                  <Text style={[styles.paymentCount, { color: theme.mutedText }]}>
+                    {val.count} transaction{val.count === 1 ? '' : 's'}
+                  </Text>
+                </View>
+              </View>
+            ))}
+            {Object.keys(summary.payments).length === 0 ? (
+              <Text style={[styles.emptyText, { color: theme.mutedText }]}>
+                No sales records in this timeframe.
+              </Text>
+            ) : null}
+          </View>
+        </View>
+  
+        {/* Top Selling Products */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, marginTop: 14 }]}>
+          <Text style={[styles.cardTitle, { color: theme.navigation }]}>
+            Top Selling Medicines
+          </Text>
+          <Text style={[styles.cardSubtitle, { color: theme.mutedText }]}>
+            Ranked by revenue contribution
+          </Text>
+  
+          {summary.topItems.map((item, idx) => (
             <View
-              key={method}
-              style={[styles.paymentRow, { borderBottomColor: theme.borderLight }]}
+              key={idx}
+              style={[styles.itemRow, { borderBottomColor: theme.borderLight }]}
             >
-              <View style={styles.paymentLeft}>
-                {method.toLowerCase().includes('card') ? (
-                  <CreditCard size={18} color={theme.primary} />
-                ) : method.toLowerCase().includes('money') ? (
-                  <Smartphone size={18} color="#10b981" />
-                ) : (
-                  <Banknote size={18} color="#f59e0b" />
-                )}
-                <Text style={[styles.paymentMethodName, { color: theme.text }]}>{method}</Text>
+              <View style={[styles.rankBadge, { backgroundColor: theme.primarySoft }]}>
+                <Text style={[styles.rankText, { color: theme.primary }]}>#{idx + 1}</Text>
               </View>
-              <View style={styles.paymentRight}>
-                <Text style={[styles.paymentTotal, { color: theme.navigation }]}>
-                  K {val.total.toFixed(2)}
+              <View style={styles.itemCopy}>
+                <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
+                  {item.name}
                 </Text>
-                <Text style={[styles.paymentCount, { color: theme.mutedText }]}>
-                  {val.count} transaction{val.count === 1 ? '' : 's'}
+                <Text style={[styles.itemUnits, { color: theme.mutedText }]}>
+                  {item.quantity} units sold
                 </Text>
               </View>
+              <Text style={[styles.itemRevenue, { color: theme.navigation }]}>
+                K {item.revenue.toFixed(2)}
+              </Text>
             </View>
           ))}
-          {Object.keys(summary.payments).length === 0 ? (
+  
+          {summary.topItems.length === 0 ? (
             <Text style={[styles.emptyText, { color: theme.mutedText }]}>
-              No sales records in this timeframe.
+              No product sales recorded in this timeframe.
             </Text>
           ) : null}
         </View>
-      </View>
-
-      {/* Top Selling Products */}
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, marginTop: 14 }]}>
-        <Text style={[styles.cardTitle, { color: theme.navigation }]}>
-          Top Selling Medicines
-        </Text>
-        <Text style={[styles.cardSubtitle, { color: theme.mutedText }]}>
-          Ranked by revenue contribution
-        </Text>
-
-        {summary.topItems.map((item, idx) => (
-          <View
-            key={idx}
-            style={[styles.itemRow, { borderBottomColor: theme.borderLight }]}
-          >
-            <View style={[styles.rankBadge, { backgroundColor: theme.primarySoft }]}>
-              <Text style={[styles.rankText, { color: theme.primary }]}>#{idx + 1}</Text>
-            </View>
-            <View style={styles.itemCopy}>
-              <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={[styles.itemUnits, { color: theme.mutedText }]}>
-                {item.quantity} units sold
-              </Text>
-            </View>
-            <Text style={[styles.itemRevenue, { color: theme.navigation }]}>
-              K {item.revenue.toFixed(2)}
-            </Text>
-          </View>
-        ))}
-
-        {summary.topItems.length === 0 ? (
-          <Text style={[styles.emptyText, { color: theme.mutedText }]}>
-            No product sales recorded in this timeframe.
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+  
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </RoleGuard>
   );
 }
 

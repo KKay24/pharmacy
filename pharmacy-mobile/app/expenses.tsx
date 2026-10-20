@@ -31,6 +31,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 const EXPENSE_CATEGORIES = [
   'Operating',
@@ -172,212 +173,214 @@ export default function ExpensesScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Top Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={styles.topRow}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-            <ArrowLeft size={22} color={theme.text} />
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-              Expense Tracking
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-              Audit & record operational pharmacy overhead
-            </Text>
+    <RoleGuard page="expenses">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Top Header */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.topRow}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+              <ArrowLeft size={22} color={theme.text} />
+            </Pressable>
+            <View style={styles.headerTitleWrap}>
+              <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+                Expense Tracking
+              </Text>
+              <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+                Audit & record operational pharmacy overhead
+              </Text>
+            </View>
+            <Button
+              title="Add Expense"
+              onPress={() => setShowAddModal(true)}
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={16} color="#ffffff" />}
+            />
           </View>
-          <Button
-            title="Add Expense"
-            onPress={() => setShowAddModal(true)}
-            variant="primary"
-            size="sm"
-            leftIcon={<Plus size={16} color="#ffffff" />}
+  
+          <SearchInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by category or description..."
+            style={{ marginTop: 8 }}
           />
         </View>
-
-        <SearchInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by category or description..."
-          style={{ marginTop: 8 }}
-        />
-      </View>
-
-      {/* Expense List */}
-      <FlatList
-        data={filteredExpenses}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadExpenses();
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        ListHeaderComponent={
-          <View style={styles.statsRow}>
-            <StatCard
-              style={styles.statCard}
-              label="Month Total"
-              value={`K ${Math.round(stats.total).toLocaleString()}`}
-              icon={<Wallet size={18} color={theme.primary} />}
-              iconBg={theme.primarySoft}
+  
+        {/* Expense List */}
+        <FlatList
+          data={filteredExpenses}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadExpenses();
+              }}
+              tintColor={theme.primary}
             />
-            <StatCard
-              style={styles.statCard}
-              label="Entries"
-              value={stats.count}
-              icon={<DollarSign size={18} color="#f59e0b" />}
-              iconBg="#fffbeb"
-            />
-            <StatCard
-              style={styles.statCard}
-              label="Top Category"
-              value={stats.topCat}
-              icon={<Tag size={18} color="#8b5cf6" />}
-              iconBg="#f5f3ff"
-            />
-          </View>
-        }
-        renderItem={({ item }) => (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.cardTopRow}>
-              <View style={styles.categoryWrap}>
-                <Badge
-                  label={item.category || 'Operating'}
-                  variant={getCategoryBadgeVariant(item.category)}
-                  size="md"
-                />
-                <Text style={[styles.expenseDate, { color: theme.mutedText }]}>
-                  {item.date ? new Date(item.date).toLocaleDateString() : 'Today'}
+          }
+          ListHeaderComponent={
+            <View style={styles.statsRow}>
+              <StatCard
+                style={styles.statCard}
+                label="Month Total"
+                value={`K ${Math.round(stats.total).toLocaleString()}`}
+                icon={<Wallet size={18} color={theme.primary} />}
+                iconBg={theme.primarySoft}
+              />
+              <StatCard
+                style={styles.statCard}
+                label="Entries"
+                value={stats.count}
+                icon={<DollarSign size={18} color="#f59e0b" />}
+                iconBg="#fffbeb"
+              />
+              <StatCard
+                style={styles.statCard}
+                label="Top Category"
+                value={stats.topCat}
+                icon={<Tag size={18} color="#8b5cf6" />}
+                iconBg="#f5f3ff"
+              />
+            </View>
+          }
+          renderItem={({ item }) => (
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={styles.cardTopRow}>
+                <View style={styles.categoryWrap}>
+                  <Badge
+                    label={item.category || 'Operating'}
+                    variant={getCategoryBadgeVariant(item.category)}
+                    size="md"
+                  />
+                  <Text style={[styles.expenseDate, { color: theme.mutedText }]}>
+                    {item.date ? new Date(item.date).toLocaleDateString() : 'Today'}
+                  </Text>
+                </View>
+                <Text style={[styles.expenseAmount, { color: theme.navigation }]}>
+                  K {Number(item.amount || 0).toFixed(2)}
                 </Text>
               </View>
-              <Text style={[styles.expenseAmount, { color: theme.navigation }]}>
-                K {Number(item.amount || 0).toFixed(2)}
-              </Text>
+  
+              {item.description ? (
+                <Text style={[styles.expenseDesc, { color: theme.textSecondary }]}>
+                  {item.description}
+                </Text>
+              ) : null}
+  
+              <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
+                <Text style={[styles.loggedBy, { color: theme.mutedText }]}>
+                  Ref #{item.id}
+                </Text>
+                <Pressable
+                  accessibilityLabel="Delete expense record"
+                  hitSlop={8}
+                  onPress={() => handleDeleteExpense(item.id)}
+                >
+                  <Trash2 size={16} color={theme.danger} />
+                </Pressable>
+              </View>
             </View>
-
-            {item.description ? (
-              <Text style={[styles.expenseDesc, { color: theme.textSecondary }]}>
-                {item.description}
-              </Text>
-            ) : null}
-
-            <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
-              <Text style={[styles.loggedBy, { color: theme.mutedText }]}>
-                Ref #{item.id}
-              </Text>
-              <Pressable
-                accessibilityLabel="Delete expense record"
-                hitSlop={8}
-                onPress={() => handleDeleteExpense(item.id)}
-              >
-                <Trash2 size={16} color={theme.danger} />
-              </Pressable>
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon={<Wallet size={32} color={theme.mutedText} />}
-              title="No expenses logged"
-              description="Tap 'Add Expense' above to log operational or overhead expenditures."
-            />
-          ) : null
-        }
-      />
-
-      {/* Add Expense Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.navigation }]}>
-                Record Operational Expense
-              </Text>
-              <Pressable hitSlop={8} onPress={() => setShowAddModal(false)}>
-                <X size={20} color={theme.mutedText} />
-              </Pressable>
-            </View>
-
-            <ScrollView style={{ marginTop: 12 }}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Category</Text>
-              <View style={styles.catChipsGrid}>
-                {EXPENSE_CATEGORIES.map((cat) => {
-                  const active = category === cat;
-                  return (
-                    <Pressable
-                      key={cat}
-                      style={[
-                        styles.catChip,
-                        {
-                          backgroundColor: active ? theme.primary : theme.surfaceMuted,
-                          borderColor: active ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => setCategory(cat)}
-                    >
-                      <Text
+          )}
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon={<Wallet size={32} color={theme.mutedText} />}
+                title="No expenses logged"
+                description="Tap 'Add Expense' above to log operational or overhead expenditures."
+              />
+            ) : null
+          }
+        />
+  
+        {/* Add Expense Modal */}
+        <Modal visible={showAddModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                <Text style={[styles.modalTitle, { color: theme.navigation }]}>
+                  Record Operational Expense
+                </Text>
+                <Pressable hitSlop={8} onPress={() => setShowAddModal(false)}>
+                  <X size={20} color={theme.mutedText} />
+                </Pressable>
+              </View>
+  
+              <ScrollView style={{ marginTop: 12 }}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Category</Text>
+                <View style={styles.catChipsGrid}>
+                  {EXPENSE_CATEGORIES.map((cat) => {
+                    const active = category === cat;
+                    return (
+                      <Pressable
+                        key={cat}
                         style={[
-                          styles.catChipText,
-                          { color: active ? '#ffffff' : theme.textSecondary },
+                          styles.catChip,
+                          {
+                            backgroundColor: active ? theme.primary : theme.surfaceMuted,
+                            borderColor: active ? theme.primary : theme.border,
+                          },
                         ]}
+                        onPress={() => setCategory(cat)}
                       >
-                        {cat}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Amount (ZMW / K) *</Text>
-              <TextInput
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="e.g. 450.00"
-                keyboardType="decimal-pad"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Description</Text>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder="e.g. Generator fuel, packaging bags, cleaning"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Date (YYYY-MM-DD)</Text>
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <View style={{ marginTop: 16 }}>
-                <Button
-                  title={submitting ? 'Recording...' : 'Record Expense'}
-                  onPress={handleCreateExpense}
-                  loading={submitting}
-                  variant="primary"
-                  fullWidth
+                        <Text
+                          style={[
+                            styles.catChipText,
+                            { color: active ? '#ffffff' : theme.textSecondary },
+                          ]}
+                        >
+                          {cat}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Amount (ZMW / K) *</Text>
+                <TextInput
+                  value={amount}
+                  onChangeText={setAmount}
+                  placeholder="e.g. 450.00"
+                  keyboardType="decimal-pad"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
                 />
-              </View>
-            </ScrollView>
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Description</Text>
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="e.g. Generator fuel, packaging bags, cleaning"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Date (YYYY-MM-DD)</Text>
+                <TextInput
+                  value={date}
+                  onChangeText={setDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <View style={{ marginTop: 16 }}>
+                  <Button
+                    title={submitting ? 'Recording...' : 'Record Expense'}
+                    onPress={handleCreateExpense}
+                    loading={submitting}
+                    variant="primary"
+                    fullWidth
+                  />
+                </View>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </RoleGuard>
   );
 }
 

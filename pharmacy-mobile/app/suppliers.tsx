@@ -34,6 +34,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 export default function SuppliersScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -131,252 +132,254 @@ export default function SuppliersScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Top Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={styles.topRow}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-            <ArrowLeft size={22} color={theme.text} />
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-              Supplier Partners
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-              Procurement partners, delivery terms & balances
-            </Text>
+    <RoleGuard page="suppliers">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Top Header */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.topRow}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+              <ArrowLeft size={22} color={theme.text} />
+            </Pressable>
+            <View style={styles.headerTitleWrap}>
+              <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+                Supplier Partners
+              </Text>
+              <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+                Procurement partners, delivery terms & balances
+              </Text>
+            </View>
+            <Button
+              title="Onboard"
+              onPress={() => setShowAddModal(true)}
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={16} color="#ffffff" />}
+            />
           </View>
-          <Button
-            title="Onboard"
-            onPress={() => setShowAddModal(true)}
-            variant="primary"
-            size="sm"
-            leftIcon={<Plus size={16} color="#ffffff" />}
+  
+          <SearchInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by supplier or contact person..."
+            style={{ marginTop: 8 }}
           />
         </View>
-
-        <SearchInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by supplier or contact person..."
-          style={{ marginTop: 8 }}
-        />
-      </View>
-
-      {/* Supplier List */}
-      <FlatList
-        data={filteredSuppliers}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadSuppliers();
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        ListHeaderComponent={
-          <View style={styles.statsRow}>
-            <StatCard
-              style={styles.statCard}
-              label="Total Partners"
-              value={stats.total}
-              icon={<Truck size={18} color="#166534" />}
-              iconBg="#dcfce7"
+  
+        {/* Supplier List */}
+        <FlatList
+          data={filteredSuppliers}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadSuppliers();
+              }}
+              tintColor={theme.primary}
             />
-            <StatCard
-              style={styles.statCard}
-              label="Balance Owed"
-              value={`K ${Math.round(stats.totalOwed).toLocaleString()}`}
-              icon={<DollarSign size={18} color="#b91c1c" />}
-              iconBg="#fee2e2"
-            />
-            <StatCard
-              style={styles.statCard}
-              label="Top Rated"
-              value={stats.topRated}
-              icon={<Star size={18} color="#a16207" />}
-              iconBg="#fef9c3"
-            />
-          </View>
-        }
-        renderItem={({ item }) => (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.cardTopRow}>
-              <View style={styles.cardTitleWrap}>
-                <Text style={[styles.supplierName, { color: theme.text }]}>{item.name}</Text>
-                {item.contactPerson ? (
-                  <Text style={[styles.contactPerson, { color: theme.mutedText }]}>
-                    Contact: {item.contactPerson}
-                  </Text>
-                ) : null}
-              </View>
-              <Badge
-                label={item.paymentTerms || 'Net 30'}
-                variant="info"
-                size="sm"
+          }
+          ListHeaderComponent={
+            <View style={styles.statsRow}>
+              <StatCard
+                style={styles.statCard}
+                label="Total Partners"
+                value={stats.total}
+                icon={<Truck size={18} color="#166534" />}
+                iconBg="#dcfce7"
+              />
+              <StatCard
+                style={styles.statCard}
+                label="Balance Owed"
+                value={`K ${Math.round(stats.totalOwed).toLocaleString()}`}
+                icon={<DollarSign size={18} color="#b91c1c" />}
+                iconBg="#fee2e2"
+              />
+              <StatCard
+                style={styles.statCard}
+                label="Top Rated"
+                value={stats.topRated}
+                icon={<Star size={18} color="#a16207" />}
+                iconBg="#fef9c3"
               />
             </View>
-
-            <View style={[styles.infoBlock, { backgroundColor: theme.surfaceMuted }]}>
-              {item.phone ? (
-                <View style={styles.metaRow}>
-                  <Phone size={13} color={theme.mutedText} />
-                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                    {item.phone}
-                  </Text>
+          }
+          renderItem={({ item }) => (
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={styles.cardTopRow}>
+                <View style={styles.cardTitleWrap}>
+                  <Text style={[styles.supplierName, { color: theme.text }]}>{item.name}</Text>
+                  {item.contactPerson ? (
+                    <Text style={[styles.contactPerson, { color: theme.mutedText }]}>
+                      Contact: {item.contactPerson}
+                    </Text>
+                  ) : null}
                 </View>
-              ) : null}
-              {item.email ? (
-                <View style={styles.metaRow}>
-                  <Mail size={13} color={theme.mutedText} />
-                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                    {item.email}
-                  </Text>
-                </View>
-              ) : null}
-              {item.address ? (
-                <View style={styles.metaRow}>
-                  <MapPin size={13} color={theme.mutedText} />
-                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                    {item.address}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-
-            <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
-              <View style={styles.balanceWrap}>
-                <Text style={[styles.balanceLabel, { color: theme.mutedText }]}>Balance Owed:</Text>
-                <Text style={[styles.balanceAmount, { color: theme.navigation }]}>
-                  K {Number(item.balanceOwed || 0).toFixed(2)}
-                </Text>
-              </View>
-
-              <View style={styles.directActions}>
-                {item.phone ? (
-                  <Pressable
-                    style={[styles.smallBtn, { backgroundColor: theme.primarySoft }]}
-                    onPress={() => handleCall(item.phone)}
-                  >
-                    <Phone size={13} color={theme.primary} />
-                    <Text style={[styles.smallBtnText, { color: theme.primary }]}>Call</Text>
-                  </Pressable>
-                ) : null}
-                {item.email ? (
-                  <Pressable
-                    style={[styles.smallBtn, { backgroundColor: theme.surfaceMuted }]}
-                    onPress={() => handleEmail(item.email)}
-                  >
-                    <Mail size={13} color={theme.textSecondary} />
-                    <Text style={[styles.smallBtnText, { color: theme.textSecondary }]}>Email</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon={<Truck size={32} color={theme.mutedText} />}
-              title="No suppliers found"
-              description="Tap 'Onboard' above to register new pharmaceutical distributors."
-            />
-          ) : null
-        }
-      />
-
-      {/* Onboard Supplier Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.navigation }]}>
-                Onboard New Supplier
-              </Text>
-              <Pressable hitSlop={8} onPress={() => setShowAddModal(false)}>
-                <X size={20} color={theme.mutedText} />
-              </Pressable>
-            </View>
-
-            <ScrollView style={{ marginTop: 12 }}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Company Name *</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="e.g. MedPharm Zambia Ltd"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Contact Person</Text>
-              <TextInput
-                value={contactPerson}
-                onChangeText={setContactPerson}
-                placeholder="e.g. Mwamba Banda"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <View style={styles.formRow}>
-                <View style={styles.formCol}>
-                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone Number</Text>
-                  <TextInput
-                    value={phone}
-                    onChangeText={setPhone}
-                    placeholder="+260 97 XXXXXXX"
-                    placeholderTextColor={theme.mutedText}
-                    style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-                  />
-                </View>
-                <View style={styles.formCol}>
-                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Payment Terms</Text>
-                  <TextInput
-                    value={paymentTerms}
-                    onChangeText={setPaymentTerms}
-                    placeholder="Net 30, COD, etc."
-                    placeholderTextColor={theme.mutedText}
-                    style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-                  />
-                </View>
-              </View>
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email Address</Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="orders@medpharm.co.zm"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Physical Address</Text>
-              <TextInput
-                value={address}
-                onChangeText={setAddress}
-                placeholder="Plot 45, Industrial Area, Lusaka"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <View style={{ marginTop: 16 }}>
-                <Button
-                  title={submitting ? 'Onboarding...' : 'Onboard Partner'}
-                  onPress={handleCreateSupplier}
-                  loading={submitting}
-                  variant="primary"
-                  fullWidth
+                <Badge
+                  label={item.paymentTerms || 'Net 30'}
+                  variant="info"
+                  size="sm"
                 />
               </View>
-            </ScrollView>
+  
+              <View style={[styles.infoBlock, { backgroundColor: theme.surfaceMuted }]}>
+                {item.phone ? (
+                  <View style={styles.metaRow}>
+                    <Phone size={13} color={theme.mutedText} />
+                    <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                      {item.phone}
+                    </Text>
+                  </View>
+                ) : null}
+                {item.email ? (
+                  <View style={styles.metaRow}>
+                    <Mail size={13} color={theme.mutedText} />
+                    <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                      {item.email}
+                    </Text>
+                  </View>
+                ) : null}
+                {item.address ? (
+                  <View style={styles.metaRow}>
+                    <MapPin size={13} color={theme.mutedText} />
+                    <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                      {item.address}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+  
+              <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
+                <View style={styles.balanceWrap}>
+                  <Text style={[styles.balanceLabel, { color: theme.mutedText }]}>Balance Owed:</Text>
+                  <Text style={[styles.balanceAmount, { color: theme.navigation }]}>
+                    K {Number(item.balanceOwed || 0).toFixed(2)}
+                  </Text>
+                </View>
+  
+                <View style={styles.directActions}>
+                  {item.phone ? (
+                    <Pressable
+                      style={[styles.smallBtn, { backgroundColor: theme.primarySoft }]}
+                      onPress={() => handleCall(item.phone)}
+                    >
+                      <Phone size={13} color={theme.primary} />
+                      <Text style={[styles.smallBtnText, { color: theme.primary }]}>Call</Text>
+                    </Pressable>
+                  ) : null}
+                  {item.email ? (
+                    <Pressable
+                      style={[styles.smallBtn, { backgroundColor: theme.surfaceMuted }]}
+                      onPress={() => handleEmail(item.email)}
+                    >
+                      <Mail size={13} color={theme.textSecondary} />
+                      <Text style={[styles.smallBtnText, { color: theme.textSecondary }]}>Email</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+          )}
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon={<Truck size={32} color={theme.mutedText} />}
+                title="No suppliers found"
+                description="Tap 'Onboard' above to register new pharmaceutical distributors."
+              />
+            ) : null
+          }
+        />
+  
+        {/* Onboard Supplier Modal */}
+        <Modal visible={showAddModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                <Text style={[styles.modalTitle, { color: theme.navigation }]}>
+                  Onboard New Supplier
+                </Text>
+                <Pressable hitSlop={8} onPress={() => setShowAddModal(false)}>
+                  <X size={20} color={theme.mutedText} />
+                </Pressable>
+              </View>
+  
+              <ScrollView style={{ marginTop: 12 }}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Company Name *</Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="e.g. MedPharm Zambia Ltd"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Contact Person</Text>
+                <TextInput
+                  value={contactPerson}
+                  onChangeText={setContactPerson}
+                  placeholder="e.g. Mwamba Banda"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone Number</Text>
+                    <TextInput
+                      value={phone}
+                      onChangeText={setPhone}
+                      placeholder="+260 97 XXXXXXX"
+                      placeholderTextColor={theme.mutedText}
+                      style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                    />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Payment Terms</Text>
+                    <TextInput
+                      value={paymentTerms}
+                      onChangeText={setPaymentTerms}
+                      placeholder="Net 30, COD, etc."
+                      placeholderTextColor={theme.mutedText}
+                      style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                    />
+                  </View>
+                </View>
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email Address</Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="orders@medpharm.co.zm"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Physical Address</Text>
+                <TextInput
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Plot 45, Industrial Area, Lusaka"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <View style={{ marginTop: 16 }}>
+                  <Button
+                    title={submitting ? 'Onboarding...' : 'Onboard Partner'}
+                    onPress={handleCreateSupplier}
+                    loading={submitting}
+                    variant="primary"
+                    fullWidth
+                  />
+                </View>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </RoleGuard>
   );
 }
 

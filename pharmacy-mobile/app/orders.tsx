@@ -37,6 +37,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 const ORDER_STATUSES = [
   'All',
@@ -249,345 +250,347 @@ export default function OrdersScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Top Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={styles.topRow}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-            <ArrowLeft size={22} color={theme.text} />
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-              Online Orders
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-              {orders.length} total orders recorded
-            </Text>
+    <RoleGuard page="orders">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Top Header */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.topRow}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+              <ArrowLeft size={22} color={theme.text} />
+            </Pressable>
+            <View style={styles.headerTitleWrap}>
+              <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+                Online Orders
+              </Text>
+              <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+                {orders.length} total orders recorded
+              </Text>
+            </View>
           </View>
-        </View>
-
-        <SearchInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by order #, customer, phone..."
-          style={{ marginTop: 8 }}
-        />
-
-        {/* Status Filter Scroll */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statusScroll}
-        >
-          {ORDER_STATUSES.map((status) => {
-            const active = statusFilter === status;
-            return (
-              <Pressable
-                key={status}
-                accessibilityRole="button"
-                onPress={() => setStatusFilter(status)}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: active ? theme.navigation : theme.surfaceMuted,
-                    borderColor: active ? theme.navigation : theme.border,
-                  },
-                ]}
-              >
-                <Text
+  
+          <SearchInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by order #, customer, phone..."
+            style={{ marginTop: 8 }}
+          />
+  
+          {/* Status Filter Scroll */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.statusScroll}
+          >
+            {ORDER_STATUSES.map((status) => {
+              const active = statusFilter === status;
+              return (
+                <Pressable
+                  key={status}
+                  accessibilityRole="button"
+                  onPress={() => setStatusFilter(status)}
                   style={[
-                    styles.filterChipText,
-                    { color: active ? '#ffffff' : theme.textSecondary },
+                    styles.filterChip,
+                    {
+                      backgroundColor: active ? theme.navigation : theme.surfaceMuted,
+                      borderColor: active ? theme.navigation : theme.border,
+                    },
                   ]}
                 >
-                  {status}
-                </Text>
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: active ? '#ffffff' : theme.textSecondary },
+                    ]}
+                  >
+                    {status}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+  
+        {error ? (
+          <View style={[styles.errorBanner, { backgroundColor: theme.danger + '15', borderColor: theme.danger + '40' }]}>
+            <AlertCircle size={18} color={theme.danger} />
+            <Text style={[styles.errorText, { color: theme.danger }]}>{error}</Text>
+            <Pressable onPress={() => loadOrders()} style={styles.retryBtn}>
+              <Text style={{ color: theme.primary, fontWeight: '700' }}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
+  
+        {/* Orders List */}
+        <FlatList
+          data={filteredOrders}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadOrders();
+              }}
+              tintColor={theme.primary}
+            />
+          }
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon={<ClipboardList size={32} color={theme.mutedText} />}
+                title={error ? 'Unable to display orders' : 'No orders found'}
+                description={
+                  error
+                    ? error
+                    : statusFilter !== 'All'
+                    ? `No orders matching status "${statusFilter}".`
+                    : 'There are no active orders to display.'
+                }
+                actionLabel={error ? 'Sign In Again' : undefined}
+                onAction={error ? () => router.push('/(auth)/login') : undefined}
+              />
+            ) : null
+          }
+          renderItem={({ item }) => {
+            const action = getNextStatusAction(item.orderStatus);
+            const totalAmount = Number(item.totalAmount || 0);
+  
+            return (
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.orderCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => setSelectedOrder(item)}
+              >
+                <View style={styles.cardTopRow}>
+                  <View>
+                    <Text style={[styles.orderNumber, { color: theme.navigation }]}>
+                      {item.orderNumber}
+                    </Text>
+                    <Text style={[styles.orderDate, { color: theme.mutedText }]}>
+                      {item.date || item.createdAt
+                        ? new Date(item.date || item.createdAt).toLocaleString()
+                        : 'N/A'}
+                    </Text>
+                  </View>
+                  <Badge
+                    label={item.orderStatus}
+                    variant={getStatusBadgeVariant(item.orderStatus)}
+                    size="md"
+                  />
+                </View>
+  
+                <View style={[styles.customerInfoBlock, { backgroundColor: theme.surfaceMuted }]}>
+                  <Text style={[styles.customerName, { color: theme.text }]}>
+                    {item.customerName || 'Customer'}
+                  </Text>
+                  {item.customerPhone ? (
+                    <View style={styles.detailRow}>
+                      <Phone size={13} color={theme.mutedText} />
+                      <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                        {item.customerPhone}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.detailRow}>
+                    <Truck size={13} color={theme.mutedText} />
+                    <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                      {item.deliveryMethod === 'delivery'
+                        ? `Delivery (${item.deliveryAddress || 'Address on file'})`
+                        : 'Store Pickup'}
+                    </Text>
+                  </View>
+                </View>
+  
+                <View style={styles.cardBottomRow}>
+                  <Text style={[styles.orderTotal, { color: theme.primary }]}>
+                    Total: K {totalAmount.toFixed(2)}
+                  </Text>
+                  <View style={styles.actionsCluster}>
+                    {action ? (
+                      <Button
+                        title={action.label}
+                        onPress={() => updateOrderStatus(item.id, action.next)}
+                        variant="primary"
+                        size="sm"
+                      />
+                    ) : null}
+                    {item.orderStatus !== 'Cancelled' && item.orderStatus !== 'Delivered' ? (
+                      <Pressable
+                        style={[styles.cancelBtn, { borderColor: theme.danger }]}
+                        onPress={() => {
+                          setCancellingOrder(item);
+                          setCancelReason('');
+                        }}
+                      >
+                        <Text style={[styles.cancelBtnText, { color: theme.danger }]}>Cancel</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
               </Pressable>
             );
-          })}
-        </ScrollView>
-      </View>
-
-      {error ? (
-        <View style={[styles.errorBanner, { backgroundColor: theme.danger + '15', borderColor: theme.danger + '40' }]}>
-          <AlertCircle size={18} color={theme.danger} />
-          <Text style={[styles.errorText, { color: theme.danger }]}>{error}</Text>
-          <Pressable onPress={() => loadOrders()} style={styles.retryBtn}>
-            <Text style={{ color: theme.primary, fontWeight: '700' }}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {/* Orders List */}
-      <FlatList
-        data={filteredOrders}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadOrders();
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon={<ClipboardList size={32} color={theme.mutedText} />}
-              title={error ? 'Unable to display orders' : 'No orders found'}
-              description={
-                error
-                  ? error
-                  : statusFilter !== 'All'
-                  ? `No orders matching status "${statusFilter}".`
-                  : 'There are no active orders to display.'
-              }
-              actionLabel={error ? 'Sign In Again' : undefined}
-              onAction={error ? () => router.push('/(auth)/login') : undefined}
-            />
-          ) : null
-        }
-        renderItem={({ item }) => {
-          const action = getNextStatusAction(item.orderStatus);
-          const totalAmount = Number(item.totalAmount || 0);
-
-          return (
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.orderCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              onPress={() => setSelectedOrder(item)}
-            >
-              <View style={styles.cardTopRow}>
+          }}
+  
+        />
+  
+        {/* Order Details Modal */}
+        <Modal visible={!!selectedOrder} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
                 <View>
-                  <Text style={[styles.orderNumber, { color: theme.navigation }]}>
-                    {item.orderNumber}
+                  <Text style={[styles.modalTitle, { color: theme.navigation }]}>
+                    {selectedOrder?.orderNumber}
                   </Text>
-                  <Text style={[styles.orderDate, { color: theme.mutedText }]}>
-                    {item.date || item.createdAt
-                      ? new Date(item.date || item.createdAt).toLocaleString()
-                      : 'N/A'}
+                  <Text style={[styles.modalSub, { color: theme.mutedText }]}>
+                    Customer Online Order Details
                   </Text>
                 </View>
-                <Badge
-                  label={item.orderStatus}
-                  variant={getStatusBadgeVariant(item.orderStatus)}
+                <Pressable hitSlop={8} onPress={() => setSelectedOrder(null)}>
+                  <X size={22} color={theme.mutedText} />
+                </Pressable>
+              </View>
+  
+              <ScrollView style={{ marginTop: 12 }}>
+                {selectedOrder ? (
+                  <>
+                    <View style={styles.detailSection}>
+                      <Text style={[styles.detailSectionHeading, { color: theme.mutedText }]}>
+                        CUSTOMER & FULFILLMENT
+                      </Text>
+                      <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
+                        Customer Name:{' '}
+                        <Text style={{ fontWeight: '700', color: theme.text }}>
+                          {selectedOrder.customerName}
+                        </Text>
+                      </Text>
+                      <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
+                        Phone:{' '}
+                        <Text style={{ fontWeight: '700', color: theme.text }}>
+                          {selectedOrder.customerPhone || 'N/A'}
+                        </Text>
+                      </Text>
+                      <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
+                        Method:{' '}
+                        <Text style={{ fontWeight: '700', color: theme.text }}>
+                          {selectedOrder.deliveryMethod === 'delivery' ? 'Home Delivery' : 'Pick Up'}
+                        </Text>
+                      </Text>
+                      {selectedOrder.deliveryAddress ? (
+                        <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
+                          Address:{' '}
+                          <Text style={{ fontWeight: '700', color: theme.text }}>
+                            {selectedOrder.deliveryAddress}
+                          </Text>
+                        </Text>
+                      ) : null}
+                      {selectedOrder.notes ? (
+                        <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
+                          Notes:{' '}
+                          <Text style={{ fontStyle: 'italic', color: theme.text }}>
+                            {selectedOrder.notes}
+                          </Text>
+                        </Text>
+                      ) : null}
+                    </View>
+  
+                    <View style={[styles.detailSection, { marginTop: 14 }]}>
+                      <Text style={[styles.detailSectionHeading, { color: theme.mutedText }]}>
+                        ORDER ITEMS
+                      </Text>
+                      {(selectedOrder.items || selectedOrder.OrderItems || []).map(
+                        (item: any, idx: number) => (
+                          <View
+                            key={idx}
+                            style={[styles.itemLine, { borderBottomColor: theme.borderLight }]}
+                          >
+                            <Text style={[styles.itemLineName, { color: theme.text }]}>
+                              {item.name || item.Medicine?.name || 'Item'} × {item.quantity}
+                            </Text>
+                            <Text style={[styles.itemLinePrice, { color: theme.text }]}>
+                              K {Number(item.price || item.totalPrice || 0).toFixed(2)}
+                            </Text>
+                          </View>
+                        )
+                      )}
+                      <View style={styles.summaryTotalRow}>
+                        <Text style={[styles.totalLabel, { color: theme.text }]}>Total Amount:</Text>
+                        <Text style={[styles.totalAmount, { color: theme.primary }]}>
+                          K {Number(selectedOrder.totalAmount || 0).toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+  
+                    {/* Status Pipeline Buttons */}
+                    <View style={{ marginTop: 20 }}>
+                      <Text style={[styles.detailSectionHeading, { color: theme.mutedText, marginBottom: 8 }]}>
+                        UPDATE STATUS
+                      </Text>
+                      <View style={styles.statusButtonsGrid}>
+                        {[
+                          'Confirmed',
+                          'Preparing',
+                          'Ready',
+                          'Out for Delivery',
+                          'Delivered',
+                        ].map((st) => (
+                          <Button
+                            key={st}
+                            title={st}
+                            onPress={() => updateOrderStatus(selectedOrder.id, st)}
+                            variant={selectedOrder.orderStatus === st ? 'primary' : 'outline'}
+                            size="sm"
+                            style={{ marginBottom: 6 }}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  </>
+                ) : null}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+  
+        {/* Cancel Reason Modal */}
+        <Modal visible={!!cancellingOrder} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalDialog, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.dialogTitle, { color: theme.danger }]}>Cancel Order</Text>
+              <Text style={[styles.dialogSubtitle, { color: theme.mutedText }]}>
+                Enter a cancellation reason for order {cancellingOrder?.orderNumber}:
+              </Text>
+              <TextInput
+                value={cancelReason}
+                onChangeText={setCancelReason}
+                placeholder="e.g. Out of stock, customer requested"
+                placeholderTextColor={theme.mutedText}
+                style={[
+                  styles.dialogInput,
+                  { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text },
+                ]}
+              />
+              <View style={styles.dialogActions}>
+                <Button
+                  title="Keep Order"
+                  onPress={() => setCancellingOrder(null)}
+                  variant="ghost"
+                  size="md"
+                />
+                <Button
+                  title={submittingCancel ? 'Cancelling...' : 'Confirm Cancel'}
+                  onPress={handleConfirmCancel}
+                  loading={submittingCancel}
+                  variant="danger"
                   size="md"
                 />
               </View>
-
-              <View style={[styles.customerInfoBlock, { backgroundColor: theme.surfaceMuted }]}>
-                <Text style={[styles.customerName, { color: theme.text }]}>
-                  {item.customerName || 'Customer'}
-                </Text>
-                {item.customerPhone ? (
-                  <View style={styles.detailRow}>
-                    <Phone size={13} color={theme.mutedText} />
-                    <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                      {item.customerPhone}
-                    </Text>
-                  </View>
-                ) : null}
-                <View style={styles.detailRow}>
-                  <Truck size={13} color={theme.mutedText} />
-                  <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                    {item.deliveryMethod === 'delivery'
-                      ? `Delivery (${item.deliveryAddress || 'Address on file'})`
-                      : 'Store Pickup'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.cardBottomRow}>
-                <Text style={[styles.orderTotal, { color: theme.primary }]}>
-                  Total: K {totalAmount.toFixed(2)}
-                </Text>
-                <View style={styles.actionsCluster}>
-                  {action ? (
-                    <Button
-                      title={action.label}
-                      onPress={() => updateOrderStatus(item.id, action.next)}
-                      variant="primary"
-                      size="sm"
-                    />
-                  ) : null}
-                  {item.orderStatus !== 'Cancelled' && item.orderStatus !== 'Delivered' ? (
-                    <Pressable
-                      style={[styles.cancelBtn, { borderColor: theme.danger }]}
-                      onPress={() => {
-                        setCancellingOrder(item);
-                        setCancelReason('');
-                      }}
-                    >
-                      <Text style={[styles.cancelBtnText, { color: theme.danger }]}>Cancel</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </View>
-            </Pressable>
-          );
-        }}
-
-      />
-
-      {/* Order Details Modal */}
-      <Modal visible={!!selectedOrder} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <View>
-                <Text style={[styles.modalTitle, { color: theme.navigation }]}>
-                  {selectedOrder?.orderNumber}
-                </Text>
-                <Text style={[styles.modalSub, { color: theme.mutedText }]}>
-                  Customer Online Order Details
-                </Text>
-              </View>
-              <Pressable hitSlop={8} onPress={() => setSelectedOrder(null)}>
-                <X size={22} color={theme.mutedText} />
-              </Pressable>
-            </View>
-
-            <ScrollView style={{ marginTop: 12 }}>
-              {selectedOrder ? (
-                <>
-                  <View style={styles.detailSection}>
-                    <Text style={[styles.detailSectionHeading, { color: theme.mutedText }]}>
-                      CUSTOMER & FULFILLMENT
-                    </Text>
-                    <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
-                      Customer Name:{' '}
-                      <Text style={{ fontWeight: '700', color: theme.text }}>
-                        {selectedOrder.customerName}
-                      </Text>
-                    </Text>
-                    <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
-                      Phone:{' '}
-                      <Text style={{ fontWeight: '700', color: theme.text }}>
-                        {selectedOrder.customerPhone || 'N/A'}
-                      </Text>
-                    </Text>
-                    <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
-                      Method:{' '}
-                      <Text style={{ fontWeight: '700', color: theme.text }}>
-                        {selectedOrder.deliveryMethod === 'delivery' ? 'Home Delivery' : 'Pick Up'}
-                      </Text>
-                    </Text>
-                    {selectedOrder.deliveryAddress ? (
-                      <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
-                        Address:{' '}
-                        <Text style={{ fontWeight: '700', color: theme.text }}>
-                          {selectedOrder.deliveryAddress}
-                        </Text>
-                      </Text>
-                    ) : null}
-                    {selectedOrder.notes ? (
-                      <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>
-                        Notes:{' '}
-                        <Text style={{ fontStyle: 'italic', color: theme.text }}>
-                          {selectedOrder.notes}
-                        </Text>
-                      </Text>
-                    ) : null}
-                  </View>
-
-                  <View style={[styles.detailSection, { marginTop: 14 }]}>
-                    <Text style={[styles.detailSectionHeading, { color: theme.mutedText }]}>
-                      ORDER ITEMS
-                    </Text>
-                    {(selectedOrder.items || selectedOrder.OrderItems || []).map(
-                      (item: any, idx: number) => (
-                        <View
-                          key={idx}
-                          style={[styles.itemLine, { borderBottomColor: theme.borderLight }]}
-                        >
-                          <Text style={[styles.itemLineName, { color: theme.text }]}>
-                            {item.name || item.Medicine?.name || 'Item'} × {item.quantity}
-                          </Text>
-                          <Text style={[styles.itemLinePrice, { color: theme.text }]}>
-                            K {Number(item.price || item.totalPrice || 0).toFixed(2)}
-                          </Text>
-                        </View>
-                      )
-                    )}
-                    <View style={styles.summaryTotalRow}>
-                      <Text style={[styles.totalLabel, { color: theme.text }]}>Total Amount:</Text>
-                      <Text style={[styles.totalAmount, { color: theme.primary }]}>
-                        K {Number(selectedOrder.totalAmount || 0).toFixed(2)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Status Pipeline Buttons */}
-                  <View style={{ marginTop: 20 }}>
-                    <Text style={[styles.detailSectionHeading, { color: theme.mutedText, marginBottom: 8 }]}>
-                      UPDATE STATUS
-                    </Text>
-                    <View style={styles.statusButtonsGrid}>
-                      {[
-                        'Confirmed',
-                        'Preparing',
-                        'Ready',
-                        'Out for Delivery',
-                        'Delivered',
-                      ].map((st) => (
-                        <Button
-                          key={st}
-                          title={st}
-                          onPress={() => updateOrderStatus(selectedOrder.id, st)}
-                          variant={selectedOrder.orderStatus === st ? 'primary' : 'outline'}
-                          size="sm"
-                          style={{ marginBottom: 6 }}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                </>
-              ) : null}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Cancel Reason Modal */}
-      <Modal visible={!!cancellingOrder} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalDialog, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.dialogTitle, { color: theme.danger }]}>Cancel Order</Text>
-            <Text style={[styles.dialogSubtitle, { color: theme.mutedText }]}>
-              Enter a cancellation reason for order {cancellingOrder?.orderNumber}:
-            </Text>
-            <TextInput
-              value={cancelReason}
-              onChangeText={setCancelReason}
-              placeholder="e.g. Out of stock, customer requested"
-              placeholderTextColor={theme.mutedText}
-              style={[
-                styles.dialogInput,
-                { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text },
-              ]}
-            />
-            <View style={styles.dialogActions}>
-              <Button
-                title="Keep Order"
-                onPress={() => setCancellingOrder(null)}
-                variant="ghost"
-                size="md"
-              />
-              <Button
-                title={submittingCancel ? 'Cancelling...' : 'Confirm Cancel'}
-                onPress={handleConfirmCancel}
-                loading={submittingCancel}
-                variant="danger"
-                size="md"
-              />
             </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </RoleGuard>
   );
 }
 

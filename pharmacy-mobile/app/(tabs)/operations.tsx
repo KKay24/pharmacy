@@ -33,7 +33,7 @@ import apiClient from '@/api/client';
 import { Badge } from '@/components/ui/Badge';
 
 export default function OperationsScreen() {
-  const { user } = useAuth();
+  const { user, canAccess } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
 
@@ -91,20 +91,16 @@ export default function OperationsScreen() {
     );
   }
 
-  const isAdmin = user.role === 'admin';
-  const isManagerOrAdmin = user.role === 'admin' || user.role === 'manager';
+  // Role label shown in the banner
+  const roleLabel =
+    user.role === 'admin'
+      ? 'Administrator'
+      : user.role === 'manager'
+      ? 'Manager'
+      : 'Staff';
 
   const modules = [
-    {
-      id: 'dashboard',
-      title: 'Dashboard & KPIs',
-      subtitle: 'Stock health, alerts & predictive analytics',
-      icon: LayoutDashboard,
-      color: theme.primary,
-      bgColor: theme.primarySoft,
-      route: '/dashboard',
-      visible: isManagerOrAdmin,
-    },
+    // ── Staff + Manager + Admin ──────────────────────────────────────────
     {
       id: 'pos',
       title: 'Point of Sale (POS)',
@@ -113,49 +109,87 @@ export default function OperationsScreen() {
       color: '#10b981',
       bgColor: '#ecfdf5',
       route: '/(tabs)/pos',
-      visible: true,
+      badge: undefined as string | undefined,
+      visible: canAccess('pos'),
     },
     {
       id: 'orders',
-      title: 'Online Orders',
-      subtitle: 'Review & update fulfillment progress',
+      title: 'Online Order Management',
+      subtitle: 'Review & update online order fulfilment',
       icon: ClipboardList,
       color: '#ff6b35',
       bgColor: '#fff3ee',
       route: '/orders',
       badge: pendingOrdersCount > 0 ? `${pendingOrdersCount} Placed` : undefined,
-      visible: true,
+      visible: canAccess('orders'),
     },
     {
       id: 'support',
-      title: 'Support Center',
-      subtitle: 'Respond to customer inquiries & issues',
+      title: 'Pharmacy Support Inquiries',
+      subtitle: 'Respond to customer inquiries & support tickets',
       icon: Headset,
       color: '#3b82f6',
       bgColor: '#eff6ff',
       route: '/support-center',
       badge: newInquiriesCount > 0 ? `${newInquiriesCount} New` : undefined,
-      visible: true,
+      visible: canAccess('support-center'),
     },
     {
       id: 'inventory',
-      title: 'Inventory Control',
-      subtitle: 'Medicine availability, batches & shelves',
+      title: 'Stock Control & Batches',
+      subtitle: 'Medicine availability, batches & shelf management',
       icon: Boxes,
       color: theme.primary,
       bgColor: theme.primarySoft,
       route: '/(tabs)/inventory',
-      visible: isManagerOrAdmin,
+      badge: undefined as string | undefined,
+      visible: canAccess('inventory'),
+    },
+
+    // ── Manager + Admin ──────────────────────────────────────────────────
+    {
+      id: 'dashboard',
+      title: 'Dashboard & KPIs',
+      subtitle: 'Stock health, alerts & predictive analytics',
+      icon: LayoutDashboard,
+      color: theme.primary,
+      bgColor: theme.primarySoft,
+      route: '/dashboard',
+      badge: undefined as string | undefined,
+      visible: canAccess('dashboard'),
     },
     {
       id: 'add-stock',
-      title: 'Add Stock / Restock',
+      title: 'Restock / Add Stock',
       subtitle: 'Receive batches, update costs & prices',
       icon: PackagePlus,
       color: '#10b981',
       bgColor: '#ecfdf5',
       route: '/add-stock',
-      visible: isManagerOrAdmin,
+      badge: undefined as string | undefined,
+      visible: canAccess('add-stock'),
+    },
+    {
+      id: 'customers',
+      title: 'Patients Hub',
+      subtitle: 'Medical history, allergies & loyalty points',
+      icon: Heart,
+      color: '#ef4444',
+      bgColor: '#fef2f2',
+      route: '/customers',
+      badge: undefined as string | undefined,
+      visible: canAccess('customers'),
+    },
+    {
+      id: 'suppliers',
+      title: 'Suppliers Management',
+      subtitle: 'Procurement partners, orders & balances',
+      icon: Truck,
+      color: '#f59e0b',
+      bgColor: '#fffbeb',
+      route: '/suppliers',
+      badge: undefined as string | undefined,
+      visible: canAccess('suppliers'),
     },
     {
       id: 'prescriptions',
@@ -165,47 +199,8 @@ export default function OperationsScreen() {
       color: '#8b5cf6',
       bgColor: '#f5f3ff',
       route: '/prescriptions',
-      visible: isManagerOrAdmin,
-    },
-    {
-      id: 'profit-loss',
-      title: 'Profit & Loss',
-      subtitle: 'Monthly revenue, COGS, margins & profit',
-      icon: TrendingUp,
-      color: '#10b981',
-      bgColor: '#ecfdf5',
-      route: '/profit-loss',
-      visible: isAdmin,
-    },
-    {
-      id: 'reports',
-      title: 'Reports & Analytics',
-      subtitle: 'Sales ledger, top items & payment trends',
-      icon: PieChart,
-      color: '#3b82f6',
-      bgColor: '#eff6ff',
-      route: '/reports',
-      visible: isAdmin,
-    },
-    {
-      id: 'customers',
-      title: 'Patient & Customer Hub',
-      subtitle: 'Medical history, allergies & loyalty points',
-      icon: Heart,
-      color: '#ef4444',
-      bgColor: '#fef2f2',
-      route: '/customers',
-      visible: isManagerOrAdmin,
-    },
-    {
-      id: 'suppliers',
-      title: 'Supplier Management',
-      subtitle: 'Procurement partners, orders & balances',
-      icon: Truck,
-      color: '#f59e0b',
-      bgColor: '#fffbeb',
-      route: '/suppliers',
-      visible: isManagerOrAdmin,
+      badge: undefined as string | undefined,
+      visible: canAccess('prescriptions'),
     },
     {
       id: 'expenses',
@@ -215,19 +210,46 @@ export default function OperationsScreen() {
       color: '#8b5cf6',
       bgColor: '#f5f3ff',
       route: '/expenses',
-      visible: isManagerOrAdmin,
+      badge: undefined as string | undefined,
+      visible: canAccess('expenses'),
+    },
+
+    // ── Admin only ───────────────────────────────────────────────────────
+    {
+      id: 'profit-loss',
+      title: 'Profit & Loss',
+      subtitle: 'Monthly revenue, COGS, margins & profit',
+      icon: TrendingUp,
+      color: '#10b981',
+      bgColor: '#ecfdf5',
+      route: '/profit-loss',
+      badge: undefined as string | undefined,
+      visible: canAccess('profit-loss'),
+    },
+    {
+      id: 'reports',
+      title: 'Reports & Analytics',
+      subtitle: 'Sales ledger, top items & payment trends',
+      icon: PieChart,
+      color: '#3b82f6',
+      bgColor: '#eff6ff',
+      route: '/reports',
+      badge: undefined as string | undefined,
+      visible: canAccess('reports'),
     },
     {
       id: 'team',
-      title: 'Team Administration & HR',
+      title: 'Team & HR Administration',
       subtitle: 'Manage staff accounts, roles & credentials',
       icon: UserPlus,
       color: theme.navigation,
       bgColor: theme.surfaceMuted,
       route: '/team',
-      visible: isAdmin,
+      badge: undefined as string | undefined,
+      visible: canAccess('team'),
     },
   ];
+
 
   return (
     <ScrollView
@@ -259,8 +281,9 @@ export default function OperationsScreen() {
             </Text>
             <Text style={[styles.bannerStaff, { color: theme.textSecondary }]}>
               Signed in as{' '}
-              <Text style={{ fontWeight: '800', color: theme.text }}>{user.username}</Text> (
-              {user.role?.toUpperCase()})
+              <Text style={{ fontWeight: '800', color: theme.text }}>{user.username}</Text> —{' '}
+              {roleLabel}
+
             </Text>
           </View>
         </View>

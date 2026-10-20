@@ -34,6 +34,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 const STATUS_TABS = [
   'All',
@@ -159,233 +160,235 @@ export default function PrescriptionsScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Top Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={styles.topRow}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-            <ArrowLeft size={22} color={theme.text} />
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-              Prescription Management
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-              Fill orders, track patient records & dispensary queue
-            </Text>
+    <RoleGuard page="prescriptions">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Top Header */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.topRow}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+              <ArrowLeft size={22} color={theme.text} />
+            </Pressable>
+            <View style={styles.headerTitleWrap}>
+              <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+                Prescription Management
+              </Text>
+              <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+                Fill orders, track patient records & dispensary queue
+              </Text>
+            </View>
+            <Button
+              title="New Rx"
+              onPress={() => setShowAddModal(true)}
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={16} color="#ffffff" />}
+            />
           </View>
-          <Button
-            title="New Rx"
-            onPress={() => setShowAddModal(true)}
-            variant="primary"
-            size="sm"
-            leftIcon={<Plus size={16} color="#ffffff" />}
+  
+          <SearchInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by patient, medicine, prescriber..."
+            style={{ marginTop: 8 }}
           />
-        </View>
-
-        <SearchInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by patient, medicine, prescriber..."
-          style={{ marginTop: 8 }}
-        />
-
-        {/* Status Scroll */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statusScroll}
-        >
-          {STATUS_TABS.map((status) => {
-            const active = activeTab === status;
-            return (
-              <Pressable
-                key={status}
-                accessibilityRole="button"
-                onPress={() => setActiveTab(status)}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: active ? theme.navigation : theme.surfaceMuted,
-                    borderColor: active ? theme.navigation : theme.border,
-                  },
-                ]}
-              >
-                <Text
+  
+          {/* Status Scroll */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.statusScroll}
+          >
+            {STATUS_TABS.map((status) => {
+              const active = activeTab === status;
+              return (
+                <Pressable
+                  key={status}
+                  accessibilityRole="button"
+                  onPress={() => setActiveTab(status)}
                   style={[
-                    styles.filterChipText,
-                    { color: active ? '#ffffff' : theme.textSecondary },
+                    styles.filterChip,
+                    {
+                      backgroundColor: active ? theme.navigation : theme.surfaceMuted,
+                      borderColor: active ? theme.navigation : theme.border,
+                    },
                   ]}
                 >
-                  {status}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Prescriptions List */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadPrescriptions();
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        renderItem={({ item }) => (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.cardTopRow}>
-              <View>
-                <Text style={[styles.patientName, { color: theme.text }]}>{item.patientName}</Text>
-                <Text style={[styles.prescriberText, { color: theme.mutedText }]}>
-                  Rx from {item.prescriber || 'Doctor'}
-                </Text>
-              </View>
-              <Badge
-                label={item.status || 'Pending'}
-                variant={getStatusBadgeVariant(item.status)}
-                size="md"
-              />
-            </View>
-
-            <View style={[styles.medicationBox, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderLight }]}>
-              <Text style={[styles.medicationHeading, { color: theme.mutedText }]}>
-                PRESCRIBED MEDICATIONS
-              </Text>
-              <Text style={[styles.medicationBody, { color: theme.text }]}>
-                {item.medications}
-              </Text>
-            </View>
-
-            <View style={styles.metaRow}>
-              <View style={styles.metaCol}>
-                <Text style={[styles.metaLabel, { color: theme.mutedText }]}>Insurance</Text>
-                <Text style={[styles.metaValue, { color: theme.textSecondary }]}>
-                  {item.insurance || 'Self-Pay'}
-                </Text>
-              </View>
-              <View style={styles.metaCol}>
-                <Text style={[styles.metaLabel, { color: theme.mutedText }]}>Due Date</Text>
-                <Text style={[styles.metaValue, { color: theme.textSecondary }]}>
-                  {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'Today'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Quick Status Action Buttons */}
-            <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
-              {item.status !== 'Filled' ? (
-                <Button
-                  title="Mark Filled"
-                  onPress={() => handleUpdateStatus(item.id, 'Filled')}
-                  variant="outline"
-                  size="sm"
-                />
-              ) : null}
-              {item.status !== 'Ready for Pickup' ? (
-                <Button
-                  title="Ready for Pickup"
-                  onPress={() => handleUpdateStatus(item.id, 'Ready for Pickup')}
-                  variant="primary"
-                  size="sm"
-                />
-              ) : null}
-              {item.status !== 'On Hold' ? (
-                <Button
-                  title="Hold"
-                  onPress={() => handleUpdateStatus(item.id, 'On Hold')}
-                  variant="ghost"
-                  size="sm"
-                />
-              ) : null}
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon={<FileText size={32} color={theme.mutedText} />}
-              title="No prescriptions in this queue"
-              description="Prescriptions uploaded by patients or added by staff will appear here."
-            />
-          ) : null
-        }
-      />
-
-      {/* Add Prescription Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.navigation }]}>
-                New Prescription Fill
-              </Text>
-              <Pressable hitSlop={8} onPress={() => setShowAddModal(false)}>
-                <X size={20} color={theme.mutedText} />
-              </Pressable>
-            </View>
-
-            <ScrollView style={{ marginTop: 12 }}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Patient Full Name *</Text>
-              <TextInput
-                value={patientName}
-                onChangeText={setPatientName}
-                placeholder="e.g. Chileshe Mumba"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Prescribed Medications *</Text>
-              <TextInput
-                value={medications}
-                onChangeText={setMedications}
-                placeholder="e.g. Amoxicillin 500mg capsules, Paracetamol 500mg"
-                placeholderTextColor={theme.mutedText}
-                multiline
-                numberOfLines={3}
-                style={[styles.inputMulti, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Prescriber / Doctor</Text>
-              <TextInput
-                value={prescriber}
-                onChangeText={setPrescriber}
-                placeholder="Dr. Name or Hospital"
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Insurance / Scheme</Text>
-              <TextInput
-                value={insurance}
-                onChangeText={setInsurance}
-                placeholder="Self-Pay, NHIMA, Madison, etc."
-                placeholderTextColor={theme.mutedText}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <View style={{ marginTop: 16 }}>
-                <Button
-                  title={submitting ? 'Creating...' : 'Add to Dispensary Queue'}
-                  onPress={handleCreatePrescription}
-                  loading={submitting}
-                  variant="primary"
-                  fullWidth
-                />
-              </View>
-            </ScrollView>
-          </View>
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: active ? '#ffffff' : theme.textSecondary },
+                    ]}
+                  >
+                    {status}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
-      </Modal>
-    </View>
+  
+        {/* Prescriptions List */}
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadPrescriptions();
+              }}
+              tintColor={theme.primary}
+            />
+          }
+          renderItem={({ item }) => (
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={styles.cardTopRow}>
+                <View>
+                  <Text style={[styles.patientName, { color: theme.text }]}>{item.patientName}</Text>
+                  <Text style={[styles.prescriberText, { color: theme.mutedText }]}>
+                    Rx from {item.prescriber || 'Doctor'}
+                  </Text>
+                </View>
+                <Badge
+                  label={item.status || 'Pending'}
+                  variant={getStatusBadgeVariant(item.status)}
+                  size="md"
+                />
+              </View>
+  
+              <View style={[styles.medicationBox, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderLight }]}>
+                <Text style={[styles.medicationHeading, { color: theme.mutedText }]}>
+                  PRESCRIBED MEDICATIONS
+                </Text>
+                <Text style={[styles.medicationBody, { color: theme.text }]}>
+                  {item.medications}
+                </Text>
+              </View>
+  
+              <View style={styles.metaRow}>
+                <View style={styles.metaCol}>
+                  <Text style={[styles.metaLabel, { color: theme.mutedText }]}>Insurance</Text>
+                  <Text style={[styles.metaValue, { color: theme.textSecondary }]}>
+                    {item.insurance || 'Self-Pay'}
+                  </Text>
+                </View>
+                <View style={styles.metaCol}>
+                  <Text style={[styles.metaLabel, { color: theme.mutedText }]}>Due Date</Text>
+                  <Text style={[styles.metaValue, { color: theme.textSecondary }]}>
+                    {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'Today'}
+                  </Text>
+                </View>
+              </View>
+  
+              {/* Quick Status Action Buttons */}
+              <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
+                {item.status !== 'Filled' ? (
+                  <Button
+                    title="Mark Filled"
+                    onPress={() => handleUpdateStatus(item.id, 'Filled')}
+                    variant="outline"
+                    size="sm"
+                  />
+                ) : null}
+                {item.status !== 'Ready for Pickup' ? (
+                  <Button
+                    title="Ready for Pickup"
+                    onPress={() => handleUpdateStatus(item.id, 'Ready for Pickup')}
+                    variant="primary"
+                    size="sm"
+                  />
+                ) : null}
+                {item.status !== 'On Hold' ? (
+                  <Button
+                    title="Hold"
+                    onPress={() => handleUpdateStatus(item.id, 'On Hold')}
+                    variant="ghost"
+                    size="sm"
+                  />
+                ) : null}
+              </View>
+            </View>
+          )}
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon={<FileText size={32} color={theme.mutedText} />}
+                title="No prescriptions in this queue"
+                description="Prescriptions uploaded by patients or added by staff will appear here."
+              />
+            ) : null
+          }
+        />
+  
+        {/* Add Prescription Modal */}
+        <Modal visible={showAddModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                <Text style={[styles.modalTitle, { color: theme.navigation }]}>
+                  New Prescription Fill
+                </Text>
+                <Pressable hitSlop={8} onPress={() => setShowAddModal(false)}>
+                  <X size={20} color={theme.mutedText} />
+                </Pressable>
+              </View>
+  
+              <ScrollView style={{ marginTop: 12 }}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Patient Full Name *</Text>
+                <TextInput
+                  value={patientName}
+                  onChangeText={setPatientName}
+                  placeholder="e.g. Chileshe Mumba"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Prescribed Medications *</Text>
+                <TextInput
+                  value={medications}
+                  onChangeText={setMedications}
+                  placeholder="e.g. Amoxicillin 500mg capsules, Paracetamol 500mg"
+                  placeholderTextColor={theme.mutedText}
+                  multiline
+                  numberOfLines={3}
+                  style={[styles.inputMulti, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Prescriber / Doctor</Text>
+                <TextInput
+                  value={prescriber}
+                  onChangeText={setPrescriber}
+                  placeholder="Dr. Name or Hospital"
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Insurance / Scheme</Text>
+                <TextInput
+                  value={insurance}
+                  onChangeText={setInsurance}
+                  placeholder="Self-Pay, NHIMA, Madison, etc."
+                  placeholderTextColor={theme.mutedText}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <View style={{ marginTop: 16 }}>
+                  <Button
+                    title={submitting ? 'Creating...' : 'Add to Dispensary Queue'}
+                    onPress={handleCreatePrescription}
+                    loading={submitting}
+                    variant="primary"
+                    fullWidth
+                  />
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </RoleGuard>
   );
 }
 

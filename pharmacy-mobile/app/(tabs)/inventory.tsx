@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getMedicineBatches, getMedicineCurrentPrice, getMedicineTotalQuantity } from '@/utils/inventory';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 interface Batch {
   id?: number;
@@ -295,301 +296,303 @@ export default function InventoryScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Top Header & Search */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={styles.topRow}>
-          <View>
-            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-              Inventory Control
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-              {stats.total} medicines · {stats.lowStock} low stock · {stats.outOfStock} out
-            </Text>
+    <RoleGuard page="inventory">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Top Header & Search */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.topRow}>
+            <View>
+              <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+                Inventory Control
+              </Text>
+              <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+                {stats.total} medicines · {stats.lowStock} low stock · {stats.outOfStock} out
+              </Text>
+            </View>
+            <Button
+              title="Add Stock"
+              onPress={() => router.push('/add-stock' as any)}
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={16} color="#ffffff" />}
+            />
           </View>
-          <Button
-            title="Add Stock"
-            onPress={() => router.push('/add-stock' as any)}
-            variant="primary"
-            size="sm"
-            leftIcon={<Plus size={16} color="#ffffff" />}
+  
+          <SearchInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by brand, generic, strength..."
+            style={{ marginTop: 8 }}
           />
-        </View>
-
-        <SearchInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by brand, generic, strength..."
-          style={{ marginTop: 8 }}
-        />
-
-        {/* Categories Bar */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          <Pressable
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor: selectedCategoryId === null ? theme.primary : theme.surfaceMuted,
-                borderColor: selectedCategoryId === null ? theme.primary : theme.border,
-              },
-            ]}
-            onPress={() => setSelectedCategoryId(null)}
-          >
-            <Text
+  
+          {/* Categories Bar */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+            <Pressable
               style={[
-                styles.filterChipText,
-                { color: selectedCategoryId === null ? '#ffffff' : theme.textSecondary },
+                styles.filterChip,
+                {
+                  backgroundColor: selectedCategoryId === null ? theme.primary : theme.surfaceMuted,
+                  borderColor: selectedCategoryId === null ? theme.primary : theme.border,
+                },
               ]}
+              onPress={() => setSelectedCategoryId(null)}
             >
-              All Categories
-            </Text>
-          </Pressable>
-          {categories.map((c) => {
-            const active = selectedCategoryId === c.id;
-            return (
-              <Pressable
-                key={c.id}
+              <Text
                 style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: active ? theme.primary : theme.surfaceMuted,
-                    borderColor: active ? theme.primary : theme.border,
-                  },
+                  styles.filterChipText,
+                  { color: selectedCategoryId === null ? '#ffffff' : theme.textSecondary },
                 ]}
-                onPress={() => setSelectedCategoryId(active ? null : c.id)}
               >
-                <Text
+                All Categories
+              </Text>
+            </Pressable>
+            {categories.map((c) => {
+              const active = selectedCategoryId === c.id;
+              return (
+                <Pressable
+                  key={c.id}
                   style={[
-                    styles.filterChipText,
-                    { color: active ? '#ffffff' : theme.textSecondary },
+                    styles.filterChip,
+                    {
+                      backgroundColor: active ? theme.primary : theme.surfaceMuted,
+                      borderColor: active ? theme.primary : theme.border,
+                    },
                   ]}
+                  onPress={() => setSelectedCategoryId(active ? null : c.id)}
                 >
-                  {c.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {/* Stock Status Pills */}
-        <View style={styles.statusFilters}>
-          {(['all', 'in', 'low', 'out'] as const).map((s) => {
-            const active = stockStatusFilter === s;
-            const labels = { all: 'All', in: 'In Stock', low: `Low (${stats.lowStock})`, out: `Out (${stats.outOfStock})` };
-            return (
-              <Pressable
-                key={s}
-                style={[
-                  styles.statusPill,
-                  {
-                    backgroundColor: active ? theme.navigation : theme.surfaceMuted,
-                    borderColor: active ? theme.navigation : theme.borderLight,
-                  },
-                ]}
-                onPress={() => setStockStatusFilter(s)}
-              >
-                <Text
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: active ? '#ffffff' : theme.textSecondary },
+                    ]}
+                  >
+                    {c.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+  
+          {/* Stock Status Pills */}
+          <View style={styles.statusFilters}>
+            {(['all', 'in', 'low', 'out'] as const).map((s) => {
+              const active = stockStatusFilter === s;
+              const labels = { all: 'All', in: 'In Stock', low: `Low (${stats.lowStock})`, out: `Out (${stats.outOfStock})` };
+              return (
+                <Pressable
+                  key={s}
                   style={[
-                    styles.statusPillText,
-                    { color: active ? '#ffffff' : theme.mutedText },
+                    styles.statusPill,
+                    {
+                      backgroundColor: active ? theme.navigation : theme.surfaceMuted,
+                      borderColor: active ? theme.navigation : theme.borderLight,
+                    },
                   ]}
+                  onPress={() => setStockStatusFilter(s)}
                 >
-                  {labels[s]}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      { color: active ? '#ffffff' : theme.mutedText },
+                    ]}
+                  >
+                    {labels[s]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
-      </View>
-
-      {/* Medicines List */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadInventory();
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        renderItem={({ item }) => {
-          const isExpanded = expandedId === item.id;
-          const batches = item.Batches || [];
-          const outOfStock = item.totalQuantity <= 0;
-          const lowStock = !outOfStock && item.totalQuantity <= (item.lowStockThreshold || 10);
-
-          return (
-            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Pressable
-                style={styles.cardHeader}
-                onPress={() => setExpandedId(isExpanded ? null : item.id)}
-              >
-                <View style={styles.cardTitleBlock}>
-                  <View style={styles.nameRow}>
-                    <Text style={[styles.medName, { color: theme.text }]}>{item.name}</Text>
-                    {item.isCustomerVisible !== false ? (
-                      <Badge label="Store" variant="info" size="sm" />
-                    ) : null}
-                  </View>
-                  <Text style={[styles.medGeneric, { color: theme.mutedText }]}>
-                    {[item.genericName, item.strength || item.dosage].filter(Boolean).join(' · ') ||
-                      'Pharmacy Item'}
-                  </Text>
-                </View>
-
-                <View style={styles.cardRightCol}>
-                  <Text style={[styles.priceTag, { color: theme.navigation }]}>
-                    K {item.price.toFixed(2)}
-                  </Text>
-                  <View style={styles.stockStatusBadge}>
-                    {outOfStock ? (
-                      <Badge label="Out of Stock" variant="danger" size="sm" />
-                    ) : lowStock ? (
-                      <Badge label={`Low: ${item.totalQuantity}`} variant="warning" size="sm" />
-                    ) : (
-                      <Badge label={`In Stock: ${item.totalQuantity}`} variant="success" size="sm" />
-                    )}
-                  </View>
-                </View>
-              </Pressable>
-
-              {/* Expansion Details */}
-              {isExpanded ? (
-                <View style={[styles.expandedArea, { borderTopColor: theme.borderLight }]}>
-                  <View style={styles.batchSectionHeader}>
-                    <Text style={[styles.batchSectionTitle, { color: theme.textSecondary }]}>
-                      Batches & Shelf Details ({batches.length})
+  
+        {/* Medicines List */}
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadInventory();
+              }}
+              tintColor={theme.primary}
+            />
+          }
+          renderItem={({ item }) => {
+            const isExpanded = expandedId === item.id;
+            const batches = item.Batches || [];
+            const outOfStock = item.totalQuantity <= 0;
+            const lowStock = !outOfStock && item.totalQuantity <= (item.lowStockThreshold || 10);
+  
+            return (
+              <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Pressable
+                  style={styles.cardHeader}
+                  onPress={() => setExpandedId(isExpanded ? null : item.id)}
+                >
+                  <View style={styles.cardTitleBlock}>
+                    <View style={styles.nameRow}>
+                      <Text style={[styles.medName, { color: theme.text }]}>{item.name}</Text>
+                      {item.isCustomerVisible !== false ? (
+                        <Badge label="Store" variant="info" size="sm" />
+                      ) : null}
+                    </View>
+                    <Text style={[styles.medGeneric, { color: theme.mutedText }]}>
+                      {[item.genericName, item.strength || item.dosage].filter(Boolean).join(' · ') ||
+                        'Pharmacy Item'}
                     </Text>
-                    <View style={styles.itemActionButtons}>
-                      <Pressable
-                        style={[styles.smallActionBtn, { backgroundColor: theme.surfaceMuted }]}
-                        onPress={() => openEditModal(item)}
-                      >
-                        <Edit2 size={14} color={theme.text} />
-                        <Text style={[styles.smallActionText, { color: theme.text }]}>Edit</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.smallActionBtn, { backgroundColor: theme.dangerSoft }]}
-                        onPress={() => handleDelete(item)}
-                      >
-                        <Trash2 size={14} color={theme.danger} />
-                        <Text style={[styles.smallActionText, { color: theme.danger }]}>Delete</Text>
-                      </Pressable>
+                  </View>
+  
+                  <View style={styles.cardRightCol}>
+                    <Text style={[styles.priceTag, { color: theme.navigation }]}>
+                      K {item.price.toFixed(2)}
+                    </Text>
+                    <View style={styles.stockStatusBadge}>
+                      {outOfStock ? (
+                        <Badge label="Out of Stock" variant="danger" size="sm" />
+                      ) : lowStock ? (
+                        <Badge label={`Low: ${item.totalQuantity}`} variant="warning" size="sm" />
+                      ) : (
+                        <Badge label={`In Stock: ${item.totalQuantity}`} variant="success" size="sm" />
+                      )}
                     </View>
                   </View>
-
-                  {batches.length > 0 ? (
-                    batches.map((b, idx) => (
-                      <View
-                        key={idx}
-                        style={[styles.batchRow, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderLight }]}
-                      >
-                        <View style={styles.batchLeft}>
-                          <Text style={[styles.batchNumber, { color: theme.text }]}>
-                            Batch #{b.batchNumber || 'N/A'}
-                          </Text>
-                          <View style={styles.batchDates}>
-                            <Clock size={12} color={theme.mutedText} />
-                            <Text style={[styles.batchExpText, { color: theme.mutedText }]}>
-                              Exp: {b.expiryDate ? new Date(b.expiryDate).toLocaleDateString() : 'N/A'}
+                </Pressable>
+  
+                {/* Expansion Details */}
+                {isExpanded ? (
+                  <View style={[styles.expandedArea, { borderTopColor: theme.borderLight }]}>
+                    <View style={styles.batchSectionHeader}>
+                      <Text style={[styles.batchSectionTitle, { color: theme.textSecondary }]}>
+                        Batches & Shelf Details ({batches.length})
+                      </Text>
+                      <View style={styles.itemActionButtons}>
+                        <Pressable
+                          style={[styles.smallActionBtn, { backgroundColor: theme.surfaceMuted }]}
+                          onPress={() => openEditModal(item)}
+                        >
+                          <Edit2 size={14} color={theme.text} />
+                          <Text style={[styles.smallActionText, { color: theme.text }]}>Edit</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.smallActionBtn, { backgroundColor: theme.dangerSoft }]}
+                          onPress={() => handleDelete(item)}
+                        >
+                          <Trash2 size={14} color={theme.danger} />
+                          <Text style={[styles.smallActionText, { color: theme.danger }]}>Delete</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+  
+                    {batches.length > 0 ? (
+                      batches.map((b, idx) => (
+                        <View
+                          key={idx}
+                          style={[styles.batchRow, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderLight }]}
+                        >
+                          <View style={styles.batchLeft}>
+                            <Text style={[styles.batchNumber, { color: theme.text }]}>
+                              Batch #{b.batchNumber || 'N/A'}
                             </Text>
+                            <View style={styles.batchDates}>
+                              <Clock size={12} color={theme.mutedText} />
+                              <Text style={[styles.batchExpText, { color: theme.mutedText }]}>
+                                Exp: {b.expiryDate ? new Date(b.expiryDate).toLocaleDateString() : 'N/A'}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.batchRight}>
+                            <Text style={[styles.batchQty, { color: theme.navigation }]}>
+                              {b.quantity} units
+                            </Text>
+                            {b.sellingPrice ? (
+                              <Text style={[styles.batchPrice, { color: theme.mutedText }]}>
+                                K {Number(b.sellingPrice).toFixed(2)}
+                              </Text>
+                            ) : null}
                           </View>
                         </View>
-                        <View style={styles.batchRight}>
-                          <Text style={[styles.batchQty, { color: theme.navigation }]}>
-                            {b.quantity} units
-                          </Text>
-                          {b.sellingPrice ? (
-                            <Text style={[styles.batchPrice, { color: theme.mutedText }]}>
-                              K {Number(b.sellingPrice).toFixed(2)}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={[styles.noBatchesText, { color: theme.mutedText }]}>
-                      No active stock batches recorded for this medicine.
-                    </Text>
-                  )}
-                </View>
-              ) : null}
-            </View>
-          );
-        }}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon={<Boxes size={32} color={theme.mutedText} />}
-              title="No medicines match filters"
-              description="Clear filters or tap 'Add Stock' to record new batches."
-            />
-          ) : null
-        }
-      />
-
-      {/* Edit Modal */}
-      <Modal visible={!!editingItem} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.modalSheetTitle, { color: theme.text }]}>
-                Edit Medicine Details
-              </Text>
-              <Pressable hitSlop={8} onPress={() => setEditingItem(null)}>
-                <X size={20} color={theme.mutedText} />
-              </Pressable>
-            </View>
-
-            <ScrollView style={{ marginTop: 12 }}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Medicine Name</Text>
-              <TextInput
-                value={editName}
-                onChangeText={setEditName}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Generic Name</Text>
-              <TextInput
-                value={editGeneric}
-                onChangeText={setEditGeneric}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Strength / Dosage</Text>
-              <TextInput
-                value={editStrength}
-                onChangeText={setEditStrength}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Low Stock Alert Threshold</Text>
-              <TextInput
-                value={editThreshold}
-                onChangeText={setEditThreshold}
-                keyboardType="numeric"
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
-              />
-
-              <View style={{ marginTop: 16 }}>
-                <Button
-                  title={savingEdit ? 'Saving...' : 'Save Changes'}
-                  onPress={handleSaveEdit}
-                  loading={savingEdit}
-                  variant="primary"
-                  fullWidth
-                />
+                      ))
+                    ) : (
+                      <Text style={[styles.noBatchesText, { color: theme.mutedText }]}>
+                        No active stock batches recorded for this medicine.
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
               </View>
-            </ScrollView>
+            );
+          }}
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon={<Boxes size={32} color={theme.mutedText} />}
+                title="No medicines match filters"
+                description="Clear filters or tap 'Add Stock' to record new batches."
+              />
+            ) : null
+          }
+        />
+  
+        {/* Edit Modal */}
+        <Modal visible={!!editingItem} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                <Text style={[styles.modalSheetTitle, { color: theme.text }]}>
+                  Edit Medicine Details
+                </Text>
+                <Pressable hitSlop={8} onPress={() => setEditingItem(null)}>
+                  <X size={20} color={theme.mutedText} />
+                </Pressable>
+              </View>
+  
+              <ScrollView style={{ marginTop: 12 }}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Medicine Name</Text>
+                <TextInput
+                  value={editName}
+                  onChangeText={setEditName}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Generic Name</Text>
+                <TextInput
+                  value={editGeneric}
+                  onChangeText={setEditGeneric}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Strength / Dosage</Text>
+                <TextInput
+                  value={editStrength}
+                  onChangeText={setEditStrength}
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Low Stock Alert Threshold</Text>
+                <TextInput
+                  value={editThreshold}
+                  onChangeText={setEditThreshold}
+                  keyboardType="numeric"
+                  style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
+                />
+  
+                <View style={{ marginTop: 16 }}>
+                  <Button
+                    title={savingEdit ? 'Saving...' : 'Save Changes'}
+                    onPress={handleSaveEdit}
+                    loading={savingEdit}
+                    variant="primary"
+                    fullWidth
+                  />
+                </View>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </RoleGuard>
   );
 }
 

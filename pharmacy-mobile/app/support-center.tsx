@@ -30,6 +30,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 const INQUIRY_STATUSES = ['All', 'New', 'Contacted', 'Resolved'] as const;
 
@@ -115,178 +116,180 @@ export default function SupportCenterScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Top Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={styles.topRow}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-            <ArrowLeft size={22} color={theme.text} />
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-              Support Center
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-              Customer inquiries & message follow-ups
-            </Text>
-          </View>
-        </View>
-
-        <SearchInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by name, phone, email, message..."
-          style={{ marginTop: 8 }}
-        />
-
-        {/* Status Filter Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statusScroll}
-        >
-          {INQUIRY_STATUSES.map((status) => {
-            const active = statusFilter === status;
-            return (
-              <Pressable
-                key={status}
-                accessibilityRole="button"
-                onPress={() => setStatusFilter(status)}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: active ? theme.navigation : theme.surfaceMuted,
-                    borderColor: active ? theme.navigation : theme.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: active ? '#ffffff' : theme.textSecondary },
-                  ]}
-                >
-                  {status}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Inquiry Cards List */}
-      <FlatList
-        data={filteredInquiries}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadInquiries();
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        renderItem={({ item }) => (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.cardTopRow}>
-              <View>
-                <Text style={[styles.customerName, { color: theme.text }]}>{item.name}</Text>
-                <Text style={[styles.inquiryDate, { color: theme.mutedText }]}>
-                  {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'N/A'}
-                </Text>
-              </View>
-              <Badge
-                label={item.status}
-                variant={getStatusBadgeVariant(item.status)}
-                size="md"
-              />
-            </View>
-
-            {item.inquiryType ? (
-              <View style={styles.typeRow}>
-                <Badge label={item.inquiryType} variant="info" size="sm" />
-              </View>
-            ) : null}
-
-            {/* Message Body */}
-            <View style={[styles.messageBox, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderLight }]}>
-              <Text style={[styles.messageText, { color: theme.text }]}>
-                "{item.message}"
+    <RoleGuard page="support-center">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Top Header */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.topRow}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+              <ArrowLeft size={22} color={theme.text} />
+            </Pressable>
+            <View style={styles.headerTitleWrap}>
+              <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+                Support Center
+              </Text>
+              <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+                Customer inquiries & message follow-ups
               </Text>
             </View>
-
-            {/* Contact Details & Direct Actions */}
-            <View style={styles.contactRow}>
-              {item.phone ? (
+          </View>
+  
+          <SearchInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by name, phone, email, message..."
+            style={{ marginTop: 8 }}
+          />
+  
+          {/* Status Filter Tabs */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.statusScroll}
+          >
+            {INQUIRY_STATUSES.map((status) => {
+              const active = statusFilter === status;
+              return (
                 <Pressable
-                  style={[styles.contactButton, { backgroundColor: theme.primarySoft }]}
-                  onPress={() => handleCall(item.phone)}
+                  key={status}
+                  accessibilityRole="button"
+                  onPress={() => setStatusFilter(status)}
+                  style={[
+                    styles.filterChip,
+                    {
+                      backgroundColor: active ? theme.navigation : theme.surfaceMuted,
+                      borderColor: active ? theme.navigation : theme.border,
+                    },
+                  ]}
                 >
-                  <Phone size={14} color={theme.primary} />
-                  <Text style={[styles.contactButtonText, { color: theme.primary }]}>
-                    Call {item.phone}
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: active ? '#ffffff' : theme.textSecondary },
+                    ]}
+                  >
+                    {status}
                   </Text>
                 </Pressable>
-              ) : null}
-
-              {item.email ? (
-                <Pressable
-                  style={[styles.contactButton, { backgroundColor: theme.surfaceMuted }]}
-                  onPress={() => handleEmail(item.email)}
-                >
-                  <Mail size={14} color={theme.textSecondary} />
-                  <Text style={[styles.contactButtonText, { color: theme.textSecondary }]}>
-                    Email
+              );
+            })}
+          </ScrollView>
+        </View>
+  
+        {/* Inquiry Cards List */}
+        <FlatList
+          data={filteredInquiries}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadInquiries();
+              }}
+              tintColor={theme.primary}
+            />
+          }
+          renderItem={({ item }) => (
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={styles.cardTopRow}>
+                <View>
+                  <Text style={[styles.customerName, { color: theme.text }]}>{item.name}</Text>
+                  <Text style={[styles.inquiryDate, { color: theme.mutedText }]}>
+                    {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'N/A'}
                   </Text>
-                </Pressable>
+                </View>
+                <Badge
+                  label={item.status}
+                  variant={getStatusBadgeVariant(item.status)}
+                  size="md"
+                />
+              </View>
+  
+              {item.inquiryType ? (
+                <View style={styles.typeRow}>
+                  <Badge label={item.inquiryType} variant="info" size="sm" />
+                </View>
               ) : null}
-            </View>
-
-            {/* Status Update Pipeline */}
-            <View style={[styles.statusUpdateRow, { borderTopColor: theme.borderLight }]}>
-              <Text style={[styles.updateLabel, { color: theme.mutedText }]}>Update Status:</Text>
-              <View style={styles.statusButtonsWrap}>
-                {item.status !== 'Contacted' ? (
-                  <Button
-                    title="Mark Contacted"
-                    onPress={() => updateStatus(item.id, 'Contacted')}
-                    variant="outline"
-                    size="sm"
-                  />
+  
+              {/* Message Body */}
+              <View style={[styles.messageBox, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderLight }]}>
+                <Text style={[styles.messageText, { color: theme.text }]}>
+                  "{item.message}"
+                </Text>
+              </View>
+  
+              {/* Contact Details & Direct Actions */}
+              <View style={styles.contactRow}>
+                {item.phone ? (
+                  <Pressable
+                    style={[styles.contactButton, { backgroundColor: theme.primarySoft }]}
+                    onPress={() => handleCall(item.phone)}
+                  >
+                    <Phone size={14} color={theme.primary} />
+                    <Text style={[styles.contactButtonText, { color: theme.primary }]}>
+                      Call {item.phone}
+                    </Text>
+                  </Pressable>
                 ) : null}
-                {item.status !== 'Resolved' ? (
-                  <Button
-                    title="Mark Resolved"
-                    onPress={() => updateStatus(item.id, 'Resolved')}
-                    variant="primary"
-                    size="sm"
-                  />
-                ) : (
-                  <Button
-                    title="Re-open"
-                    onPress={() => updateStatus(item.id, 'New')}
-                    variant="ghost"
-                    size="sm"
-                  />
-                )}
+  
+                {item.email ? (
+                  <Pressable
+                    style={[styles.contactButton, { backgroundColor: theme.surfaceMuted }]}
+                    onPress={() => handleEmail(item.email)}
+                  >
+                    <Mail size={14} color={theme.textSecondary} />
+                    <Text style={[styles.contactButtonText, { color: theme.textSecondary }]}>
+                      Email
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+  
+              {/* Status Update Pipeline */}
+              <View style={[styles.statusUpdateRow, { borderTopColor: theme.borderLight }]}>
+                <Text style={[styles.updateLabel, { color: theme.mutedText }]}>Update Status:</Text>
+                <View style={styles.statusButtonsWrap}>
+                  {item.status !== 'Contacted' ? (
+                    <Button
+                      title="Mark Contacted"
+                      onPress={() => updateStatus(item.id, 'Contacted')}
+                      variant="outline"
+                      size="sm"
+                    />
+                  ) : null}
+                  {item.status !== 'Resolved' ? (
+                    <Button
+                      title="Mark Resolved"
+                      onPress={() => updateStatus(item.id, 'Resolved')}
+                      variant="primary"
+                      size="sm"
+                    />
+                  ) : (
+                    <Button
+                      title="Re-open"
+                      onPress={() => updateStatus(item.id, 'New')}
+                      variant="ghost"
+                      size="sm"
+                    />
+                  )}
+                </View>
               </View>
             </View>
-          </View>
-        )}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon={<Headset size={32} color={theme.mutedText} />}
-              title="No customer inquiries"
-              description="Inquiries submitted via the store contact form will appear here."
-            />
-          ) : null
-        }
-      />
-    </View>
+          )}
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon={<Headset size={32} color={theme.mutedText} />}
+                title="No customer inquiries"
+                description="Inquiries submitted via the store contact form will appear here."
+              />
+            ) : null
+          }
+        />
+      </View>
+    </RoleGuard>
   );
 }
 

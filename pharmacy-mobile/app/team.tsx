@@ -35,6 +35,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import SearchInput from '../components/ui/SearchInput';
 import EmptyState from '../components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 interface StaffUser {
   id: string | number;
@@ -178,342 +179,344 @@ export default function TeamScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
-      {/* Search & Actions Header */}
-      <View style={[styles.headerContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View style={styles.topRow}>
-          <SearchInput
-            placeholder="Search staff by username, email, role..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={styles.searchBar}
-          />
-          <TouchableOpacity
-            style={[styles.matrixBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
-            onPress={() => setShowMatrixModal(true)}
-            accessibilityLabel="View access matrix"
-          >
-            <Key size={20} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.actionRow}>
-          <Text style={[styles.countText, { color: colors.textMuted }]}>
-            {filteredUsers.length} active staff profiles
-          </Text>
-          <Button
-            title="Onboard Staff"
-            variant="primary"
-            size="sm"
-            leftIcon={<UserPlus size={15} color="#ffffff" />}
-            onPress={openAddModal}
-          />
-        </View>
-      </View>
-
-      {/* Staff List */}
-      {loading ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading team members...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredUsers}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          ListEmptyComponent={
-            <EmptyState
-              title="No Staff Profiles Found"
-              description="No staff profiles match your search criteria. Tap 'Onboard Staff' to add a new team member."
-              actionLabel="Onboard Staff"
-              onAction={openAddModal}
+    <RoleGuard page="team">
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+        {/* Search & Actions Header */}
+        <View style={[styles.headerContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <View style={styles.topRow}>
+            <SearchInput
+              placeholder="Search staff by username, email, role..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchBar}
             />
-          }
-          renderItem={({ item }) => {
-            const roleConf = ROLE_CONFIG[item.role] || ROLE_CONFIG.user;
-            const RoleIcon = roleConf.Icon;
-            return (
-              <Card style={styles.staffCard}>
-                <View style={styles.staffCardHeader}>
-                  <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
-                    <Text style={[styles.avatarText, { color: colors.primary }]}>
-                      {item.username.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.staffMainInfo}>
-                    <View style={styles.nameRow}>
-                      <Text style={[styles.staffName, { color: colors.text }]}>{item.username}</Text>
-                      <Badge
-                        label={roleConf.label}
-                        variant={roleConf.variant}
-                        size="sm"
-                        icon={<RoleIcon size={12} color={colors.primary} />}
-                      />
+            <TouchableOpacity
+              style={[styles.matrixBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+              onPress={() => setShowMatrixModal(true)}
+              accessibilityLabel="View access matrix"
+            >
+              <Key size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+  
+          <View style={styles.actionRow}>
+            <Text style={[styles.countText, { color: colors.textMuted }]}>
+              {filteredUsers.length} active staff profiles
+            </Text>
+            <Button
+              title="Onboard Staff"
+              variant="primary"
+              size="sm"
+              leftIcon={<UserPlus size={15} color="#ffffff" />}
+              onPress={openAddModal}
+            />
+          </View>
+        </View>
+  
+        {/* Staff List */}
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading team members...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredUsers}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.listContent}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            ListEmptyComponent={
+              <EmptyState
+                title="No Staff Profiles Found"
+                description="No staff profiles match your search criteria. Tap 'Onboard Staff' to add a new team member."
+                actionLabel="Onboard Staff"
+                onAction={openAddModal}
+              />
+            }
+            renderItem={({ item }) => {
+              const roleConf = ROLE_CONFIG[item.role] || ROLE_CONFIG.user;
+              const RoleIcon = roleConf.Icon;
+              return (
+                <Card style={styles.staffCard}>
+                  <View style={styles.staffCardHeader}>
+                    <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.avatarText, { color: colors.primary }]}>
+                        {item.username.charAt(0).toUpperCase()}
+                      </Text>
                     </View>
-                    <Text style={[styles.staffEmail, { color: colors.textMuted }]}>
-                      {item.email || 'No email attached'}
-                    </Text>
+                    <View style={styles.staffMainInfo}>
+                      <View style={styles.nameRow}>
+                        <Text style={[styles.staffName, { color: colors.text }]}>{item.username}</Text>
+                        <Badge
+                          label={roleConf.label}
+                          variant={roleConf.variant}
+                          size="sm"
+                          icon={<RoleIcon size={12} color={colors.primary} />}
+                        />
+                      </View>
+                      <Text style={[styles.staffEmail, { color: colors.textMuted }]}>
+                        {item.email || 'No email attached'}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-
-                <View style={[styles.staffMetaRow, { borderTopColor: colors.border }]}>
-                  <View style={styles.metaItem}>
-                    <MapPin size={14} color={colors.textMuted} />
-                    <Text style={[styles.metaText, { color: colors.textMuted }]}>
-                      {item.locations?.join(', ') || 'Main Pharmacy'}
-                    </Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <View
-                      style={[
-                        styles.statusDot,
-                        { backgroundColor: item.status !== 'inactive' ? colors.success : colors.danger },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.statusText,
-                        { color: item.status !== 'inactive' ? colors.success : colors.danger },
-                      ]}
-                    >
-                      {item.status !== 'inactive' ? 'Active' : 'Revoked'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.cardActions}>
-                  <Button
-                    title="Edit Credentials"
-                    variant="outline"
-                    size="sm"
-                    leftIcon={<Edit size={14} color={colors.primary} />}
-                    onPress={() => openEditModal(item)}
-                    style={styles.editBtn}
-                  />
-                </View>
-              </Card>
-            );
-          }}
-        />
-      )}
-
-      {/* Onboard / Edit Staff Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalOverlay}
-        >
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <View>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {editingUser ? 'Edit Staff Profile' : 'Staff Onboarding'}
-                </Text>
-                <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                  {editingUser
-                    ? `Update system credentials for @${editingUser.username}`
-                    : 'Provision new credentials and assign operational role'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <X size={22} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.modalBody}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Username *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.surfaceMuted,
-                    borderColor: colors.border,
-                    color: colors.text,
-                  },
-                ]}
-                placeholder="e.g. pharmacist_sarah"
-                placeholderTextColor={colors.textMuted}
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                editable={!editingUser}
-              />
-
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Email Address</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.surfaceMuted,
-                    borderColor: colors.border,
-                    color: colors.text,
-                  },
-                ]}
-                placeholder="sarah@mediquick.com"
-                placeholderTextColor={colors.textMuted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                {editingUser ? 'Change Password (leave blank to keep)' : 'System Password *'}
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.surfaceMuted,
-                    borderColor: colors.border,
-                    color: colors.text,
-                  },
-                ]}
-                placeholder={editingUser ? '••••••••' : 'Minimum 6 characters'}
-                placeholderTextColor={colors.textMuted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Operational Role</Text>
-              <View style={styles.rolePickerRow}>
-                {(['user', 'manager', 'admin'] as const).map((r) => {
-                  const conf = ROLE_CONFIG[r];
-                  const RoleIcon = conf.Icon;
-                  const selected = role === r;
-                  return (
-                    <TouchableOpacity
-                      key={r}
-                      style={[
-                        styles.roleChip,
-                        {
-                          borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: selected ? colors.primary + '15' : colors.surfaceMuted,
-                        },
-                      ]}
-                      onPress={() => setRole(r)}
-                    >
-                      <RoleIcon
-                        size={16}
-                        color={selected ? colors.primary : colors.textMuted}
+  
+                  <View style={[styles.staffMetaRow, { borderTopColor: colors.border }]}>
+                    <View style={styles.metaItem}>
+                      <MapPin size={14} color={colors.textMuted} />
+                      <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                        {item.locations?.join(', ') || 'Main Pharmacy'}
+                      </Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                      <View
+                        style={[
+                          styles.statusDot,
+                          { backgroundColor: item.status !== 'inactive' ? colors.success : colors.danger },
+                        ]}
                       />
                       <Text
                         style={[
-                          styles.roleChipText,
-                          { color: selected ? colors.primary : colors.text, fontWeight: selected ? '700' : '500' },
+                          styles.statusText,
+                          { color: item.status !== 'inactive' ? colors.success : colors.danger },
                         ]}
                       >
-                        {r === 'user' ? 'Staff' : conf.label}
+                        {item.status !== 'inactive' ? 'Active' : 'Revoked'}
                       </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                    </View>
+                  </View>
+  
+                  <View style={styles.cardActions}>
+                    <Button
+                      title="Edit Credentials"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Edit size={14} color={colors.primary} />}
+                      onPress={() => openEditModal(item)}
+                      style={styles.editBtn}
+                    />
+                  </View>
+                </Card>
+              );
+            }}
+          />
+        )}
+  
+        {/* Onboard / Edit Staff Modal */}
+        <Modal visible={modalVisible} animationType="slide" transparent>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalOverlay}
+          >
+            <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+                <View>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    {editingUser ? 'Edit Staff Profile' : 'Staff Onboarding'}
+                  </Text>
+                  <Text style={[styles.modalSub, { color: colors.textMuted }]}>
+                    {editingUser
+                      ? `Update system credentials for @${editingUser.username}`
+                      : 'Provision new credentials and assign operational role'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <X size={22} color={colors.textMuted} />
+                </TouchableOpacity>
               </View>
-
-              <View style={[styles.advisoryBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-                <Lock size={18} color={colors.primary} />
-                <Text style={[styles.advisoryText, { color: colors.text }]}>
-                  Staff access will be provisioned instantly. The user will be restricted to designated modules based on their assigned role permissions.
-                </Text>
-              </View>
-            </ScrollView>
-
-            <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
-              <Button
-                title="Cancel"
-                variant="ghost"
-                onPress={() => setModalVisible(false)}
-                style={styles.modalCancelBtn}
-              />
-              <Button
-                title={editingUser ? 'Update Profile' : 'Save Staff Account'}
-                variant="primary"
-                onPress={handleSave}
-                loading={saving}
-                style={styles.modalSaveBtn}
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Permissions Matrix Modal */}
-      <Modal visible={showMatrixModal} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.matrixCard, { backgroundColor: colors.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Key size={20} color={colors.primary} />
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Access Permissions Matrix</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowMatrixModal(false)}>
-                <X size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
-              <View style={[styles.matrixHeaderRow, { backgroundColor: colors.surfaceMuted }]}>
-                <Text style={[styles.matrixColHeader, { flex: 2, color: colors.text }]}>Feature Module</Text>
-                <Text style={[styles.matrixColHeader, { flex: 1, color: colors.text }]}>Admin</Text>
-                <Text style={[styles.matrixColHeader, { flex: 1, color: colors.text }]}>Manager</Text>
-                <Text style={[styles.matrixColHeader, { flex: 1, color: colors.text }]}>Staff</Text>
-              </View>
-
-              {PERMISSIONS.map((perm, index) => (
-                <View
-                  key={perm.feature}
+  
+              <ScrollView contentContainerStyle={styles.modalBody}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Username *</Text>
+                <TextInput
                   style={[
-                    styles.matrixRow,
+                    styles.input,
                     {
-                      borderBottomColor: colors.border,
-                      backgroundColor: index % 2 === 0 ? 'transparent' : colors.surfaceMuted + '40',
+                      backgroundColor: colors.surfaceMuted,
+                      borderColor: colors.border,
+                      color: colors.text,
                     },
                   ]}
-                >
-                  <Text style={[styles.matrixFeatureText, { flex: 2, color: colors.text }]}>
-                    {perm.feature}
-                  </Text>
-                  <View style={[styles.matrixIconCell, { flex: 1 }]}>
-                    {perm.admin ? (
-                      <CheckCircle2 size={18} color={colors.success} />
-                    ) : (
-                      <XCircle size={18} color={colors.border} />
-                    )}
-                  </View>
-                  <View style={[styles.matrixIconCell, { flex: 1 }]}>
-                    {perm.manager ? (
-                      <CheckCircle2 size={18} color={colors.success} />
-                    ) : (
-                      <XCircle size={18} color={colors.border} />
-                    )}
-                  </View>
-                  <View style={[styles.matrixIconCell, { flex: 1 }]}>
-                    {perm.user ? (
-                      <CheckCircle2 size={18} color={colors.success} />
-                    ) : (
-                      <XCircle size={18} color={colors.border} />
-                    )}
-                  </View>
+                  placeholder="e.g. pharmacist_sarah"
+                  placeholderTextColor={colors.textMuted}
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  editable={!editingUser}
+                />
+  
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Email Address</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.surfaceMuted,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    },
+                  ]}
+                  placeholder="sarah@mediquick.com"
+                  placeholderTextColor={colors.textMuted}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+  
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  {editingUser ? 'Change Password (leave blank to keep)' : 'System Password *'}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.surfaceMuted,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    },
+                  ]}
+                  placeholder={editingUser ? '••••••••' : 'Minimum 6 characters'}
+                  placeholderTextColor={colors.textMuted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+  
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Operational Role</Text>
+                <View style={styles.rolePickerRow}>
+                  {(['user', 'manager', 'admin'] as const).map((r) => {
+                    const conf = ROLE_CONFIG[r];
+                    const RoleIcon = conf.Icon;
+                    const selected = role === r;
+                    return (
+                      <TouchableOpacity
+                        key={r}
+                        style={[
+                          styles.roleChip,
+                          {
+                            borderColor: selected ? colors.primary : colors.border,
+                            backgroundColor: selected ? colors.primary + '15' : colors.surfaceMuted,
+                          },
+                        ]}
+                        onPress={() => setRole(r)}
+                      >
+                        <RoleIcon
+                          size={16}
+                          color={selected ? colors.primary : colors.textMuted}
+                        />
+                        <Text
+                          style={[
+                            styles.roleChipText,
+                            { color: selected ? colors.primary : colors.text, fontWeight: selected ? '700' : '500' },
+                          ]}
+                        >
+                          {r === 'user' ? 'Staff' : conf.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              ))}
-            </ScrollView>
-
-            <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
-              <Button
-                title="Close"
-                variant="primary"
-                onPress={() => setShowMatrixModal(false)}
-                style={{ width: '100%' }}
-              />
+  
+                <View style={[styles.advisoryBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+                  <Lock size={18} color={colors.primary} />
+                  <Text style={[styles.advisoryText, { color: colors.text }]}>
+                    Staff access will be provisioned instantly. The user will be restricted to designated modules based on their assigned role permissions.
+                  </Text>
+                </View>
+              </ScrollView>
+  
+              <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
+                <Button
+                  title="Cancel"
+                  variant="ghost"
+                  onPress={() => setModalVisible(false)}
+                  style={styles.modalCancelBtn}
+                />
+                <Button
+                  title={editingUser ? 'Update Profile' : 'Save Staff Account'}
+                  variant="primary"
+                  onPress={handleSave}
+                  loading={saving}
+                  style={styles.modalSaveBtn}
+                />
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+  
+        {/* Permissions Matrix Modal */}
+        <Modal visible={showMatrixModal} animationType="fade" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.matrixCard, { backgroundColor: colors.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Key size={20} color={colors.primary} />
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>Access Permissions Matrix</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowMatrixModal(false)}>
+                  <X size={24} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+  
+              <ScrollView contentContainerStyle={{ padding: 16 }}>
+                <View style={[styles.matrixHeaderRow, { backgroundColor: colors.surfaceMuted }]}>
+                  <Text style={[styles.matrixColHeader, { flex: 2, color: colors.text }]}>Feature Module</Text>
+                  <Text style={[styles.matrixColHeader, { flex: 1, color: colors.text }]}>Admin</Text>
+                  <Text style={[styles.matrixColHeader, { flex: 1, color: colors.text }]}>Manager</Text>
+                  <Text style={[styles.matrixColHeader, { flex: 1, color: colors.text }]}>Staff</Text>
+                </View>
+  
+                {PERMISSIONS.map((perm, index) => (
+                  <View
+                    key={perm.feature}
+                    style={[
+                      styles.matrixRow,
+                      {
+                        borderBottomColor: colors.border,
+                        backgroundColor: index % 2 === 0 ? 'transparent' : colors.surfaceMuted + '40',
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.matrixFeatureText, { flex: 2, color: colors.text }]}>
+                      {perm.feature}
+                    </Text>
+                    <View style={[styles.matrixIconCell, { flex: 1 }]}>
+                      {perm.admin ? (
+                        <CheckCircle2 size={18} color={colors.success} />
+                      ) : (
+                        <XCircle size={18} color={colors.border} />
+                      )}
+                    </View>
+                    <View style={[styles.matrixIconCell, { flex: 1 }]}>
+                      {perm.manager ? (
+                        <CheckCircle2 size={18} color={colors.success} />
+                      ) : (
+                        <XCircle size={18} color={colors.border} />
+                      )}
+                    </View>
+                    <View style={[styles.matrixIconCell, { flex: 1 }]}>
+                      {perm.user ? (
+                        <CheckCircle2 size={18} color={colors.success} />
+                      ) : (
+                        <XCircle size={18} color={colors.border} />
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+  
+              <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
+                <Button
+                  title="Close"
+                  variant="primary"
+                  onPress={() => setShowMatrixModal(false)}
+                  style={{ width: '100%' }}
+                />
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    </RoleGuard>
   );
 }
 

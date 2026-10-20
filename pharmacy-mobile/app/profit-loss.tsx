@@ -25,6 +25,7 @@ import { layout } from '@/constants/theme';
 import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 export default function ProfitLossScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -75,135 +76,137 @@ export default function ProfitLossScreen() {
   const netProfitTrend = calcChange('netProfit');
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            loadData();
-          }}
-          tintColor={theme.primary}
-        />
-      }
-    >
-      {/* Top Header */}
-      <View style={styles.topHeader}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-          <ArrowLeft size={22} color={theme.text} />
-        </Pressable>
-        <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-            Profit & Loss Summary
+    <RoleGuard page="profit-loss">
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadData();
+            }}
+            tintColor={theme.primary}
+          />
+        }
+      >
+        {/* Top Header */}
+        <View style={styles.topHeader}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+            <ArrowLeft size={22} color={theme.text} />
+          </Pressable>
+          <View style={styles.headerTitleWrap}>
+            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+              Profit & Loss Summary
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+              Compare revenue, cost of goods & profit performance
+            </Text>
+          </View>
+        </View>
+  
+        {/* KPI Cards */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statsRow}>
+            <StatCard
+              style={styles.statCard}
+              label="Gross Revenue"
+              value={`K ${Number(currentMonth.revenue || 0).toLocaleString()}`}
+              icon={<DollarSign size={20} color={theme.primary} />}
+              iconBg={theme.primarySoft}
+              trend={revenueTrend || undefined}
+            />
+            <StatCard
+              style={styles.statCard}
+              label="Cost of Goods (COGS)"
+              value={`K ${Number(currentMonth.cogs || 0).toLocaleString()}`}
+              icon={<Wallet size={20} color="#f59e0b" />}
+              iconBg="#fffbeb"
+            />
+          </View>
+  
+          <View style={styles.statsRow}>
+            <StatCard
+              style={styles.statCard}
+              label="Gross Margin Profit"
+              value={`K ${Number(currentMonth.grossProfit || 0).toLocaleString()}`}
+              subValue={`Margin: ${
+                currentMonth.revenue
+                  ? Math.round((currentMonth.grossProfit / currentMonth.revenue) * 100)
+                  : 0
+              }%`}
+              icon={<TrendingUp size={20} color="#10b981" />}
+              iconBg="#ecfdf5"
+            />
+            <StatCard
+              style={styles.statCard}
+              label="Net Operating Profit"
+              value={`K ${Number(currentMonth.netProfit || 0).toLocaleString()}`}
+              icon={<Activity size={20} color={currentMonth.netProfit >= 0 ? '#10b981' : '#ef4444'} />}
+              iconBg={currentMonth.netProfit >= 0 ? '#ecfdf5' : '#fef2f2'}
+              trend={netProfitTrend || undefined}
+            />
+          </View>
+        </View>
+  
+        {/* Monthly Financial Breakdown */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.cardTitle, { color: theme.navigation }]}>
+            Monthly Breakdown History
           </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-            Compare revenue, cost of goods & profit performance
+          <Text style={[styles.cardSubtitle, { color: theme.mutedText }]}>
+            Financial records sorted by reporting month
           </Text>
-        </View>
-      </View>
-
-      {/* KPI Cards */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statsRow}>
-          <StatCard
-            style={styles.statCard}
-            label="Gross Revenue"
-            value={`K ${Number(currentMonth.revenue || 0).toLocaleString()}`}
-            icon={<DollarSign size={20} color={theme.primary} />}
-            iconBg={theme.primarySoft}
-            trend={revenueTrend || undefined}
-          />
-          <StatCard
-            style={styles.statCard}
-            label="Cost of Goods (COGS)"
-            value={`K ${Number(currentMonth.cogs || 0).toLocaleString()}`}
-            icon={<Wallet size={20} color="#f59e0b" />}
-            iconBg="#fffbeb"
-          />
-        </View>
-
-        <View style={styles.statsRow}>
-          <StatCard
-            style={styles.statCard}
-            label="Gross Margin Profit"
-            value={`K ${Number(currentMonth.grossProfit || 0).toLocaleString()}`}
-            subValue={`Margin: ${
-              currentMonth.revenue
-                ? Math.round((currentMonth.grossProfit / currentMonth.revenue) * 100)
-                : 0
-            }%`}
-            icon={<TrendingUp size={20} color="#10b981" />}
-            iconBg="#ecfdf5"
-          />
-          <StatCard
-            style={styles.statCard}
-            label="Net Operating Profit"
-            value={`K ${Number(currentMonth.netProfit || 0).toLocaleString()}`}
-            icon={<Activity size={20} color={currentMonth.netProfit >= 0 ? '#10b981' : '#ef4444'} />}
-            iconBg={currentMonth.netProfit >= 0 ? '#ecfdf5' : '#fef2f2'}
-            trend={netProfitTrend || undefined}
-          />
-        </View>
-      </View>
-
-      {/* Monthly Financial Breakdown */}
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.cardTitle, { color: theme.navigation }]}>
-          Monthly Breakdown History
-        </Text>
-        <Text style={[styles.cardSubtitle, { color: theme.mutedText }]}>
-          Financial records sorted by reporting month
-        </Text>
-
-        {data.length > 0 ? (
-          data
-            .slice()
-            .reverse()
-            .map((row, idx) => (
-              <View
-                key={idx}
-                style={[styles.historyRow, { borderBottomColor: theme.borderLight }]}
-              >
-                <View style={styles.historyLeft}>
-                  <Text style={[styles.historyMonth, { color: theme.text }]}>
-                    {row.month}
-                  </Text>
-                  <Text style={[styles.historySub, { color: theme.mutedText }]}>
-                    Rev: K {Number(row.revenue || 0).toLocaleString()} · COGS: K{' '}
-                    {Number(row.cogs || 0).toLocaleString()}
-                  </Text>
+  
+          {data.length > 0 ? (
+            data
+              .slice()
+              .reverse()
+              .map((row, idx) => (
+                <View
+                  key={idx}
+                  style={[styles.historyRow, { borderBottomColor: theme.borderLight }]}
+                >
+                  <View style={styles.historyLeft}>
+                    <Text style={[styles.historyMonth, { color: theme.text }]}>
+                      {row.month}
+                    </Text>
+                    <Text style={[styles.historySub, { color: theme.mutedText }]}>
+                      Rev: K {Number(row.revenue || 0).toLocaleString()} · COGS: K{' '}
+                      {Number(row.cogs || 0).toLocaleString()}
+                    </Text>
+                  </View>
+  
+                  <View style={styles.historyRight}>
+                    <Text
+                      style={[
+                        styles.historyProfit,
+                        { color: row.netProfit >= 0 ? theme.primary : theme.danger },
+                      ]}
+                    >
+                      K {Number(row.netProfit || 0).toLocaleString()}
+                    </Text>
+                    <Badge
+                      label={row.netProfit >= 0 ? 'Profitable' : 'Deficit'}
+                      variant={row.netProfit >= 0 ? 'success' : 'danger'}
+                      size="sm"
+                    />
+                  </View>
                 </View>
-
-                <View style={styles.historyRight}>
-                  <Text
-                    style={[
-                      styles.historyProfit,
-                      { color: row.netProfit >= 0 ? theme.primary : theme.danger },
-                    ]}
-                  >
-                    K {Number(row.netProfit || 0).toLocaleString()}
-                  </Text>
-                  <Badge
-                    label={row.netProfit >= 0 ? 'Profitable' : 'Deficit'}
-                    variant={row.netProfit >= 0 ? 'success' : 'danger'}
-                    size="sm"
-                  />
-                </View>
-              </View>
-            ))
-        ) : (
-          <EmptyState
-            icon={<TrendingUp size={32} color={theme.mutedText} />}
-            title="No financial records"
-            description="Monthly sales and recorded expenses will populate financial reports here."
-          />
-        )}
-      </View>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+              ))
+          ) : (
+            <EmptyState
+              icon={<TrendingUp size={32} color={theme.mutedText} />}
+              title="No financial records"
+              description="Monthly sales and recorded expenses will populate financial reports here."
+            />
+          )}
+        </View>
+  
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </RoleGuard>
   );
 }
 

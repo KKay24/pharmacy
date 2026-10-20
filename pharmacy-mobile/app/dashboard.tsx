@@ -34,6 +34,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { getMedicineBatches, getMedicineTotalQuantity } from '@/utils/inventory';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 export default function DashboardScreen() {
   const { user } = useAuth();
@@ -196,197 +197,199 @@ export default function DashboardScreen() {
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            loadDashboardData();
-          }}
-          tintColor={theme.primary}
-        />
-      }
-    >
-      {/* Top Header */}
-      <View style={styles.topHeader}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={8}
-        >
-          <ArrowLeft size={22} color={theme.text} />
-        </Pressable>
-        <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-            Executive Dashboard
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-            Stock health, urgent restocks & performance
-          </Text>
-        </View>
-      </View>
-
-      {/* KPI Stats Grid */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statsRow}>
-          <StatCard
-            style={styles.statCard}
-            label="Total Stock Value"
-            value={`K ${Math.round(kpis.stockValue).toLocaleString()}`}
-            icon={<DollarSign size={20} color={theme.primary} />}
-            iconBg={theme.primarySoft}
-            trend={{ direction: 'up', value: 'Active assets' }}
+    <RoleGuard page="dashboard">
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadDashboardData();
+            }}
+            tintColor={theme.primary}
           />
-          <StatCard
-            style={styles.statCard}
-            label="Monthly Revenue"
-            value={`K ${Math.round(kpis.currentMonthRevenue).toLocaleString()}`}
-            icon={<TrendingUp size={20} color="#10b981" />}
-            iconBg="#ecfdf5"
-            trend={{ direction: 'up', value: 'Current month' }}
-          />
-        </View>
-
-        <View style={styles.statsRow}>
-          <StatCard
-            style={styles.statCard}
-            label="Low Stock Alert"
-            value={kpis.lowStockCount}
-            subValue="Needs reordering"
-            icon={<AlertTriangle size={20} color="#f59e0b" />}
-            iconBg="#fffbeb"
-          />
-          <StatCard
-            style={styles.statCard}
-            label="Expiring (30 days)"
-            value={kpis.expiringCount}
-            subValue="Monitor batches"
-            icon={<Clock size={20} color="#ef4444" />}
-            iconBg="#fef2f2"
-          />
-        </View>
-      </View>
-
-      {/* Quick Action Shortcuts */}
-      <View style={[styles.quickActionsCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.cardHeading, { color: theme.text }]}>Quick Actions</Text>
-        <View style={styles.actionsRow}>
+        }
+      >
+        {/* Top Header */}
+        <View style={styles.topHeader}>
           <Pressable
-            style={[styles.actionTile, { backgroundColor: theme.primarySoft }]}
-            onPress={() => router.push('/(tabs)/pos')}
+            style={styles.backButton}
+            onPress={() => router.back()}
+            hitSlop={8}
           >
-            <ShoppingCart size={22} color={theme.primary} />
-            <Text style={[styles.actionTileText, { color: theme.primary }]}>New Sale</Text>
+            <ArrowLeft size={22} color={theme.text} />
           </Pressable>
-          <Pressable
-            style={[styles.actionTile, { backgroundColor: '#ecfdf5' }]}
-            onPress={() => router.push('/add-stock' as any)}
-          >
-            <PackagePlus size={22} color="#10b981" />
-            <Text style={[styles.actionTileText, { color: '#059669' }]}>Add Stock</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.actionTile, { backgroundColor: '#fff3ee' }]}
-            onPress={() => router.push('/orders' as any)}
-          >
-            <ClipboardList size={22} color="#ff6b35" />
-            <Text style={[styles.actionTileText, { color: '#ff6b35' }]}>Orders</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.actionTile, { backgroundColor: '#eff6ff' }]}
-            onPress={() => router.push('/(tabs)/inventory')}
-          >
-            <Boxes size={22} color="#3b82f6" />
-            <Text style={[styles.actionTileText, { color: '#2563eb' }]}>Inventory</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Reorder Insights */}
-      <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <View style={styles.sectionHeaderRow}>
-          <View>
-            <Text style={[styles.cardHeading, { color: theme.text }]}>Urgent Restock Suggestions</Text>
-            <Text style={[styles.cardSubheading, { color: theme.mutedText }]}>
-              Items based on velocity & lead time
+          <View style={styles.headerTitleWrap}>
+            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+              Executive Dashboard
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+              Stock health, urgent restocks & performance
             </Text>
           </View>
-          <Badge label={`${reorderList.length} items`} variant="warning" size="sm" />
         </View>
-
-        {reorderList.length > 0 ? (
-          reorderList.slice(0, 5).map((item, idx) => (
-            <View
-              key={idx}
-              style={[styles.listItem, { borderBottomColor: theme.borderLight }]}
-            >
-              <View style={styles.itemCopy}>
-                <Text style={[styles.itemName, { color: theme.text }]}>
-                  {item.medicineName || item.name}
-                </Text>
-                <Text style={[styles.itemSub, { color: theme.mutedText }]}>
-                  Stock: {item.currentStock || item.totalQuantity || 0} · Reorder point: {item.reorderPoint || 10}
-                </Text>
-              </View>
-              <Badge
-                label={`+${item.suggestedQuantity || 50} units`}
-                variant="primary"
-                size="sm"
-              />
-            </View>
-          ))
-        ) : (
-          <Text style={[styles.emptySectionText, { color: theme.mutedText }]}>
-            All inventory levels are currently within safe thresholds.
-          </Text>
-        )}
-      </View>
-
-      {/* Stockout Risk Warnings */}
-      <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <View style={styles.sectionHeaderRow}>
-          <View>
-            <Text style={[styles.cardHeading, { color: theme.text }]}>Stockout Risk Alerts</Text>
-            <Text style={[styles.cardSubheading, { color: theme.mutedText }]}>
-              High-velocity medicines near zero
-            </Text>
+  
+        {/* KPI Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statsRow}>
+            <StatCard
+              style={styles.statCard}
+              label="Total Stock Value"
+              value={`K ${Math.round(kpis.stockValue).toLocaleString()}`}
+              icon={<DollarSign size={20} color={theme.primary} />}
+              iconBg={theme.primarySoft}
+              trend={{ direction: 'up', value: 'Active assets' }}
+            />
+            <StatCard
+              style={styles.statCard}
+              label="Monthly Revenue"
+              value={`K ${Math.round(kpis.currentMonthRevenue).toLocaleString()}`}
+              icon={<TrendingUp size={20} color="#10b981" />}
+              iconBg="#ecfdf5"
+              trend={{ direction: 'up', value: 'Current month' }}
+            />
           </View>
-          <Badge
-            label={`${stockoutRiskList.length} alerts`}
-            variant="danger"
-            size="sm"
-          />
+  
+          <View style={styles.statsRow}>
+            <StatCard
+              style={styles.statCard}
+              label="Low Stock Alert"
+              value={kpis.lowStockCount}
+              subValue="Needs reordering"
+              icon={<AlertTriangle size={20} color="#f59e0b" />}
+              iconBg="#fffbeb"
+            />
+            <StatCard
+              style={styles.statCard}
+              label="Expiring (30 days)"
+              value={kpis.expiringCount}
+              subValue="Monitor batches"
+              icon={<Clock size={20} color="#ef4444" />}
+              iconBg="#fef2f2"
+            />
+          </View>
         </View>
-
-        {stockoutRiskList.length > 0 ? (
-          stockoutRiskList.slice(0, 5).map((item, idx) => (
-            <View
-              key={idx}
-              style={[styles.listItem, { borderBottomColor: theme.borderLight }]}
+  
+        {/* Quick Action Shortcuts */}
+        <View style={[styles.quickActionsCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.cardHeading, { color: theme.text }]}>Quick Actions</Text>
+          <View style={styles.actionsRow}>
+            <Pressable
+              style={[styles.actionTile, { backgroundColor: theme.primarySoft }]}
+              onPress={() => router.push('/(tabs)/pos')}
             >
-              <View style={styles.itemCopy}>
-                <Text style={[styles.itemName, { color: theme.text }]}>
-                  {item.medicineName || item.name}
-                </Text>
-                <Text style={[styles.itemSub, { color: theme.mutedText }]}>
-                  Days until stockout: ~{item.daysUntilStockout || 2} days
-                </Text>
-              </View>
-              <Badge label="High Risk" variant="danger" size="sm" />
+              <ShoppingCart size={22} color={theme.primary} />
+              <Text style={[styles.actionTileText, { color: theme.primary }]}>New Sale</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.actionTile, { backgroundColor: '#ecfdf5' }]}
+              onPress={() => router.push('/add-stock' as any)}
+            >
+              <PackagePlus size={22} color="#10b981" />
+              <Text style={[styles.actionTileText, { color: '#059669' }]}>Add Stock</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.actionTile, { backgroundColor: '#fff3ee' }]}
+              onPress={() => router.push('/orders' as any)}
+            >
+              <ClipboardList size={22} color="#ff6b35" />
+              <Text style={[styles.actionTileText, { color: '#ff6b35' }]}>Orders</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.actionTile, { backgroundColor: '#eff6ff' }]}
+              onPress={() => router.push('/(tabs)/inventory')}
+            >
+              <Boxes size={22} color="#3b82f6" />
+              <Text style={[styles.actionTileText, { color: '#2563eb' }]}>Inventory</Text>
+            </Pressable>
+          </View>
+        </View>
+  
+        {/* Reorder Insights */}
+        <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={[styles.cardHeading, { color: theme.text }]}>Urgent Restock Suggestions</Text>
+              <Text style={[styles.cardSubheading, { color: theme.mutedText }]}>
+                Items based on velocity & lead time
+              </Text>
             </View>
-          ))
-        ) : (
-          <Text style={[styles.emptySectionText, { color: theme.mutedText }]}>
-            No high-priority stockout risks identified right now.
-          </Text>
-        )}
-      </View>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+            <Badge label={`${reorderList.length} items`} variant="warning" size="sm" />
+          </View>
+  
+          {reorderList.length > 0 ? (
+            reorderList.slice(0, 5).map((item, idx) => (
+              <View
+                key={idx}
+                style={[styles.listItem, { borderBottomColor: theme.borderLight }]}
+              >
+                <View style={styles.itemCopy}>
+                  <Text style={[styles.itemName, { color: theme.text }]}>
+                    {item.medicineName || item.name}
+                  </Text>
+                  <Text style={[styles.itemSub, { color: theme.mutedText }]}>
+                    Stock: {item.currentStock || item.totalQuantity || 0} · Reorder point: {item.reorderPoint || 10}
+                  </Text>
+                </View>
+                <Badge
+                  label={`+${item.suggestedQuantity || 50} units`}
+                  variant="primary"
+                  size="sm"
+                />
+              </View>
+            ))
+          ) : (
+            <Text style={[styles.emptySectionText, { color: theme.mutedText }]}>
+              All inventory levels are currently within safe thresholds.
+            </Text>
+          )}
+        </View>
+  
+        {/* Stockout Risk Warnings */}
+        <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={[styles.cardHeading, { color: theme.text }]}>Stockout Risk Alerts</Text>
+              <Text style={[styles.cardSubheading, { color: theme.mutedText }]}>
+                High-velocity medicines near zero
+              </Text>
+            </View>
+            <Badge
+              label={`${stockoutRiskList.length} alerts`}
+              variant="danger"
+              size="sm"
+            />
+          </View>
+  
+          {stockoutRiskList.length > 0 ? (
+            stockoutRiskList.slice(0, 5).map((item, idx) => (
+              <View
+                key={idx}
+                style={[styles.listItem, { borderBottomColor: theme.borderLight }]}
+              >
+                <View style={styles.itemCopy}>
+                  <Text style={[styles.itemName, { color: theme.text }]}>
+                    {item.medicineName || item.name}
+                  </Text>
+                  <Text style={[styles.itemSub, { color: theme.mutedText }]}>
+                    Days until stockout: ~{item.daysUntilStockout || 2} days
+                  </Text>
+                </View>
+                <Badge label="High Risk" variant="danger" size="sm" />
+              </View>
+            ))
+          ) : (
+            <Text style={[styles.emptySectionText, { color: theme.mutedText }]}>
+              No high-priority stockout risks identified right now.
+            </Text>
+          )}
+        </View>
+  
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </RoleGuard>
   );
 }
 

@@ -36,6 +36,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 interface Medicine {
   id: number;
@@ -332,453 +333,455 @@ export default function PosScreen() {
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* POS Top Bar */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={styles.brandRow}>
-          <View style={[styles.logoMark, { backgroundColor: theme.primary }]}>
-            <HeartPulse size={20} color="#ffffff" />
-          </View>
-          <View style={styles.brandCopy}>
-            <Text style={[styles.brand, { color: theme.navigation }]}>
-              MediQuick <Text style={{ color: theme.primary }}>POS</Text>
-            </Text>
-            <Text style={[styles.cashierLabel, { color: theme.mutedText }]}>
-              Cashier: <Text style={{ fontWeight: '700', color: theme.text }}>{user?.username || 'Staff'}</Text>
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Select customer"
-            style={[
-              styles.customerBtn,
-              {
-                backgroundColor: selectedCustomer ? theme.primarySoft : theme.surfaceMuted,
-                borderColor: selectedCustomer ? theme.primary : theme.border,
-              },
-            ]}
-            onPress={() => setShowCustomerModal(true)}
-          >
-            <User size={15} color={selectedCustomer ? theme.primary : theme.mutedText} />
-            <Text
-              style={[
-                styles.customerBtnText,
-                { color: selectedCustomer ? theme.primary : theme.textSecondary },
-              ]}
-              numberOfLines={1}
-            >
-              {selectedCustomer ? selectedCustomer.name : 'Patient'}
-            </Text>
-          </Pressable>
-        </View>
-
-        <SearchInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search medicines, OTC, dosages..."
-        />
-
-        {/* Category Pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryScroll}
-        >
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setSelectedCategoryId(null)}
-            style={[
-              styles.categoryChip,
-              {
-                backgroundColor: selectedCategoryId === null ? theme.primary : theme.surfaceMuted,
-                borderColor: selectedCategoryId === null ? theme.primary : theme.border,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.categoryChipText,
-                { color: selectedCategoryId === null ? '#ffffff' : theme.textSecondary },
-              ]}
-            >
-              All Items
-            </Text>
-          </Pressable>
-          {categories.map((cat) => {
-            const active = selectedCategoryId === cat.id;
-            return (
-              <Pressable
-                key={cat.id}
-                accessibilityRole="button"
-                onPress={() => setSelectedCategoryId(active ? null : cat.id)}
-                style={[
-                  styles.categoryChip,
-                  {
-                    backgroundColor: active ? theme.primary : theme.surfaceMuted,
-                    borderColor: active ? theme.primary : theme.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.categoryChipText,
-                    { color: active ? '#ffffff' : theme.textSecondary },
-                  ]}
-                >
-                  {cat.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Product Grid */}
-      <FlatList
-        data={filteredMedicines}
-        numColumns={2}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => {
-          const outOfStock = item.totalQuantity <= 0;
-          return (
+    <RoleGuard page="pos">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* POS Top Bar */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.brandRow}>
+            <View style={[styles.logoMark, { backgroundColor: theme.primary }]}>
+              <HeartPulse size={20} color="#ffffff" />
+            </View>
+            <View style={styles.brandCopy}>
+              <Text style={[styles.brand, { color: theme.navigation }]}>
+                MediQuick <Text style={{ color: theme.primary }}>POS</Text>
+              </Text>
+              <Text style={[styles.cashierLabel, { color: theme.mutedText }]}>
+                Cashier: <Text style={{ fontWeight: '700', color: theme.text }}>{user?.username || 'Staff'}</Text>
+              </Text>
+            </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Add ${item.name} to sale`}
-              disabled={outOfStock}
-              style={({ pressed }) => [
-                styles.itemCard,
+              accessibilityLabel="Select customer"
+              style={[
+                styles.customerBtn,
                 {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.border,
-                  opacity: outOfStock ? 0.6 : pressed ? 0.85 : 1,
+                  backgroundColor: selectedCustomer ? theme.primarySoft : theme.surfaceMuted,
+                  borderColor: selectedCustomer ? theme.primary : theme.border,
                 },
               ]}
-              onPress={() => addToCart(item)}
+              onPress={() => setShowCustomerModal(true)}
             >
-              <View style={[styles.productVisual, { backgroundColor: theme.primarySoft }]}>
-                <Pill size={36} color={theme.primary} strokeWidth={1.8} />
-                {outOfStock ? (
-                  <View style={styles.outOfStockBadge}>
-                    <Text style={styles.outOfStockText}>Out of stock</Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text numberOfLines={2} style={[styles.itemName, { color: theme.text }]}>
-                {item.name}
-              </Text>
-              <Text numberOfLines={1} style={[styles.itemStock, { color: theme.mutedText }]}>
-                Stock: {item.totalQuantity} units
-              </Text>
-              <Text style={[styles.itemPrice, { color: theme.navigation }]}>
-                K {item.price.toFixed(2)}
-              </Text>
-              <View
+              <User size={15} color={selectedCustomer ? theme.primary : theme.mutedText} />
+              <Text
                 style={[
-                  styles.addButton,
-                  { backgroundColor: outOfStock ? theme.border : theme.primary },
+                  styles.customerBtnText,
+                  { color: selectedCustomer ? theme.primary : theme.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {selectedCustomer ? selectedCustomer.name : 'Patient'}
+              </Text>
+            </Pressable>
+          </View>
+  
+          <SearchInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search medicines, OTC, dosages..."
+          />
+  
+          {/* Category Pills */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryScroll}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSelectedCategoryId(null)}
+              style={[
+                styles.categoryChip,
+                {
+                  backgroundColor: selectedCategoryId === null ? theme.primary : theme.surfaceMuted,
+                  borderColor: selectedCategoryId === null ? theme.primary : theme.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  { color: selectedCategoryId === null ? '#ffffff' : theme.textSecondary },
                 ]}
               >
-                <Text style={styles.quickAddText}>
-                  {outOfStock ? 'Unavailable' : 'Add to sale'}
-                </Text>
-                {!outOfStock ? <Plus size={15} color="#ffffff" /> : null}
-              </View>
-            </Pressable>
-          );
-        }}
-        columnWrapperStyle={styles.productRow}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          !fetching ? (
-            <EmptyState
-              icon={<Pill size={32} color={theme.mutedText} />}
-              title="No products found"
-              description="Try adjusting your search terms or category filter."
-            />
-          ) : null
-        }
-      />
-
-      {/* Cart Summary FAB */}
-      {cart.length > 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Review current sale"
-          style={[styles.cartFab, { backgroundColor: theme.navigation, shadowColor: theme.navigation }]}
-          onPress={() => setShowCart(true)}
-        >
-          <View style={styles.cartFabLeft}>
-            <View style={[styles.cartBadge, { backgroundColor: theme.primary }]}>
-              <Text style={styles.cartBadgeText}>{cartCount}</Text>
-            </View>
-            <View style={styles.cartFabCopy}>
-              <Text style={styles.cartFabTitle}>Current Sale</Text>
-              <Text style={styles.cartFabSubtitle}>
-                {paymentMethod} · {selectedCustomer ? selectedCustomer.name : 'Walk-in'}
+                All Items
               </Text>
-            </View>
-          </View>
-          <View style={styles.cartFabRight}>
-            <Text style={styles.cartFabTotal}>K {calculateTotal().toFixed(2)}</Text>
-            <Text style={styles.cartFabAction}>Pay & Checkout →</Text>
-          </View>
-        </Pressable>
-      ) : null}
-
-      {/* Cart & Payment Drawer Modal */}
-      <Modal visible={showCart} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <View>
-                <Text style={[styles.modalTitle, { color: theme.text }]}>Checkout & Sale</Text>
-                <Text style={[styles.modalSubtitle, { color: theme.mutedText }]}>
-                  {cartCount} item{cartCount === 1 ? '' : 's'} in cart
+            </Pressable>
+            {categories.map((cat) => {
+              const active = selectedCategoryId === cat.id;
+              return (
+                <Pressable
+                  key={cat.id}
+                  accessibilityRole="button"
+                  onPress={() => setSelectedCategoryId(active ? null : cat.id)}
+                  style={[
+                    styles.categoryChip,
+                    {
+                      backgroundColor: active ? theme.primary : theme.surfaceMuted,
+                      borderColor: active ? theme.primary : theme.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      { color: active ? '#ffffff' : theme.textSecondary },
+                    ]}
+                  >
+                    {cat.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+  
+        {/* Product Grid */}
+        <FlatList
+          data={filteredMedicines}
+          numColumns={2}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={({ item }) => {
+            const outOfStock = item.totalQuantity <= 0;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${item.name} to sale`}
+                disabled={outOfStock}
+                style={({ pressed }) => [
+                  styles.itemCard,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    opacity: outOfStock ? 0.6 : pressed ? 0.85 : 1,
+                  },
+                ]}
+                onPress={() => addToCart(item)}
+              >
+                <View style={[styles.productVisual, { backgroundColor: theme.primarySoft }]}>
+                  <Pill size={36} color={theme.primary} strokeWidth={1.8} />
+                  {outOfStock ? (
+                    <View style={styles.outOfStockBadge}>
+                      <Text style={styles.outOfStockText}>Out of stock</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text numberOfLines={2} style={[styles.itemName, { color: theme.text }]}>
+                  {item.name}
+                </Text>
+                <Text numberOfLines={1} style={[styles.itemStock, { color: theme.mutedText }]}>
+                  Stock: {item.totalQuantity} units
+                </Text>
+                <Text style={[styles.itemPrice, { color: theme.navigation }]}>
+                  K {item.price.toFixed(2)}
+                </Text>
+                <View
+                  style={[
+                    styles.addButton,
+                    { backgroundColor: outOfStock ? theme.border : theme.primary },
+                  ]}
+                >
+                  <Text style={styles.quickAddText}>
+                    {outOfStock ? 'Unavailable' : 'Add to sale'}
+                  </Text>
+                  {!outOfStock ? <Plus size={15} color="#ffffff" /> : null}
+                </View>
+              </Pressable>
+            );
+          }}
+          columnWrapperStyle={styles.productRow}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            !fetching ? (
+              <EmptyState
+                icon={<Pill size={32} color={theme.mutedText} />}
+                title="No products found"
+                description="Try adjusting your search terms or category filter."
+              />
+            ) : null
+          }
+        />
+  
+        {/* Cart Summary FAB */}
+        {cart.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Review current sale"
+            style={[styles.cartFab, { backgroundColor: theme.navigation, shadowColor: theme.navigation }]}
+            onPress={() => setShowCart(true)}
+          >
+            <View style={styles.cartFabLeft}>
+              <View style={[styles.cartBadge, { backgroundColor: theme.primary }]}>
+                <Text style={styles.cartBadgeText}>{cartCount}</Text>
+              </View>
+              <View style={styles.cartFabCopy}>
+                <Text style={styles.cartFabTitle}>Current Sale</Text>
+                <Text style={styles.cartFabSubtitle}>
+                  {paymentMethod} · {selectedCustomer ? selectedCustomer.name : 'Walk-in'}
                 </Text>
               </View>
-              <Pressable hitSlop={8} onPress={() => setShowCart(false)}>
-                <X size={22} color={theme.mutedText} />
-              </Pressable>
             </View>
-
-            <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
-              {cart.map((item) => (
-                <View key={item.id} style={[styles.cartItem, { borderBottomColor: theme.borderLight }]}>
-                  <View style={styles.cartItemInfo}>
-                    <Text style={[styles.cartItemName, { color: theme.text }]} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={[styles.cartItemPrice, { color: theme.mutedText }]}>
-                      K {item.price.toFixed(2)} each
-                    </Text>
-                  </View>
-                  <View style={styles.cartItemActions}>
-                    <Pressable
-                      style={[styles.qtyBtn, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
-                      onPress={() => updateCartQuantity(item.id, -1)}
-                    >
-                      <Minus size={15} color={theme.text} />
-                    </Pressable>
-                    <Text style={[styles.qtyText, { color: theme.text }]}>{item.quantity}</Text>
-                    <Pressable
-                      style={[styles.qtyBtn, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
-                      onPress={() => updateCartQuantity(item.id, 1)}
-                    >
-                      <Plus size={15} color={theme.text} />
-                    </Pressable>
-                    <Pressable
-                      style={styles.deleteBtn}
-                      onPress={() => removeFromCart(item.id)}
-                    >
-                      <Trash2 size={16} color={theme.danger} />
-                    </Pressable>
-                  </View>
+            <View style={styles.cartFabRight}>
+              <Text style={styles.cartFabTotal}>K {calculateTotal().toFixed(2)}</Text>
+              <Text style={styles.cartFabAction}>Pay & Checkout →</Text>
+            </View>
+          </Pressable>
+        ) : null}
+  
+        {/* Cart & Payment Drawer Modal */}
+        <Modal visible={showCart} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                <View>
+                  <Text style={[styles.modalTitle, { color: theme.text }]}>Checkout & Sale</Text>
+                  <Text style={[styles.modalSubtitle, { color: theme.mutedText }]}>
+                    {cartCount} item{cartCount === 1 ? '' : 's'} in cart
+                  </Text>
                 </View>
-              ))}
-
-              {/* Payment Method Selector */}
-              <View style={styles.paymentSection}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Payment Method</Text>
-                <View style={styles.paymentMethodsGrid}>
-                  {PAYMENT_METHODS.map(({ id, label, Icon }) => {
-                    const active = paymentMethod === id;
-                    return (
-                      <Pressable
-                        key={id}
-                        accessibilityRole="button"
-                        style={[
-                          styles.paymentOption,
-                          {
-                            backgroundColor: active ? theme.primarySoft : theme.surfaceMuted,
-                            borderColor: active ? theme.primary : theme.border,
-                          },
-                        ]}
-                        onPress={() => setPaymentMethod(id)}
-                      >
-                        <Icon size={18} color={active ? theme.primary : theme.mutedText} />
-                        <Text
-                          style={[
-                            styles.paymentOptionText,
-                            { color: active ? theme.primary : theme.textSecondary, fontWeight: active ? '700' : '500' },
-                          ]}
-                        >
-                          {label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <Pressable hitSlop={8} onPress={() => setShowCart(false)}>
+                  <X size={22} color={theme.mutedText} />
+                </Pressable>
               </View>
-
-              {/* Customer Linkage */}
-              <View style={styles.customerSection}>
-                <View style={styles.customerHeaderRow}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Patient / Customer</Text>
-                  <Pressable onPress={() => setShowCustomerModal(true)}>
-                    <Text style={[styles.changeCustomerText, { color: theme.primary }]}>
-                      {selectedCustomer ? 'Change' : 'Assign Patient'}
-                    </Text>
-                  </Pressable>
+  
+              <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
+                {cart.map((item) => (
+                  <View key={item.id} style={[styles.cartItem, { borderBottomColor: theme.borderLight }]}>
+                    <View style={styles.cartItemInfo}>
+                      <Text style={[styles.cartItemName, { color: theme.text }]} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.cartItemPrice, { color: theme.mutedText }]}>
+                        K {item.price.toFixed(2)} each
+                      </Text>
+                    </View>
+                    <View style={styles.cartItemActions}>
+                      <Pressable
+                        style={[styles.qtyBtn, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
+                        onPress={() => updateCartQuantity(item.id, -1)}
+                      >
+                        <Minus size={15} color={theme.text} />
+                      </Pressable>
+                      <Text style={[styles.qtyText, { color: theme.text }]}>{item.quantity}</Text>
+                      <Pressable
+                        style={[styles.qtyBtn, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
+                        onPress={() => updateCartQuantity(item.id, 1)}
+                      >
+                        <Plus size={15} color={theme.text} />
+                      </Pressable>
+                      <Pressable
+                        style={styles.deleteBtn}
+                        onPress={() => removeFromCart(item.id)}
+                      >
+                        <Trash2 size={16} color={theme.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+  
+                {/* Payment Method Selector */}
+                <View style={styles.paymentSection}>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Payment Method</Text>
+                  <View style={styles.paymentMethodsGrid}>
+                    {PAYMENT_METHODS.map(({ id, label, Icon }) => {
+                      const active = paymentMethod === id;
+                      return (
+                        <Pressable
+                          key={id}
+                          accessibilityRole="button"
+                          style={[
+                            styles.paymentOption,
+                            {
+                              backgroundColor: active ? theme.primarySoft : theme.surfaceMuted,
+                              borderColor: active ? theme.primary : theme.border,
+                            },
+                          ]}
+                          onPress={() => setPaymentMethod(id)}
+                        >
+                          <Icon size={18} color={active ? theme.primary : theme.mutedText} />
+                          <Text
+                            style={[
+                              styles.paymentOptionText,
+                              { color: active ? theme.primary : theme.textSecondary, fontWeight: active ? '700' : '500' },
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
-                {selectedCustomer ? (
-                  <View style={[styles.selectedCustomerCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
-                    <User size={16} color={theme.primary} />
-                    <View style={styles.customerInfo}>
-                      <Text style={[styles.customerNameText, { color: theme.text }]}>{selectedCustomer.name}</Text>
-                      {selectedCustomer.phone ? (
-                        <Text style={[styles.customerPhoneText, { color: theme.mutedText }]}>{selectedCustomer.phone}</Text>
+  
+                {/* Customer Linkage */}
+                <View style={styles.customerSection}>
+                  <View style={styles.customerHeaderRow}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Patient / Customer</Text>
+                    <Pressable onPress={() => setShowCustomerModal(true)}>
+                      <Text style={[styles.changeCustomerText, { color: theme.primary }]}>
+                        {selectedCustomer ? 'Change' : 'Assign Patient'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  {selectedCustomer ? (
+                    <View style={[styles.selectedCustomerCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                      <User size={16} color={theme.primary} />
+                      <View style={styles.customerInfo}>
+                        <Text style={[styles.customerNameText, { color: theme.text }]}>{selectedCustomer.name}</Text>
+                        {selectedCustomer.phone ? (
+                          <Text style={[styles.customerPhoneText, { color: theme.mutedText }]}>{selectedCustomer.phone}</Text>
+                        ) : null}
+                      </View>
+                      <Pressable hitSlop={6} onPress={() => setSelectedCustomer(null)}>
+                        <X size={16} color={theme.mutedText} />
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Text style={[styles.noCustomerNotice, { color: theme.mutedText }]}>
+                      Walk-in customer (optional patient assignment)
+                    </Text>
+                  )}
+                </View>
+              </ScrollView>
+  
+              <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, { color: theme.mutedText }]}>Total to Pay</Text>
+                  <Text style={[styles.totalValue, { color: theme.navigation }]}>
+                    K {calculateTotal().toFixed(2)}
+                  </Text>
+                </View>
+                <Button
+                  title={loading ? 'Processing Sale...' : `Confirm & Record Sale (K ${calculateTotal().toFixed(2)})`}
+                  onPress={handleCheckout}
+                  loading={loading}
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+  
+        {/* Customer Selection Modal */}
+        <Modal visible={showCustomerModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContentSmall, { backgroundColor: theme.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Assign Patient / Customer</Text>
+                <Pressable hitSlop={8} onPress={() => setShowCustomerModal(false)}>
+                  <X size={20} color={theme.mutedText} />
+                </Pressable>
+              </View>
+              <View style={{ paddingVertical: 10 }}>
+                <SearchInput
+                  value={customerSearch}
+                  onChangeText={setCustomerSearch}
+                  placeholder="Search by name or phone..."
+                />
+              </View>
+              <FlatList
+                data={filteredCustomers}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={({ item }) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[styles.customerRow, { borderBottomColor: theme.borderLight }]}
+                    onPress={() => {
+                      setSelectedCustomer(item);
+                      setShowCustomerModal(false);
+                    }}
+                  >
+                    <View style={[styles.custAvatar, { backgroundColor: theme.primarySoft }]}>
+                      <Text style={[styles.custAvatarText, { color: theme.primary }]}>
+                        {item.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.custDetails}>
+                      <Text style={[styles.custName, { color: theme.text }]}>{item.name}</Text>
+                      {item.phone ? (
+                        <Text style={[styles.custPhone, { color: theme.mutedText }]}>{item.phone}</Text>
                       ) : null}
                     </View>
-                    <Pressable hitSlop={6} onPress={() => setSelectedCustomer(null)}>
-                      <X size={16} color={theme.mutedText} />
-                    </Pressable>
-                  </View>
-                ) : (
-                  <Text style={[styles.noCustomerNotice, { color: theme.mutedText }]}>
-                    Walk-in customer (optional patient assignment)
-                  </Text>
+                  </Pressable>
                 )}
+                ListEmptyComponent={
+                  <Text style={[styles.emptyCustomer, { color: theme.mutedText }]}>
+                    No patients found.
+                  </Text>
+                }
+              />
+            </View>
+          </View>
+        </Modal>
+  
+        {/* Confirmed Receipt Modal */}
+        <Modal visible={successModal} transparent animationType="fade">
+          <View style={styles.successOverlay}>
+            <View style={[styles.successContent, { backgroundColor: theme.surface }]}>
+              <View style={[styles.successIconCircle, { backgroundColor: theme.successSoft }]}>
+                <CheckCircle2 size={46} color={theme.success} />
               </View>
-            </ScrollView>
-
-            <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
-              <View style={styles.totalRow}>
-                <Text style={[styles.totalLabel, { color: theme.mutedText }]}>Total to Pay</Text>
-                <Text style={[styles.totalValue, { color: theme.navigation }]}>
-                  K {calculateTotal().toFixed(2)}
-                </Text>
+              <Text style={[styles.successTitle, { color: theme.navigation }]}>Sale Recorded!</Text>
+              <Text style={[styles.receiptNumber, { color: theme.primary }]}>
+                Receipt #{confirmedReceipt?.receiptNumber}
+              </Text>
+  
+              <View style={[styles.receiptPaper, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                <View style={styles.receiptLine}>
+                  <Text style={[styles.receiptFieldLabel, { color: theme.mutedText }]}>Date & Time:</Text>
+                  <Text style={[styles.receiptFieldValue, { color: theme.text }]}>
+                    {confirmedReceipt?.date ? new Date(confirmedReceipt.date).toLocaleString() : '—'}
+                  </Text>
+                </View>
+                <View style={styles.receiptLine}>
+                  <Text style={[styles.receiptFieldLabel, { color: theme.mutedText }]}>Cashier:</Text>
+                  <Text style={[styles.receiptFieldValue, { color: theme.text }]}>
+                    {confirmedReceipt?.cashierName}
+                  </Text>
+                </View>
+                <View style={styles.receiptLine}>
+                  <Text style={[styles.receiptFieldLabel, { color: theme.mutedText }]}>Payment Method:</Text>
+                  <Text style={[styles.receiptFieldValue, { color: theme.text }]}>
+                    {confirmedReceipt?.paymentMethod}
+                  </Text>
+                </View>
+  
+                <View style={[styles.receiptDivider, { backgroundColor: theme.border }]} />
+  
+                {confirmedReceipt?.items?.map((item, idx) => (
+                  <View key={idx} style={styles.receiptItemLine}>
+                    <Text style={[styles.receiptItemName, { color: theme.text }]} numberOfLines={1}>
+                      {item.name} × {item.quantity}
+                    </Text>
+                    <Text style={[styles.receiptItemTotal, { color: theme.text }]}>
+                      K {item.total.toFixed(2)}
+                    </Text>
+                  </View>
+                ))}
+  
+                <View style={[styles.receiptDivider, { backgroundColor: theme.border }]} />
+  
+                <View style={styles.receiptTotalLine}>
+                  <Text style={[styles.receiptTotalLabel, { color: theme.text }]}>Total Amount</Text>
+                  <Text style={[styles.receiptTotalAmount, { color: theme.primary }]}>
+                    K {Number(confirmedReceipt?.total || 0).toFixed(2)}
+                  </Text>
+                </View>
               </View>
+  
               <Button
-                title={loading ? 'Processing Sale...' : `Confirm & Record Sale (K ${calculateTotal().toFixed(2)})`}
-                onPress={handleCheckout}
-                loading={loading}
+                title="Start New Sale"
+                onPress={() => setSuccessModal(false)}
                 variant="primary"
-                size="lg"
+                size="md"
                 fullWidth
               />
             </View>
           </View>
-        </View>
-      </Modal>
-
-      {/* Customer Selection Modal */}
-      <Modal visible={showCustomerModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContentSmall, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Assign Patient / Customer</Text>
-              <Pressable hitSlop={8} onPress={() => setShowCustomerModal(false)}>
-                <X size={20} color={theme.mutedText} />
-              </Pressable>
-            </View>
-            <View style={{ paddingVertical: 10 }}>
-              <SearchInput
-                value={customerSearch}
-                onChangeText={setCustomerSearch}
-                placeholder="Search by name or phone..."
-              />
-            </View>
-            <FlatList
-              data={filteredCustomers}
-              keyExtractor={(item) => String(item.id)}
-              renderItem={({ item }) => (
-                <Pressable
-                  accessibilityRole="button"
-                  style={[styles.customerRow, { borderBottomColor: theme.borderLight }]}
-                  onPress={() => {
-                    setSelectedCustomer(item);
-                    setShowCustomerModal(false);
-                  }}
-                >
-                  <View style={[styles.custAvatar, { backgroundColor: theme.primarySoft }]}>
-                    <Text style={[styles.custAvatarText, { color: theme.primary }]}>
-                      {item.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.custDetails}>
-                    <Text style={[styles.custName, { color: theme.text }]}>{item.name}</Text>
-                    {item.phone ? (
-                      <Text style={[styles.custPhone, { color: theme.mutedText }]}>{item.phone}</Text>
-                    ) : null}
-                  </View>
-                </Pressable>
-              )}
-              ListEmptyComponent={
-                <Text style={[styles.emptyCustomer, { color: theme.mutedText }]}>
-                  No patients found.
-                </Text>
-              }
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Confirmed Receipt Modal */}
-      <Modal visible={successModal} transparent animationType="fade">
-        <View style={styles.successOverlay}>
-          <View style={[styles.successContent, { backgroundColor: theme.surface }]}>
-            <View style={[styles.successIconCircle, { backgroundColor: theme.successSoft }]}>
-              <CheckCircle2 size={46} color={theme.success} />
-            </View>
-            <Text style={[styles.successTitle, { color: theme.navigation }]}>Sale Recorded!</Text>
-            <Text style={[styles.receiptNumber, { color: theme.primary }]}>
-              Receipt #{confirmedReceipt?.receiptNumber}
-            </Text>
-
-            <View style={[styles.receiptPaper, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
-              <View style={styles.receiptLine}>
-                <Text style={[styles.receiptFieldLabel, { color: theme.mutedText }]}>Date & Time:</Text>
-                <Text style={[styles.receiptFieldValue, { color: theme.text }]}>
-                  {confirmedReceipt?.date ? new Date(confirmedReceipt.date).toLocaleString() : '—'}
-                </Text>
-              </View>
-              <View style={styles.receiptLine}>
-                <Text style={[styles.receiptFieldLabel, { color: theme.mutedText }]}>Cashier:</Text>
-                <Text style={[styles.receiptFieldValue, { color: theme.text }]}>
-                  {confirmedReceipt?.cashierName}
-                </Text>
-              </View>
-              <View style={styles.receiptLine}>
-                <Text style={[styles.receiptFieldLabel, { color: theme.mutedText }]}>Payment Method:</Text>
-                <Text style={[styles.receiptFieldValue, { color: theme.text }]}>
-                  {confirmedReceipt?.paymentMethod}
-                </Text>
-              </View>
-
-              <View style={[styles.receiptDivider, { backgroundColor: theme.border }]} />
-
-              {confirmedReceipt?.items?.map((item, idx) => (
-                <View key={idx} style={styles.receiptItemLine}>
-                  <Text style={[styles.receiptItemName, { color: theme.text }]} numberOfLines={1}>
-                    {item.name} × {item.quantity}
-                  </Text>
-                  <Text style={[styles.receiptItemTotal, { color: theme.text }]}>
-                    K {item.total.toFixed(2)}
-                  </Text>
-                </View>
-              ))}
-
-              <View style={[styles.receiptDivider, { backgroundColor: theme.border }]} />
-
-              <View style={styles.receiptTotalLine}>
-                <Text style={[styles.receiptTotalLabel, { color: theme.text }]}>Total Amount</Text>
-                <Text style={[styles.receiptTotalAmount, { color: theme.primary }]}>
-                  K {Number(confirmedReceipt?.total || 0).toFixed(2)}
-                </Text>
-              </View>
-            </View>
-
-            <Button
-              title="Start New Sale"
-              onPress={() => setSuccessModal(false)}
-              variant="primary"
-              size="md"
-              fullWidth
-            />
-          </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </RoleGuard>
   );
 }
 

@@ -31,6 +31,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RoleGuard } from '@/components/ui/RoleGuard';
 
 export default function CustomersScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -100,221 +101,223 @@ export default function CustomersScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Top Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={styles.topRow}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-            <ArrowLeft size={22} color={theme.text} />
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-              Patient & Customer Hub
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-              Medical history, allergy alerts & loyalty status
-            </Text>
-          </View>
-        </View>
-
-        <SearchInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by patient name or phone number..."
-          style={{ marginTop: 8 }}
-        />
-      </View>
-
-      {/* Patients List */}
-      <FlatList
-        data={filteredCustomers}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadCustomers();
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        ListHeaderComponent={
-          <View style={styles.statsRow}>
-            <StatCard
-              style={styles.statCard}
-              label="Total Patients"
-              value={stats.total}
-              icon={<Users size={18} color="#0369a1" />}
-              iconBg="#e0f2fe"
-            />
-            <StatCard
-              style={styles.statCard}
-              label="Allergy Alerts"
-              value={stats.withAllergies}
-              icon={<ShieldAlert size={18} color="#b91c1c" />}
-              iconBg="#fee2e2"
-            />
-            <StatCard
-              style={styles.statCard}
-              label="Loyalty Points"
-              value={stats.totalPoints}
-              icon={<Star size={18} color="#a16207" />}
-              iconBg="#fef9c3"
-            />
-          </View>
-        }
-        renderItem={({ item }) => {
-          const hasAllergies =
-            item.allergies && item.allergies.toLowerCase() !== 'none';
-          return (
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.patientCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              onPress={() => openPatientDetail(item)}
-            >
-              <View style={styles.patientTopRow}>
-                <View style={[styles.avatarCircle, { backgroundColor: theme.primarySoft }]}>
-                  <Text style={[styles.avatarText, { color: theme.primary }]}>
-                    {item.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.patientCopy}>
-                  <Text style={[styles.patientName, { color: theme.text }]}>{item.name}</Text>
-                  <Text style={[styles.patientMeta, { color: theme.mutedText }]}>
-                    {item.phone || 'No phone'} · {item.email || 'No email'}
-                  </Text>
-                </View>
-                <Badge
-                  label={`★ ${item.loyaltyPoints || 0} pts`}
-                  variant="warning"
-                  size="sm"
-                />
-              </View>
-
-              {hasAllergies ? (
-                <View style={[styles.allergyBanner, { backgroundColor: theme.dangerSoft, borderColor: theme.danger }]}>
-                  <ShieldAlert size={14} color={theme.danger} />
-                  <Text style={[styles.allergyText, { color: theme.danger }]}>
-                    Allergy Alert: {item.allergies}
-                  </Text>
-                </View>
-              ) : null}
-
-              {item.phone ? (
-                <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
-                  <Pressable
-                    style={[styles.callBtn, { backgroundColor: theme.primarySoft }]}
-                    onPress={() => handleCall(item.phone)}
-                  >
-                    <Phone size={13} color={theme.primary} />
-                    <Text style={[styles.callBtnText, { color: theme.primary }]}>
-                      Call {item.phone}
-                    </Text>
-                  </Pressable>
-                  <Text style={[styles.viewDetailsText, { color: theme.mutedText }]}>
-                    View Records →
-                  </Text>
-                </View>
-              ) : null}
+    <RoleGuard page="customers">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Top Header */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.topRow}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+              <ArrowLeft size={22} color={theme.text} />
             </Pressable>
-          );
-        }}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon={<Users size={32} color={theme.mutedText} />}
-              title="No patients found"
-              description="Patients added through sales or registrations will appear here."
-            />
-          ) : null
-        }
-      />
-
-      {/* Patient History Detail Modal */}
-      <Modal visible={!!selectedPatient} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <View>
-                <Text style={[styles.modalTitle, { color: theme.navigation }]}>
-                  {selectedPatient?.name}
-                </Text>
-                <Text style={[styles.modalSub, { color: theme.mutedText }]}>
-                  Patient Medical & Dispense History
-                </Text>
-              </View>
-              <Pressable hitSlop={8} onPress={() => setSelectedPatient(null)}>
-                <X size={20} color={theme.mutedText} />
-              </Pressable>
+            <View style={styles.headerTitleWrap}>
+              <Text style={[styles.headerTitle, { color: theme.navigation }]}>
+                Patient & Customer Hub
+              </Text>
+              <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
+                Medical history, allergy alerts & loyalty status
+              </Text>
             </View>
-
-            <ScrollView style={{ marginTop: 12 }}>
-              {selectedPatient ? (
-                <>
-                  <View style={[styles.infoSection, { backgroundColor: theme.surfaceMuted }]}>
-                    <Text style={[styles.infoSectionTitle, { color: theme.textSecondary }]}>
-                      CLINICAL PROFILE
-                    </Text>
-                    <Text style={[styles.infoRow, { color: theme.text }]}>
-                      Phone: <Text style={{ fontWeight: '700' }}>{selectedPatient.phone || 'N/A'}</Text>
-                    </Text>
-                    <Text style={[styles.infoRow, { color: theme.text }]}>
-                      Email: <Text style={{ fontWeight: '700' }}>{selectedPatient.email || 'N/A'}</Text>
-                    </Text>
-                    <Text style={[styles.infoRow, { color: theme.text }]}>
-                      Allergies:{' '}
-                      <Text style={{ fontWeight: '700', color: theme.danger }}>
-                        {selectedPatient.allergies || 'None recorded'}
-                      </Text>
-                    </Text>
-                    <Text style={[styles.infoRow, { color: theme.text }]}>
-                      Loyalty Balance:{' '}
-                      <Text style={{ fontWeight: '700', color: theme.primary }}>
-                        {selectedPatient.loyaltyPoints || 0} points
-                      </Text>
+          </View>
+  
+          <SearchInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by patient name or phone number..."
+            style={{ marginTop: 8 }}
+          />
+        </View>
+  
+        {/* Patients List */}
+        <FlatList
+          data={filteredCustomers}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadCustomers();
+              }}
+              tintColor={theme.primary}
+            />
+          }
+          ListHeaderComponent={
+            <View style={styles.statsRow}>
+              <StatCard
+                style={styles.statCard}
+                label="Total Patients"
+                value={stats.total}
+                icon={<Users size={18} color="#0369a1" />}
+                iconBg="#e0f2fe"
+              />
+              <StatCard
+                style={styles.statCard}
+                label="Allergy Alerts"
+                value={stats.withAllergies}
+                icon={<ShieldAlert size={18} color="#b91c1c" />}
+                iconBg="#fee2e2"
+              />
+              <StatCard
+                style={styles.statCard}
+                label="Loyalty Points"
+                value={stats.totalPoints}
+                icon={<Star size={18} color="#a16207" />}
+                iconBg="#fef9c3"
+              />
+            </View>
+          }
+          renderItem={({ item }) => {
+            const hasAllergies =
+              item.allergies && item.allergies.toLowerCase() !== 'none';
+            return (
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.patientCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => openPatientDetail(item)}
+              >
+                <View style={styles.patientTopRow}>
+                  <View style={[styles.avatarCircle, { backgroundColor: theme.primarySoft }]}>
+                    <Text style={[styles.avatarText, { color: theme.primary }]}>
+                      {item.name.charAt(0).toUpperCase()}
                     </Text>
                   </View>
-
-                  <View style={{ marginTop: 14 }}>
-                    <Text style={[styles.infoSectionTitle, { color: theme.mutedText, marginBottom: 8 }]}>
-                      RECENT DISPENSED TRANSACTIONS
+                  <View style={styles.patientCopy}>
+                    <Text style={[styles.patientName, { color: theme.text }]}>{item.name}</Text>
+                    <Text style={[styles.patientMeta, { color: theme.mutedText }]}>
+                      {item.phone || 'No phone'} · {item.email || 'No email'}
                     </Text>
-                    {(patientHistory?.Sales || patientHistory?.sales || []).length > 0 ? (
-                      (patientHistory?.Sales || patientHistory?.sales || []).map(
-                        (sale: any, idx: number) => (
-                          <View
-                            key={idx}
-                            style={[styles.historyRow, { borderBottomColor: theme.borderLight }]}
-                          >
-                            <View>
-                              <Text style={[styles.historyItemName, { color: theme.text }]}>
-                                {sale.name} × {sale.quantity}
-                              </Text>
-                              <Text style={[styles.historyDate, { color: theme.mutedText }]}>
-                                {sale.date ? new Date(sale.date).toLocaleDateString() : '—'}
+                  </View>
+                  <Badge
+                    label={`★ ${item.loyaltyPoints || 0} pts`}
+                    variant="warning"
+                    size="sm"
+                  />
+                </View>
+  
+                {hasAllergies ? (
+                  <View style={[styles.allergyBanner, { backgroundColor: theme.dangerSoft, borderColor: theme.danger }]}>
+                    <ShieldAlert size={14} color={theme.danger} />
+                    <Text style={[styles.allergyText, { color: theme.danger }]}>
+                      Allergy Alert: {item.allergies}
+                    </Text>
+                  </View>
+                ) : null}
+  
+                {item.phone ? (
+                  <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
+                    <Pressable
+                      style={[styles.callBtn, { backgroundColor: theme.primarySoft }]}
+                      onPress={() => handleCall(item.phone)}
+                    >
+                      <Phone size={13} color={theme.primary} />
+                      <Text style={[styles.callBtnText, { color: theme.primary }]}>
+                        Call {item.phone}
+                      </Text>
+                    </Pressable>
+                    <Text style={[styles.viewDetailsText, { color: theme.mutedText }]}>
+                      View Records →
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          }}
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon={<Users size={32} color={theme.mutedText} />}
+                title="No patients found"
+                description="Patients added through sales or registrations will appear here."
+              />
+            ) : null
+          }
+        />
+  
+        {/* Patient History Detail Modal */}
+        <Modal visible={!!selectedPatient} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalSheet, { backgroundColor: theme.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                <View>
+                  <Text style={[styles.modalTitle, { color: theme.navigation }]}>
+                    {selectedPatient?.name}
+                  </Text>
+                  <Text style={[styles.modalSub, { color: theme.mutedText }]}>
+                    Patient Medical & Dispense History
+                  </Text>
+                </View>
+                <Pressable hitSlop={8} onPress={() => setSelectedPatient(null)}>
+                  <X size={20} color={theme.mutedText} />
+                </Pressable>
+              </View>
+  
+              <ScrollView style={{ marginTop: 12 }}>
+                {selectedPatient ? (
+                  <>
+                    <View style={[styles.infoSection, { backgroundColor: theme.surfaceMuted }]}>
+                      <Text style={[styles.infoSectionTitle, { color: theme.textSecondary }]}>
+                        CLINICAL PROFILE
+                      </Text>
+                      <Text style={[styles.infoRow, { color: theme.text }]}>
+                        Phone: <Text style={{ fontWeight: '700' }}>{selectedPatient.phone || 'N/A'}</Text>
+                      </Text>
+                      <Text style={[styles.infoRow, { color: theme.text }]}>
+                        Email: <Text style={{ fontWeight: '700' }}>{selectedPatient.email || 'N/A'}</Text>
+                      </Text>
+                      <Text style={[styles.infoRow, { color: theme.text }]}>
+                        Allergies:{' '}
+                        <Text style={{ fontWeight: '700', color: theme.danger }}>
+                          {selectedPatient.allergies || 'None recorded'}
+                        </Text>
+                      </Text>
+                      <Text style={[styles.infoRow, { color: theme.text }]}>
+                        Loyalty Balance:{' '}
+                        <Text style={{ fontWeight: '700', color: theme.primary }}>
+                          {selectedPatient.loyaltyPoints || 0} points
+                        </Text>
+                      </Text>
+                    </View>
+  
+                    <View style={{ marginTop: 14 }}>
+                      <Text style={[styles.infoSectionTitle, { color: theme.mutedText, marginBottom: 8 }]}>
+                        RECENT DISPENSED TRANSACTIONS
+                      </Text>
+                      {(patientHistory?.Sales || patientHistory?.sales || []).length > 0 ? (
+                        (patientHistory?.Sales || patientHistory?.sales || []).map(
+                          (sale: any, idx: number) => (
+                            <View
+                              key={idx}
+                              style={[styles.historyRow, { borderBottomColor: theme.borderLight }]}
+                            >
+                              <View>
+                                <Text style={[styles.historyItemName, { color: theme.text }]}>
+                                  {sale.name} × {sale.quantity}
+                                </Text>
+                                <Text style={[styles.historyDate, { color: theme.mutedText }]}>
+                                  {sale.date ? new Date(sale.date).toLocaleDateString() : '—'}
+                                </Text>
+                              </View>
+                              <Text style={[styles.historyAmount, { color: theme.primary }]}>
+                                K {Number(sale.totalPrice || 0).toFixed(2)}
                               </Text>
                             </View>
-                            <Text style={[styles.historyAmount, { color: theme.primary }]}>
-                              K {Number(sale.totalPrice || 0).toFixed(2)}
-                            </Text>
-                          </View>
+                          )
                         )
-                      )
-                    ) : (
-                      <Text style={[styles.emptyHistory, { color: theme.mutedText }]}>
-                        No previous dispensary records found for this patient.
-                      </Text>
-                    )}
-                  </View>
-                </>
-              ) : null}
-            </ScrollView>
+                      ) : (
+                        <Text style={[styles.emptyHistory, { color: theme.mutedText }]}>
+                          No previous dispensary records found for this patient.
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                ) : null}
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </RoleGuard>
   );
 }
 

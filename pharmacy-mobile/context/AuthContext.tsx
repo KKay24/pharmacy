@@ -4,17 +4,78 @@ import * as SecureStore from 'expo-secure-store';
 const SESSION_KEY = 'mediquick.auth';
 const TOKEN_KEY = 'mediquick.token';
 
-type AuthUser = {
+/**
+ * Backend roles:
+ *   'user'    → pharmacy staff  (cashier / dispenser)
+ *   'manager' → manager / supervisor
+ *   'admin'   → full system administrator
+ */
+export type UserRole = 'user' | 'manager' | 'admin';
+
+export type AuthUser = {
   id?: number;
   username: string;
-  role: string;
+  role: UserRole | string;
   email?: string | null;
   locations?: string[];
 };
 
-type AuthSession = {
+export type AuthSession = {
   token: string;
   user: AuthUser;
+};
+
+/**
+ * All protected operational pages.
+ * Access by role:
+ *   staff   ('user')    → support-center, orders, pos, inventory
+ *   manager             → + dashboard, add-stock, customers, suppliers, prescriptions, expenses
+ *   admin               → all of the above + profit-loss, reports, team
+ */
+export type ProtectedPage =
+  | 'support-center'
+  | 'orders'
+  | 'pos'
+  | 'inventory'
+  | 'dashboard'
+  | 'add-stock'
+  | 'customers'
+  | 'suppliers'
+  | 'prescriptions'
+  | 'expenses'
+  | 'profit-loss'
+  | 'reports'
+  | 'team';
+
+export const ROLE_ACCESS: Record<UserRole, ProtectedPage[]> = {
+  user: ['support-center', 'orders', 'pos', 'inventory'],
+  manager: [
+    'support-center',
+    'orders',
+    'pos',
+    'inventory',
+    'dashboard',
+    'add-stock',
+    'customers',
+    'suppliers',
+    'prescriptions',
+    'expenses',
+  ],
+  admin: [
+    'support-center',
+    'orders',
+    'pos',
+    'inventory',
+    'dashboard',
+    'add-stock',
+    'customers',
+    'suppliers',
+    'prescriptions',
+    'expenses',
+    'profit-loss',
+    'reports',
+    'team',
+  ],
 };
 
 interface AuthContextType {
@@ -23,6 +84,14 @@ interface AuthContextType {
   isLoading: boolean;
   login: (session: AuthSession) => Promise<void>;
   logout: () => Promise<void>;
+  /** True if the signed-in user has at least one of the given roles */
+  hasRole: (...roles: UserRole[]) => boolean;
+  /** True if the signed-in user can access the given protected page */
+  canAccess: (page: ProtectedPage) => boolean;
+  isAdmin: boolean;
+  isManagerOrAdmin: boolean;
+  /** True if the user is a regular staff member (role === 'user') */
+  isStaff: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,8 +146,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const hasRole = (...roles: UserRole[]): boolean => {
+    if (!user) return false;
+    return roles.includes(user.role as UserRole);
+  };
+
+  const canAccess = (page: ProtectedPage): boolean => {
+    if (!user) return false;
+    const allowed = ROLE_ACCESS[user.role as UserRole] ?? [];
+    return allowed.includes(page);
+  };
+
+  const isAdmin = user?.role === 'admin';
+  const isManagerOrAdmin = user?.role === 'admin' || user?.role === 'manager';
+  const isStaff = user?.role === 'user';
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, token, isLoading, login, logout, hasRole, canAccess, isAdmin, isManagerOrAdmin, isStaff }}
+    >
       {children}
     </AuthContext.Provider>
   );
