@@ -107,7 +107,7 @@ if (__DEV__) {
 
 const apiClient = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 45000,
   headers: {
     Accept: 'application/json',
   },
@@ -125,5 +125,21 @@ apiClient.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+// Interceptor to handle expired tokens and auth failures.
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      try {
+        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await SecureStore.deleteItemAsync('mediquick.auth');
+      } catch (err) {
+        // ignore
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default apiClient;

@@ -16,9 +16,13 @@ type ThemeProps = {
 export type TextProps = ThemeProps & DefaultText['props'];
 export type ViewProps = ThemeProps & DefaultView['props'];
 
+type StringColorKeys = {
+  [K in keyof typeof Colors.light]: typeof Colors.light[K] extends string ? K : never;
+}[keyof typeof Colors.light];
+
 export function useThemeColor(
   props: { light?: string; dark?: string },
-  colorName: keyof typeof Colors.light & keyof typeof Colors.dark
+  colorName: StringColorKeys
 ) {
   const theme = useColorScheme() ?? 'light';
   const colorFromProps = props[theme];
@@ -26,7 +30,7 @@ export function useThemeColor(
   if (colorFromProps) {
     return colorFromProps;
   } else {
-    return Colors[theme][colorName];
+    return Colors[theme][colorName] as string;
   }
 }
 

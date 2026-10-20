@@ -6,7 +6,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://pharmacy-inventory-backend-4.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://pharmacy-backend-5bcl.onrender.com"
       }
     },
     "production": {
@@ -14,7 +14,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://pharmacy-inventory-backend-4.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://pharmacy-backend-5bcl.onrender.com"
       }
     }
   }
