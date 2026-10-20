@@ -32,8 +32,10 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { RoleGuard } from '@/components/ui/RoleGuard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CustomersScreen() {
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
 
@@ -131,7 +133,7 @@ export default function CustomersScreen() {
         <FlatList
           data={filteredCustomers}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

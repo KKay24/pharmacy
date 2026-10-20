@@ -31,8 +31,11 @@ import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
 import apiClient from '@/api/client';
 import { Badge } from '@/components/ui/Badge';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 export default function OperationsScreen() {
+  const insets = useSafeAreaInsets();
   const { user, canAccess } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -269,8 +272,8 @@ export default function OperationsScreen() {
       {/* Banner */}
       <View style={[styles.banner, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={styles.bannerRow}>
-          <View style={[styles.avatarBox, { backgroundColor: theme.primarySoft }]}>
-            <HeartPulse size={26} color={theme.primary} />
+          <View style={[styles.avatarBox, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
+            <BrandLogo size="icon" width={48} height={48} />
           </View>
           <View style={styles.bannerCopy}>
             <Text style={[styles.bannerEyebrow, { color: theme.mutedText }]}>

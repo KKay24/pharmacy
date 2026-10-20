@@ -41,6 +41,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getMedicineBatches, getMedicineCurrentPrice, getMedicineTotalQuantity } from '@/utils/inventory';
 import { RoleGuard } from '@/components/ui/RoleGuard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Batch {
   id?: number;
@@ -73,6 +74,7 @@ interface MedicineItem {
 }
 
 export default function InventoryScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -408,7 +410,7 @@ export default function InventoryScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

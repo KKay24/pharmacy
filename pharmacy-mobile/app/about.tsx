@@ -28,6 +28,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../constants/theme';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
@@ -104,6 +105,10 @@ export default function AboutScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Brand Hero */}
         <View style={[styles.heroCard, { backgroundColor: colors.primary }]}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 20, alignSelf: 'center', marginBottom: 16 }}>
+            <BrandLogo size="lg" width={180} height={60} />
+          </View>
+
           <View style={styles.heroBadge}>
             <Stethoscope size={16} color="#ffffff" />
             <Text style={styles.heroBadgeText}>Licensed Community Pharmacy</Text>

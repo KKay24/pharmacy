@@ -28,8 +28,10 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { RoleGuard } from '@/components/ui/RoleGuard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReportsScreen() {
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
 
@@ -113,7 +115,7 @@ export default function ReportsScreen() {
     <RoleGuard page="reports">
       <ScrollView
         style={[styles.container, { backgroundColor: theme.background }]}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -27,6 +27,7 @@ import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
 import { RoleGuard } from '@/components/ui/RoleGuard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Supplier {
   id: number;
@@ -53,6 +54,7 @@ interface RestockItem {
 }
 
 export default function AddStockScreen() {
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
 
@@ -227,7 +229,7 @@ export default function AddStockScreen() {
     <RoleGuard page="add-stock">
       <ScrollView
         style={[styles.container, { backgroundColor: theme.background }]}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
       >
         {/* Top Header */}
         <View style={styles.topHeader}>

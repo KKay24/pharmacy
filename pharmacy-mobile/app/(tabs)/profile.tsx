@@ -24,8 +24,11 @@ import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
 import { API_URL } from '@/api/client';
 import { Badge } from '@/components/ui/Badge';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -45,17 +48,20 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 20, 32) }}
+    >
       {/* Header Profile Card */}
       <View style={[styles.headerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={styles.headerRow}>
-          <View style={[styles.avatar, { backgroundColor: theme.primarySoft, borderColor: theme.primary }]}>
+          <View style={[styles.avatar, { backgroundColor: user ? theme.primarySoft : '#ffffff', borderColor: theme.primary, overflow: 'hidden' }]}>
             {user ? (
               <Text style={[styles.avatarText, { color: theme.primary }]}>
                 {user.username.charAt(0).toUpperCase()}
               </Text>
             ) : (
-              <HeartPulse size={36} color={theme.primary} />
+              <BrandLogo size="icon" width={52} height={52} />
             )}
           </View>
           <View style={styles.userCopy}>

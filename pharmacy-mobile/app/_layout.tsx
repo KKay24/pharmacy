@@ -3,7 +3,10 @@ import { useFonts } from 'expo-font';
 import { Stack, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -45,9 +48,7 @@ function InitialLayout() {
 
   useEffect(() => {
     if (isLoading) return;
-
     const inAuthGroup = segments[0] === '(auth)';
-
     if (user && inAuthGroup) {
       router.replace('/(tabs)');
     }
@@ -72,33 +73,37 @@ function InitialLayout() {
   };
 
   return (
-    <Stack screenOptions={screenHeaderOptions}>
-      {/* Tab Navigator */}
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'System Information' }} />
+    <>
+      {/* Adaptive status bar – automatically adapts to light/dark color scheme */}
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <Stack screenOptions={screenHeaderOptions}>
+        {/* Tab Navigator */}
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'System Information' }} />
 
-      {/* Staff & Operations Screens */}
-      <Stack.Screen name="dashboard" options={{ title: 'Executive Dashboard' }} />
-      <Stack.Screen name="orders" options={{ title: 'Online Orders' }} />
-      <Stack.Screen name="support-center" options={{ title: 'Customer Support' }} />
-      <Stack.Screen name="prescriptions" options={{ title: 'Prescription Queue' }} />
-      <Stack.Screen name="add-stock" options={{ title: 'Restock Inventory' }} />
-      <Stack.Screen name="profit-loss" options={{ title: 'Profit & Loss' }} />
-      <Stack.Screen name="reports" options={{ title: 'Sales Analytics' }} />
-      <Stack.Screen name="customers" options={{ title: 'Patient Directory' }} />
-      <Stack.Screen name="suppliers" options={{ title: 'Suppliers' }} />
-      <Stack.Screen name="expenses" options={{ title: 'Expenses' }} />
-      <Stack.Screen name="team" options={{ title: 'Team & HR Hub' }} />
+        {/* Staff & Operations Screens */}
+        <Stack.Screen name="dashboard" options={{ title: 'Executive Dashboard' }} />
+        <Stack.Screen name="orders" options={{ title: 'Online Orders' }} />
+        <Stack.Screen name="support-center" options={{ title: 'Customer Support' }} />
+        <Stack.Screen name="prescriptions" options={{ title: 'Prescription Queue' }} />
+        <Stack.Screen name="add-stock" options={{ title: 'Restock Inventory' }} />
+        <Stack.Screen name="profit-loss" options={{ title: 'Profit & Loss' }} />
+        <Stack.Screen name="reports" options={{ title: 'Sales Analytics' }} />
+        <Stack.Screen name="customers" options={{ title: 'Patient Directory' }} />
+        <Stack.Screen name="suppliers" options={{ title: 'Suppliers' }} />
+        <Stack.Screen name="expenses" options={{ title: 'Expenses' }} />
+        <Stack.Screen name="team" options={{ title: 'Team & HR Hub' }} />
 
-      {/* Customer Storefront Screens */}
-      <Stack.Screen name="product/[id]" options={{ title: 'Medication Info' }} />
-      <Stack.Screen name="track-order" options={{ title: 'Track Order' }} />
-      <Stack.Screen name="prescription-upload" options={{ title: 'Prescription Services' }} />
-      <Stack.Screen name="contact" options={{ title: 'Contact Us' }} />
-      <Stack.Screen name="health-wellness" options={{ title: 'Health & Wellness' }} />
-      <Stack.Screen name="about" options={{ title: 'About MediQuick' }} />
-    </Stack>
+        {/* Customer Storefront Screens */}
+        <Stack.Screen name="product/[id]" options={{ title: 'Medication Info' }} />
+        <Stack.Screen name="track-order" options={{ title: 'Track Order' }} />
+        <Stack.Screen name="prescription-upload" options={{ title: 'Prescription Services' }} />
+        <Stack.Screen name="contact" options={{ title: 'Contact Us' }} />
+        <Stack.Screen name="health-wellness" options={{ title: 'Health & Wellness' }} />
+        <Stack.Screen name="about" options={{ title: 'About MediQuick' }} />
+      </Stack>
+    </>
   );
 }
 
@@ -106,12 +111,15 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        <CartProvider>
-          <InitialLayout />
-        </CartProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    // SafeAreaProvider must be at the root so useSafeAreaInsets() works everywhere
+    <SafeAreaProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AuthProvider>
+          <CartProvider>
+            <InitialLayout />
+          </CartProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

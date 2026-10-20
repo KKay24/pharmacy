@@ -37,6 +37,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { RoleGuard } from '@/components/ui/RoleGuard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 interface Medicine {
   id: number;
@@ -74,6 +76,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function PosScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -338,8 +341,8 @@ export default function PosScreen() {
         {/* POS Top Bar */}
         <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <View style={styles.brandRow}>
-            <View style={[styles.logoMark, { backgroundColor: theme.primary }]}>
-              <HeartPulse size={20} color="#ffffff" />
+            <View style={[styles.logoMark, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
+              <BrandLogo size="icon" width={38} height={38} />
             </View>
             <View style={styles.brandCopy}>
               <Text style={[styles.brand, { color: theme.navigation }]}>

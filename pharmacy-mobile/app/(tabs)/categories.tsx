@@ -117,7 +117,7 @@ export default function CategoriesScreen() {
         <FlatList
           data={filteredCategories}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 40, 60) }]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <Pressable

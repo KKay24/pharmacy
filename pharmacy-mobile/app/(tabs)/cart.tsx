@@ -112,7 +112,7 @@ export default function CartTabScreen() {
   return (
     <ScrollView
       style={[styles.container, { paddingTop: insets.top }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 40, 60) }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}

@@ -35,8 +35,10 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { getMedicineBatches, getMedicineTotalQuantity } from '@/utils/inventory';
 import { RoleGuard } from '@/components/ui/RoleGuard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function DashboardScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -200,7 +202,7 @@ export default function DashboardScreen() {
     <RoleGuard page="dashboard">
       <ScrollView
         style={[styles.container, { backgroundColor: theme.background }]}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

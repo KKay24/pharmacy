@@ -12,12 +12,15 @@ import { Text, View } from '@/components/Themed';
 import { useAuth } from '@/context/AuthContext';
 import apiClient, { API_URL } from '@/api/client';
 import { router } from 'expo-router';
-import { Lock, User, HeartPulse, ArrowLeft } from 'lucide-react-native';
+import { Lock, User, ArrowLeft } from 'lucide-react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
 
@@ -69,7 +72,13 @@ export default function LoginScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: Math.max(insets.top + 16, 24),
+            paddingBottom: Math.max(insets.bottom + 24, 32),
+          },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <Pressable
@@ -83,12 +92,7 @@ export default function LoginScreen() {
         </Pressable>
 
         <View style={styles.header}>
-          <View style={[styles.logoMark, { backgroundColor: theme.primary }]}>
-            <HeartPulse size={36} color="#ffffff" />
-          </View>
-          <Text style={[styles.brand, { color: theme.navigation }]}>
-            MediQuick <Text style={{ color: theme.primary }}>Pharmacy</Text>
-          </Text>
+          <BrandLogo size="xl" style={{ alignSelf: 'center', marginBottom: 12 }} />
           <Text style={[styles.subtitle, { color: theme.mutedText }]}>
             Staff & Operations Sign-in
           </Text>

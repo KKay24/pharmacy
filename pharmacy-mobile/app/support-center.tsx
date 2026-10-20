@@ -31,10 +31,12 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { RoleGuard } from '@/components/ui/RoleGuard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const INQUIRY_STATUSES = ['All', 'New', 'Contacted', 'Resolved'] as const;
 
 export default function SupportCenterScreen() {
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
 
@@ -180,7 +182,7 @@ export default function SupportCenterScreen() {
         <FlatList
           data={filteredInquiries}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

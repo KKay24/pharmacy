@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 interface RoleGuardProps {
   /** The page key to check against canAccess() */
@@ -31,8 +32,9 @@ export function RoleGuard({ page, children }: RoleGuardProps) {
   if (!user) {
     return (
       <View style={[styles.center, { backgroundColor: theme.background }]}>
+        <BrandLogo size="md" width={150} height={50} style={{ marginBottom: 20 }} />
         <View style={[styles.iconWrap, { backgroundColor: theme.primarySoft }]}>
-          <LogIn size={40} color={theme.primary} />
+          <LogIn size={36} color={theme.primary} />
         </View>
         <Text style={[styles.title, { color: theme.text }]}>Sign In Required</Text>
         <Text style={[styles.subtitle, { color: theme.mutedText }]}>

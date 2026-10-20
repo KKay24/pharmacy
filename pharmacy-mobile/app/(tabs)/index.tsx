@@ -43,6 +43,7 @@ import {
 import apiClient from '@/api/client';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40 - 12) / 2;
@@ -175,14 +176,7 @@ export default function HomeScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* ─── Top Header ────────────────────────────────────────────── */}
       <View style={styles.topHeader}>
-        <View style={styles.brandRow}>
-          <View style={styles.appIcon}>
-            <HeartPulse size={22} color="#ffffff" strokeWidth={2.5} />
-          </View>
-          <Text style={styles.brandTitle}>
-            MediQuick <Text style={styles.brandTitleGreen}>Pharmacy</Text>
-          </Text>
-        </View>
+        <BrandLogo size="md" width={150} height={48} />
 
         <TouchableOpacity
           style={styles.menuBtn}
@@ -464,14 +458,7 @@ export default function HomeScreen() {
           <View style={[styles.menuSheet, { paddingTop: insets.top + 10 }]}>
             {/* Sheet Header */}
             <View style={styles.menuSheetHeader}>
-              <View style={styles.brandRow}>
-                <View style={styles.appIconSmall}>
-                  <HeartPulse size={18} color="#ffffff" />
-                </View>
-                <Text style={styles.brandTitle}>
-                  MediQuick <Text style={styles.brandTitleGreen}>Pharmacy</Text>
-                </Text>
-              </View>
+              <BrandLogo size="sm" width={130} height={42} />
               <TouchableOpacity onPress={() => setMenuOpen(false)}>
                 <X size={22} color="#0e3854" />
               </TouchableOpacity>
