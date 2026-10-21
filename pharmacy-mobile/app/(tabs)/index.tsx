@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -11,8 +11,9 @@ import {
   Dimensions,
   ActivityIndicator,
   RefreshControl,
+  View,
+  Text,
 } from 'react-native';
-import { Text, View } from '@/components/Themed';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
@@ -39,6 +40,11 @@ import {
   PhoneCall,
   Info,
   LogIn,
+  Camera,
+  UploadCloud,
+  Stethoscope,
+  Tag,
+  Check,
 } from 'lucide-react-native';
 import apiClient from '@/api/client';
 import { useAuth } from '@/context/AuthContext';
@@ -47,6 +53,66 @@ import { BrandLogo } from '@/components/ui/BrandLogo';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40 - 12) / 2;
+const BANNER_WIDTH = width - 40;
+
+interface PromoAdvert {
+  id: string;
+  badge: string;
+  title: string;
+  subtitle: string;
+  codeText: string;
+  description: string;
+  backgroundColor: string;
+  iconType: 'truck' | 'prescription' | 'delivery' | 'advice';
+  route?: string | null;
+}
+
+const PROMO_ADVERTS: PromoAdvert[] = [
+  {
+    id: 'welcome10',
+    badge: '10% DISCOUNT CODE',
+    title: 'Get 10% Off',
+    subtitle: 'Your First Order!',
+    codeText: 'code: WELCOME10',
+    description: 'Use at checkout · Valid on all medicines & essentials',
+    backgroundColor: '#008375',
+    iconType: 'truck',
+    route: null,
+  },
+  {
+    id: 'rx-upload',
+    badge: 'DIRECT DISPENSARY',
+    title: 'Upload Doctor’s Rx',
+    subtitle: 'Fast Script Verification',
+    codeText: 'Upload Rx Photo →',
+    description: 'Reviewed by licensed pharmacists in minutes',
+    backgroundColor: '#0b3156',
+    iconType: 'prescription',
+    route: '/prescription-upload',
+  },
+  {
+    id: 'free-delivery',
+    badge: 'EXPRESS DOORSTEP',
+    title: 'Free Delivery',
+    subtitle: 'On Orders Over ZMW 250',
+    codeText: 'Shop Catalogue →',
+    description: 'Safe, temperature-regulated doorstep delivery',
+    backgroundColor: '#1d4ed8',
+    iconType: 'delivery',
+    route: '/(tabs)/categories',
+  },
+  {
+    id: 'clinical-advice',
+    badge: 'PHARMACIST ON CALL',
+    title: 'Need Advice?',
+    subtitle: 'Free Clinical Guidance',
+    codeText: 'Contact Pharmacist →',
+    description: 'Expert dosage advice, interactions & generic options',
+    backgroundColor: '#047857',
+    iconType: 'advice',
+    route: '/contact',
+  },
+];
 
 interface DatabaseProduct {
   id: number;
@@ -87,6 +153,39 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const bannerScrollRef = useRef<ScrollView>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => {
+        const next = (prev + 1) % PROMO_ADVERTS.length;
+        bannerScrollRef.current?.scrollTo({
+          x: next * BANNER_WIDTH,
+          animated: true,
+        });
+        return next;
+      });
+    }, 4500);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleAdvertPress = (ad: PromoAdvert) => {
+    if (ad.route) {
+      router.push(ad.route as any);
+    } else if (ad.id === 'welcome10') {
+      Alert.alert(
+        'Promo Code: WELCOME10',
+        'Use promo code WELCOME10 in your Cart checkout to receive 10% off your entire order!',
+        [
+          { text: 'Start Shopping', onPress: () => router.push('/(tabs)/categories') },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
+    }
+  };
 
   useEffect(() => {
     if (params.category) {
@@ -209,25 +308,93 @@ export default function HomeScreen() {
           ) : null}
         </View>
 
-        {/* ─── Promo Banner ("Get 10% Off Your First Order!") ────── */}
-        <View style={styles.promoBanner}>
-          <View style={styles.promoLeft}>
-            <Text style={styles.promoTitle}>Get 10% Off</Text>
-            <Text style={styles.promoSubtitle}>Your First Order!</Text>
-            <View style={styles.codePill}>
-              <Text style={styles.codePillText}>code: WELCOME10</Text>
-            </View>
-          </View>
+        {/* ─── Promotions & Advertisements Carousel ────────────────── */}
+        <View style={styles.carouselContainer}>
+          <ScrollView
+            ref={bannerScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={BANNER_WIDTH}
+            snapToAlignment="center"
+            contentContainerStyle={styles.carouselTrack}
+            onMomentumScrollEnd={(e) => {
+              const offsetX = e.nativeEvent.contentOffset.x;
+              const index = Math.round(offsetX / BANNER_WIDTH);
+              setActiveSlide(index);
+            }}
+          >
+            {PROMO_ADVERTS.map((ad) => (
+              <TouchableOpacity
+                key={ad.id}
+                activeOpacity={0.92}
+                onPress={() => handleAdvertPress(ad)}
+                style={[styles.promoBanner, { backgroundColor: ad.backgroundColor }]}
+              >
+                <View style={styles.promoLeft}>
+                  <View style={styles.promoBadgePill}>
+                    <Sparkles size={11} color="#ffffff" />
+                    <Text style={styles.promoBadgeText}>{ad.badge}</Text>
+                  </View>
+                  <Text style={styles.promoTitle}>{ad.title}</Text>
+                  <Text style={styles.promoSubtitle}>{ad.subtitle}</Text>
+                  <View style={styles.codePill}>
+                    <Text style={styles.codePillText}>{ad.codeText}</Text>
+                  </View>
+                </View>
 
-          {/* Delivery Van & First Aid Graphic */}
-          <View style={styles.promoRightGraphic}>
-            <View style={styles.vanBackdropCircle} />
-            <View style={styles.truckBox}>
-              <Truck size={38} color="#ffffff" strokeWidth={1.8} />
-              <View style={styles.crossCircle}>
-                <Text style={styles.crossSymbol}>+</Text>
-              </View>
-            </View>
+                {/* Right Visual Graphic */}
+                <View style={styles.promoRightGraphic}>
+                  <View style={styles.vanBackdropCircle} />
+                  {ad.iconType === 'truck' && (
+                    <View style={styles.truckBox}>
+                      <Truck size={38} color="#ffffff" strokeWidth={1.8} />
+                      <View style={styles.crossCircle}>
+                        <Text style={styles.crossSymbol}>+</Text>
+                      </View>
+                    </View>
+                  )}
+                  {ad.iconType === 'prescription' && (
+                    <View style={styles.truckBox}>
+                      <FileText size={38} color="#ffffff" strokeWidth={1.8} />
+                      <View style={[styles.crossCircle, { backgroundColor: '#38bdf8' }]}>
+                        <Camera size={10} color="#ffffff" />
+                      </View>
+                    </View>
+                  )}
+                  {ad.iconType === 'delivery' && (
+                    <View style={styles.truckBox}>
+                      <Truck size={38} color="#ffffff" strokeWidth={1.8} />
+                      <View style={[styles.crossCircle, { backgroundColor: '#fbbf24' }]}>
+                        <Sparkles size={10} color="#000000" />
+                      </View>
+                    </View>
+                  )}
+                  {ad.iconType === 'advice' && (
+                    <View style={styles.truckBox}>
+                      <Stethoscope size={38} color="#ffffff" strokeWidth={1.8} />
+                      <View style={[styles.crossCircle, { backgroundColor: '#34d399' }]}>
+                        <Check size={10} color="#ffffff" />
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Pagination Indicators */}
+          <View style={styles.dotsRow}>
+            {PROMO_ADVERTS.map((ad, idx) => (
+              <View
+                key={ad.id}
+                style={[
+                  styles.dot,
+                  activeSlide === idx ? styles.dotActive : styles.dotInactive,
+                ]}
+              />
+            ))}
           </View>
         </View>
 
@@ -384,6 +551,33 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </ScrollView>
 
+        {/* ─── Mid-Page Advert: Prescription Upload ───────────────── */}
+        <TouchableOpacity
+          style={styles.advertCard}
+          activeOpacity={0.9}
+          onPress={() => router.push('/prescription-upload')}
+        >
+          <View style={styles.advertCardLeft}>
+            <View style={styles.advertCardBadge}>
+              <Camera size={13} color="#00966d" />
+              <Text style={styles.advertCardBadgeText}>DIRECT DISPENSARY</Text>
+            </View>
+            <Text style={styles.advertCardTitle}>Got a Doctor’s Script?</Text>
+            <Text style={styles.advertCardDesc}>
+              Snap a photo of your prescription. Our certified pharmacists will review, verify & prepare your dosage.
+            </Text>
+            <View style={styles.advertCardCta}>
+              <Text style={styles.advertCardCtaText}>Upload Prescription Now</Text>
+              <ChevronRight size={15} color="#00966d" />
+            </View>
+          </View>
+          <View style={styles.advertCardRight}>
+            <View style={styles.advertCardIconCircle}>
+              <UploadCloud size={28} color="#ffffff" />
+            </View>
+          </View>
+        </TouchableOpacity>
+
         {/* ─── Popular Products from Database ───────────────────── */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Popular Products</Text>
@@ -449,6 +643,24 @@ export default function HomeScreen() {
             ))}
           </View>
         )}
+
+        {/* ─── Healthcare & Advisory Advert Card ──────────────── */}
+        <TouchableOpacity
+          style={styles.advisoryAdvert}
+          activeOpacity={0.9}
+          onPress={() => router.push('/contact')}
+        >
+          <View style={styles.advisoryIconCircle}>
+            <Stethoscope size={24} color="#008375" />
+          </View>
+          <View style={styles.advisoryTextWrap}>
+            <Text style={styles.advisoryTitle}>Need Advice From a Pharmacist?</Text>
+            <Text style={styles.advisoryDesc}>
+              Free clinical guidance on dosage, medicine combinations, and certified generic alternatives.
+            </Text>
+          </View>
+          <ChevronRight size={18} color="#0e3854" />
+        </TouchableOpacity>
       </ScrollView>
 
       {/* ─── Slide-In Navigation Drawer Modal ────────────────────── */}
@@ -719,40 +931,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0e3854',
   },
+  carouselContainer: {
+    marginVertical: 6,
+  },
+  carouselTrack: {
+    alignItems: 'center',
+  },
   promoBanner: {
+    width: BANNER_WIDTH,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#008375',
     borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    marginVertical: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
     overflow: 'hidden',
+  },
+  promoBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  promoBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   promoLeft: {
     flex: 1,
     zIndex: 2,
+    backgroundColor: 'transparent',
   },
   promoTitle: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '800',
     color: '#ffffff',
     letterSpacing: -0.3,
   },
   promoSubtitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
-    marginTop: 2,
+    marginTop: 1,
   },
   codePill: {
-    backgroundColor: 'rgba(0, 35, 25, 0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 8,
-    marginTop: 12,
+    marginTop: 10,
   },
   codePillText: {
     color: '#ffffff',
@@ -761,30 +996,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   promoRightGraphic: {
-    width: 100,
-    height: 90,
+    width: 90,
+    height: 80,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    backgroundColor: 'transparent',
   },
   vanBackdropCircle: {
     position: 'absolute',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
   truckBox: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   crossCircle: {
     position: 'absolute',
-    top: 6,
+    top: 4,
     right: -4,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: '#00966d',
     alignItems: 'center',
     justifyContent: 'center',
@@ -793,9 +1030,138 @@ const styles = StyleSheet.create({
   },
   crossSymbol: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
-    lineHeight: 13,
+    lineHeight: 14,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  dot: {
+    height: 5,
+    borderRadius: 2.5,
+  },
+  dotActive: {
+    width: 22,
+    backgroundColor: '#00966d',
+  },
+  dotInactive: {
+    width: 6,
+    backgroundColor: '#cbd5e1',
+  },
+  advertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    marginVertical: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  advertCardLeft: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  advertCardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ecfdf5',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  advertCardBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#00966d',
+    letterSpacing: 0.5,
+  },
+  advertCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0e3854',
+    marginBottom: 4,
+  },
+  advertCardDesc: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#64748b',
+    marginBottom: 10,
+  },
+  advertCardCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  advertCardCtaText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#00966d',
+  },
+  advertCardRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  advertCardIconCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#00966d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#00966d',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  advisoryAdvert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#f0fdf9',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ccfbf1',
+    padding: 14,
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  advisoryIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#ccfbf1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  advisoryTextWrap: {
+    flex: 1,
+  },
+  advisoryTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0e3854',
+    marginBottom: 2,
+  },
+  advisoryDesc: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#0f766e',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
