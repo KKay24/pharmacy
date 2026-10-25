@@ -1,7 +1,11 @@
 {
+  "cli": {
+    "version": ">= 25.0.0"
+  },
   "build": {
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       },
@@ -10,12 +14,21 @@
       }
     },
     "production": {
+      "channel": "production",
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://pharmacy-backend-5bcl.onrender.com"
       }
+    }
+  },
+  "update": {
+    "production": {
+      "channel": "production"
+    },
+    "preview": {
+      "channel": "preview"
     }
   }
 }
