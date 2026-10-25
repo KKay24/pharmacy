@@ -13,6 +13,8 @@ import {
   RefreshControl,
   View,
   Text,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -45,6 +47,7 @@ import {
   Stethoscope,
   Tag,
   Check,
+  AlertCircle,
 } from 'lucide-react-native';
 import apiClient from '@/api/client';
 import { useAuth } from '@/context/AuthContext';
@@ -151,8 +154,17 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string>(params.category || 'all');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+
+  const isFetchingRef = useRef(false);
+  const reqSeqRef = useRef(0);
 
   const bannerScrollRef = useRef<ScrollView>(null);
   const [activeSlide, setActiveSlide] = useState(0);
@@ -193,60 +205,121 @@ export default function HomeScreen() {
     }
   }, [params.category]);
 
-  const fetchDatabaseProducts = useCallback(async () => {
-    try {
-      let url = '/api/products?limit=50';
-      if (selectedCategory && selectedCategory !== 'all') {
-        if (selectedCategory === 'prescriptions') {
-          url += '&prescriptionRequired=true';
+  const PAGE_LIMIT = 25;
+
+  const formatProduct = (m: any): DatabaseProduct => {
+    const catSlug = (m.MainCategory?.slug || m.category || 'medicines').toLowerCase();
+    return {
+      id: m.id,
+      name: m.name,
+      genericName: m.genericName,
+      brandName: m.brandName,
+      price: Number(m.price ?? m.basePrice ?? 0),
+      imageUrl:
+        m.imageUrl ||
+        CATEGORY_DEFAULT_IMAGES[catSlug] ||
+        'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80',
+      category: catSlug,
+      dosage: m.dosage,
+      strength: m.strength,
+      description: m.description,
+      prescriptionRequired: Boolean(m.prescriptionRequired),
+      MainCategory: m.MainCategory,
+    };
+  };
+
+  const fetchProductsPage = useCallback(
+    async (targetPage: number, isRefresh = false) => {
+      if (isFetchingRef.current && !isRefresh) return;
+      isFetchingRef.current = true;
+
+      const currentSeq = ++reqSeqRef.current;
+      if (targetPage === 1) {
+        if (!isRefresh) setLoading(true);
+        setError(null);
+      } else {
+        setLoadingMore(true);
+        setLoadMoreError(null);
+      }
+
+      try {
+        let url = `/api/products?page=${targetPage}&limit=${PAGE_LIMIT}`;
+        if (selectedCategory && selectedCategory !== 'all') {
+          if (selectedCategory === 'prescriptions') {
+            url += '&prescriptionRequired=true';
+          } else {
+            url += `&category=${encodeURIComponent(selectedCategory)}`;
+          }
+        }
+        if (search.trim()) {
+          url += `&search=${encodeURIComponent(search.trim())}`;
+        }
+
+        const res = await apiClient.get(url);
+        if (currentSeq !== reqSeqRef.current) return;
+
+        const payload = res.data;
+        const rows = payload?.data || (Array.isArray(payload) ? payload : []);
+        const formatted = rows.map(formatProduct);
+
+        const serverTotal = payload?.pagination?.total ?? formatted.length;
+        const serverTotalPages =
+          payload?.pagination?.totalPages ?? Math.ceil(serverTotal / PAGE_LIMIT) ?? 1;
+
+        setTotalProducts(serverTotal);
+        setTotalPages(serverTotalPages);
+        setPage(targetPage);
+
+        if (targetPage === 1) {
+          setProducts(formatted);
         } else {
-          url += `&category=${encodeURIComponent(selectedCategory)}`;
+          setProducts((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            const newItems = formatted.filter((p: DatabaseProduct) => !seen.has(p.id));
+            return [...prev, ...newItems];
+          });
+        }
+      } catch (err: any) {
+        if (currentSeq !== reqSeqRef.current) return;
+        console.warn('Failed to fetch products from database:', err);
+        const msg =
+          err?.response?.data?.message ||
+          err?.message ||
+          'Failed to load products from database.';
+        if (targetPage === 1) {
+          setError(msg);
+        } else {
+          setLoadMoreError('Could not load more items. Tap to retry.');
+        }
+      } finally {
+        if (currentSeq === reqSeqRef.current) {
+          isFetchingRef.current = false;
+          setLoading(false);
+          setLoadingMore(false);
+          setRefreshing(false);
         }
       }
-      if (search.trim()) {
-        url += `&search=${encodeURIComponent(search.trim())}`;
-      }
-
-      const res = await apiClient.get(url);
-      const rows = res.data?.data || (Array.isArray(res.data) ? res.data : []);
-
-      const formatted: DatabaseProduct[] = rows.map((m: any) => {
-        const catSlug = (m.MainCategory?.slug || m.category || 'medicines').toLowerCase();
-        return {
-          id: m.id,
-          name: m.name,
-          genericName: m.genericName,
-          brandName: m.brandName,
-          price: Number(m.price ?? m.basePrice ?? 0),
-          imageUrl:
-            m.imageUrl ||
-            CATEGORY_DEFAULT_IMAGES[catSlug] ||
-            'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80',
-          category: catSlug,
-          dosage: m.dosage,
-          strength: m.strength,
-          description: m.description,
-          prescriptionRequired: Boolean(m.prescriptionRequired),
-          MainCategory: m.MainCategory,
-        };
-      });
-
-      setProducts(formatted);
-    } catch (err) {
-      console.warn('Failed to fetch products from database:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [selectedCategory, search]);
+    },
+    [selectedCategory, search]
+  );
 
   useEffect(() => {
-    fetchDatabaseProducts();
-  }, [fetchDatabaseProducts]);
+    fetchProductsPage(1);
+  }, [fetchProductsPage]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchDatabaseProducts();
+    fetchProductsPage(1, true);
+  };
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 400;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+      if (page < totalPages && !loading && !loadingMore && !isFetchingRef.current) {
+        fetchProductsPage(page + 1);
+      }
+    }
   };
 
   const handleAddToCart = (product: DatabaseProduct) => {
@@ -290,6 +363,8 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00966d" />}
+        onScroll={handleScroll}
+        scrollEventThrottle={32}
       >
         {/* ─── Search Bar ────────────────────────────────────────── */}
         <View style={styles.searchBar}>
@@ -580,16 +655,27 @@ export default function HomeScreen() {
 
         {/* ─── Popular Products from Database ───────────────────── */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Popular Products</Text>
+          <Text style={styles.sectionTitle}>
+            {selectedCategory && selectedCategory !== 'all' ? 'Category Products' : 'Popular Products'}
+          </Text>
           <TouchableOpacity onPress={() => router.push('/(tabs)/categories')}>
-            <Text style={styles.seeAllText}>See all ({products.length})</Text>
+            <Text style={styles.seeAllText}>See all ({totalProducts || products.length})</Text>
           </TouchableOpacity>
         </View>
 
-        {loading ? (
+        {loading && products.length === 0 ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#00966d" />
             <Text style={styles.loadingText}>Fetching catalogue from pharmacy database...</Text>
+          </View>
+        ) : error && products.length === 0 ? (
+          <View style={styles.emptyProducts}>
+            <AlertCircle size={36} color="#dc2626" />
+            <Text style={styles.emptyProductsTitle}>Unable to load products</Text>
+            <Text style={styles.emptyProductsSubtitle}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => fetchProductsPage(1)}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : products.length === 0 ? (
           <View style={styles.emptyProducts}>
@@ -601,47 +687,81 @@ export default function HomeScreen() {
             </Text>
           </View>
         ) : (
-          <View style={styles.productsGrid}>
-            {products.map((item) => (
-              <View key={item.id} style={styles.productCard}>
-                {/* Product Image */}
-                <TouchableOpacity
-                  style={styles.productImageWrap}
-                  onPress={() => router.push({ pathname: '/product/[id]', params: { id: String(item.id) } })}
-                >
-                  <Image source={{ uri: item.imageUrl }} style={styles.productImage} resizeMode="contain" />
-                  {item.prescriptionRequired && (
-                    <View style={styles.rxRequiredBadge}>
-                      <Text style={styles.rxRequiredText}>Rx Required</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+          <>
+            <View style={styles.productsGrid}>
+              {products.map((item) => (
+                <View key={item.id} style={styles.productCard}>
+                  {/* Product Image */}
+                  <TouchableOpacity
+                    style={styles.productImageWrap}
+                    onPress={() => router.push({ pathname: '/product/[id]', params: { id: String(item.id) } })}
+                  >
+                    <Image source={{ uri: item.imageUrl }} style={styles.productImage} resizeMode="contain" />
+                    {item.prescriptionRequired && (
+                      <View style={styles.rxRequiredBadge}>
+                        <Text style={styles.rxRequiredText}>Rx Required</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
 
-                {/* Product Title & Real Price */}
-                <TouchableOpacity
-                  onPress={() => router.push({ pathname: '/product/[id]', params: { id: String(item.id) } })}
-                >
-                  <Text style={styles.productName} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  {item.dosage || item.strength ? (
-                    <Text style={styles.productDosage} numberOfLines={1}>
-                      {[item.dosage, item.strength].filter(Boolean).join(' · ')}
+                  {/* Product Title & Real Price */}
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/product/[id]', params: { id: String(item.id) } })}
+                  >
+                    <Text style={styles.productName} numberOfLines={1}>
+                      {item.name}
                     </Text>
-                  ) : null}
-                  <Text style={styles.productPrice}>ZMW {item.price.toFixed(2)}</Text>
-                </TouchableOpacity>
+                    {item.dosage || item.strength ? (
+                      <Text style={styles.productDosage} numberOfLines={1}>
+                        {[item.dosage, item.strength].filter(Boolean).join(' · ')}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.productPrice}>ZMW {item.price.toFixed(2)}</Text>
+                  </TouchableOpacity>
 
-                {/* Add to Cart button */}
+                  {/* Add to Cart button */}
+                  <TouchableOpacity
+                    style={styles.addToCartBtn}
+                    onPress={() => handleAddToCart(item)}
+                  >
+                    <Text style={styles.addToCartText}>Add to Cart</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+
+            {/* Pagination Controls */}
+            {loadingMore ? (
+              <View style={styles.loadMoreBox}>
+                <ActivityIndicator size="small" color="#00966d" />
+                <Text style={styles.loadMoreText}>Loading more products...</Text>
+              </View>
+            ) : loadMoreError ? (
+              <View style={styles.loadMoreBox}>
+                <Text style={styles.loadMoreErrorText}>{loadMoreError}</Text>
                 <TouchableOpacity
-                  style={styles.addToCartBtn}
-                  onPress={() => handleAddToCart(item)}
+                  style={styles.retryInlineBtn}
+                  onPress={() => fetchProductsPage(page + 1)}
                 >
-                  <Text style={styles.addToCartText}>Add to Cart</Text>
+                  <Text style={styles.retryInlineBtnText}>Retry Loading</Text>
                 </TouchableOpacity>
               </View>
-            ))}
-          </View>
+            ) : page < totalPages ? (
+              <TouchableOpacity
+                style={styles.loadMoreBtn}
+                onPress={() => fetchProductsPage(page + 1)}
+                accessibilityLabel="Load more products"
+              >
+                <Text style={styles.loadMoreBtnText}>
+                  Load More Products ({products.length} of {totalProducts})
+                </Text>
+              </TouchableOpacity>
+            ) : products.length > 0 ? (
+              <View style={styles.endOfListBox}>
+                <Text style={styles.endOfListText}>Showing all {products.length} products</Text>
+              </View>
+            ) : null}
+          </>
         )}
 
         {/* ─── Healthcare & Advisory Advert Card ──────────────── */}
@@ -1342,6 +1462,71 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  retryBtn: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    backgroundColor: '#00966d',
+    borderRadius: 8,
+  },
+  retryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  loadMoreBox: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadMoreText: {
+    fontSize: 13,
+    color: '#00966d',
+    fontWeight: '600',
+  },
+  loadMoreErrorText: {
+    fontSize: 13,
+    color: '#dc2626',
+    textAlign: 'center',
+  },
+  retryInlineBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    backgroundColor: '#fee2e2',
+    borderRadius: 8,
+  },
+  retryInlineBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+  loadMoreBtn: {
+    marginHorizontal: 20,
+    marginVertical: 14,
+    paddingVertical: 12,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loadMoreBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#00966d',
+  },
+  endOfListBox: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  endOfListText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '500',
   },
   menuOverlay: {
     flex: 1,

@@ -50,7 +50,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 20, 32) }}
+      contentContainerStyle={{ paddingBottom: 24 }}
     >
       {/* Header Profile Card */}
       <View style={[styles.headerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>

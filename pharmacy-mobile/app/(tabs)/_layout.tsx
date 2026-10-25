@@ -6,18 +6,27 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
   const { user } = useAuth();
   const { cartCount } = useCart();
+  const insets = useSafeAreaInsets();
+
+  // Tab bar height: 60dp content area + bottom safe-area inset
+  // This ensures the bar always sits above Android system nav (3-button ~48dp, gesture ~16-24dp)
+  const TAB_BAR_CONTENT_HEIGHT = 60;
+  const tabBarHeight = TAB_BAR_CONTENT_HEIGHT + insets.bottom;
+  const tabBarPaddingBottom = insets.bottom > 0 ? insets.bottom + 4 : 8;
 
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#00966d',
         tabBarInactiveTintColor: '#64748b',
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopColor: '#eef2f6',
@@ -26,8 +35,8 @@ export default function TabLayout() {
           shadowColor: '#000',
           shadowOpacity: 0.04,
           shadowRadius: 6,
-          height: 60,
-          paddingBottom: 8,
+          height: tabBarHeight,
+          paddingBottom: tabBarPaddingBottom,
           paddingTop: 6,
         },
         tabBarLabelStyle: {

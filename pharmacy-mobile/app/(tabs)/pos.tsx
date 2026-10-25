@@ -7,6 +7,7 @@ import {
   Modal,
   ScrollView,
   TextInput,
+  RefreshControl,
 } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import apiClient from '@/api/client';
@@ -44,6 +45,8 @@ interface Medicine {
   id: number;
   name: string;
   genericName?: string;
+  brandName?: string;
+  barcode?: string;
   totalQuantity: number;
   price: number;
   mainCategoryId?: number;
@@ -107,29 +110,58 @@ export default function PosScreen() {
   const fetchInventory = async () => {
     try {
       setFetching(true);
-      const [inventoryRes, catRes, custRes] = await Promise.allSettled([
-        apiClient.get('/api/inventory?limit=100'),
+      const [firstInvRes, catRes, custRes] = await Promise.allSettled([
+        apiClient.get('/api/inventory?page=1&limit=100'),
         apiClient.get('/api/inventory/categories'),
         apiClient.get('/api/customers'),
       ]);
 
-      if (inventoryRes.status === 'fulfilled') {
-        const rows = Array.isArray(inventoryRes.value.data)
-          ? inventoryRes.value.data
-          : inventoryRes.value.data?.data || [];
-        const data = rows.map((med: any) => {
-          const batches = getMedicineBatches(med.Batches);
-          return {
-            id: med.id,
-            name: med.name,
-            genericName: med.genericName,
-            totalQuantity: getMedicineTotalQuantity(batches),
-            price: getMedicineCurrentPrice(batches),
-            mainCategoryId: med.mainCategoryId,
-          };
-        });
-        setMedicines(data);
+      let allRows: any[] = [];
+      if (firstInvRes.status === 'fulfilled') {
+        const firstData = firstInvRes.value.data;
+        const initialRows = Array.isArray(firstData) ? firstData : firstData?.data || [];
+        allRows.push(...initialRows);
+        const totalPages = Number(firstData?.pagination?.totalPages) || 1;
+
+        if (totalPages > 1) {
+          const pagePromises = [];
+          for (let p = 2; p <= totalPages; p++) {
+            pagePromises.push(apiClient.get(`/api/inventory?page=${p}&limit=100`));
+          }
+          const results = await Promise.allSettled(pagePromises);
+          for (const res of results) {
+            if (res.status === 'fulfilled') {
+              const pageData = res.value.data;
+              const rows = Array.isArray(pageData) ? pageData : pageData?.data || [];
+              allRows.push(...rows);
+            }
+          }
+        }
       }
+
+      // Deduplicate by med.id
+      const seen = new Set<number>();
+      const deduplicated = allRows.filter((med: any) => {
+        if (!med || !med.id) return false;
+        if (seen.has(med.id)) return false;
+        seen.add(med.id);
+        return true;
+      });
+
+      const data = deduplicated.map((med: any) => {
+        const batches = getMedicineBatches(med.Batches);
+        return {
+          id: med.id,
+          name: med.name,
+          genericName: med.genericName,
+          brandName: med.brandName,
+          barcode: med.barcode || med.sku || '',
+          totalQuantity: getMedicineTotalQuantity(batches),
+          price: getMedicineCurrentPrice(batches),
+          mainCategoryId: med.mainCategoryId,
+        };
+      });
+      setMedicines(data);
 
       if (catRes.status === 'fulfilled') {
         const catRows = Array.isArray(catRes.value.data) ? catRes.value.data : [];
@@ -163,7 +195,9 @@ export default function PosScreen() {
       result = result.filter(
         (m) =>
           m.name.toLowerCase().includes(q) ||
-          (m.genericName && m.genericName.toLowerCase().includes(q))
+          (m.genericName && m.genericName.toLowerCase().includes(q)) ||
+          (m.brandName && m.brandName.toLowerCase().includes(q)) ||
+          (m.barcode && m.barcode.toLowerCase().includes(q))
       );
     }
     return result;
@@ -380,7 +414,7 @@ export default function PosScreen() {
           <SearchInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search medicines, OTC, dosages..."
+            placeholder="Search medicines, OTC, barcode..."
           />
   
           {/* Category Pills */}
@@ -443,6 +477,13 @@ export default function PosScreen() {
           data={filteredMedicines}
           numColumns={2}
           keyExtractor={(item) => String(item.id)}
+          refreshControl={
+            <RefreshControl
+              refreshing={fetching}
+              onRefresh={fetchInventory}
+              tintColor={theme.primary}
+            />
+          }
           renderItem={({ item }) => {
             const outOfStock = item.totalQuantity <= 0;
             return (
@@ -472,7 +513,7 @@ export default function PosScreen() {
                   {item.name}
                 </Text>
                 <Text numberOfLines={1} style={[styles.itemStock, { color: theme.mutedText }]}>
-                  Stock: {item.totalQuantity} units
+                  Stock: {item.totalQuantity} units{item.barcode ? ` · #${item.barcode}` : ''}
                 </Text>
                 <Text style={[styles.itemPrice, { color: theme.navigation }]}>
                   K {item.price.toFixed(2)}

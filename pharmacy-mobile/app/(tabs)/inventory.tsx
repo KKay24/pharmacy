@@ -96,35 +96,71 @@ export default function InventoryScreen() {
   const [editStrength, setEditStrength] = useState('');
   const [editThreshold, setEditThreshold] = useState('10');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadInventory = useCallback(async () => {
     try {
-      const [invRes, catRes] = await Promise.allSettled([
-        apiClient.get('/api/inventory?limit=100'),
+      setError(null);
+      const [firstInvRes, catRes] = await Promise.allSettled([
+        apiClient.get('/api/inventory?page=1&limit=100'),
         apiClient.get('/api/inventory/categories'),
       ]);
 
-      if (invRes.status === 'fulfilled') {
-        const rows = Array.isArray(invRes.value.data)
-          ? invRes.value.data
-          : invRes.value.data?.data || [];
-        const formatted = rows.map((med: any) => {
-          const batches = getMedicineBatches(med.Batches) as Batch[];
-          return {
-            ...med,
-            Batches: batches,
-            totalQuantity: getMedicineTotalQuantity(batches),
-            price: getMedicineCurrentPrice(batches),
-          };
-        });
-        setMedicines(formatted);
+      if (firstInvRes.status === 'rejected') {
+        throw firstInvRes.reason;
       }
+
+      const firstData = firstInvRes.value.data;
+      const initialRows: any[] = Array.isArray(firstData)
+        ? firstData
+        : firstData?.data || [];
+      const totalPages = Number(firstData?.pagination?.totalPages) || 1;
+
+      let allRows = [...initialRows];
+
+      if (totalPages > 1) {
+        const remainingPromises = [];
+        for (let p = 2; p <= totalPages; p++) {
+          remainingPromises.push(apiClient.get(`/api/inventory?page=${p}&limit=100`));
+        }
+        const remainingResults = await Promise.allSettled(remainingPromises);
+        for (const res of remainingResults) {
+          if (res.status === 'fulfilled') {
+            const pageData = res.value.data;
+            const rows = Array.isArray(pageData) ? pageData : pageData?.data || [];
+            allRows.push(...rows);
+          }
+        }
+      }
+
+      // Deduplicate by med.id
+      const seen = new Set<number>();
+      const deduplicatedRows = allRows.filter((med: any) => {
+        if (!med || !med.id) return false;
+        if (seen.has(med.id)) return false;
+        seen.add(med.id);
+        return true;
+      });
+
+      const formatted = deduplicatedRows.map((med: any) => {
+        const batches = getMedicineBatches(med.Batches) as Batch[];
+        return {
+          ...med,
+          Batches: batches,
+          totalQuantity: getMedicineTotalQuantity(batches),
+          price: getMedicineCurrentPrice(batches),
+        };
+      });
+      setMedicines(formatted);
 
       if (catRes.status === 'fulfilled') {
         setCategories(Array.isArray(catRes.value.data) ? catRes.value.data : []);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load inventory', err);
+      setError(
+        err?.response?.data?.message || err?.message || 'Failed to load inventory from server.'
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -410,7 +446,7 @@ export default function InventoryScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 24 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -528,11 +564,21 @@ export default function InventoryScreen() {
           }}
           ListEmptyComponent={
             !loading ? (
-              <EmptyState
-                icon={<Boxes size={32} color={theme.mutedText} />}
-                title="No medicines match filters"
-                description="Clear filters or tap 'Add Stock' to record new batches."
-              />
+              error && medicines.length === 0 ? (
+                <EmptyState
+                  icon={<Boxes size={32} color="#dc2626" />}
+                  title="Unable to load inventory"
+                  description={error}
+                  actionLabel="Retry"
+                  onAction={loadInventory}
+                />
+              ) : (
+                <EmptyState
+                  icon={<Boxes size={32} color={theme.mutedText} />}
+                  title="No medicines match filters"
+                  description="Clear filters or tap 'Add Stock' to record new batches."
+                />
+              )
             ) : null
           }
         />
