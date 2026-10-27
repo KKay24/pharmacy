@@ -189,7 +189,7 @@ export default function StoreAboutPage() {
           <p>Contact the pharmacy team for help with products, orders, or prescriptions.</p>
           <div className="about-visit__details">
             <span><MapPin size={19} /><span><strong>Nationalist Road, 25147</strong><small>Store location listed in contact details</small></span></span>
-            <a href="tel:+260977000000"><Truck size={19} /><span><strong>+260 97 700 0000</strong><small>Phone / WhatsApp</small></span></a>
+            <a href="tel:+260974392925"><Truck size={19} /><span><strong>+260 97 439 2925</strong><small>Phone / WhatsApp</small></span></a>
             <span><Clock3 size={19} /><span><strong>Mon–Sat, 8 AM–8 PM</strong><small>Sunday: 9 AM–5 PM</small></span></span>
           </div>
           <div className="about-visit__actions">

@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BarChart3, Download, History, RefreshCw, Table } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { apiFetch, getApiErrorMessage } from '../utils/api';
+import { DataContext } from '../context/DataContext';
 import '../styles/reports-modern.css';
 
 const COLORS = ['#039d83', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
@@ -21,6 +22,7 @@ function paymentAmount(row, method) { return Number(row.payments?.find((payment)
 function csvValue(value) { return `"${String(value ?? '').replace(/"/g, '""')}"`; }
 
 export default function ReportsPage() {
+  const { userRole } = useContext(DataContext);
   const [tab, setTab] = useState('ledger');
   const [period, setPeriod] = useState('30d');
   const [report, setReport] = useState(null);
@@ -32,6 +34,9 @@ export default function ReportsPage() {
   const [countedCash, setCountedCash] = useState('');
   const [cashNotes, setCashNotes] = useState('');
   const [reconciliations, setReconciliations] = useState([]);
+  const [reversalPreview, setReversalPreview] = useState(null);
+  const [reversalReason, setReversalReason] = useState('');
+  const [reversalLoading, setReversalLoading] = useState(false);
 
   const range = useMemo(() => selectedRange(period), [period]);
   const loadReport = async () => {
@@ -44,13 +49,61 @@ export default function ReportsPage() {
     } catch (loadError) { setReport(null); setError(loadError.message || 'Could not load the financial report'); }
     finally { setLoading(false); }
   };
+  const loadHistory = useCallback(async () => {
+    const start = new Date(`${historyDate}T00:00:00`); const end = new Date(start); end.setDate(end.getDate() + 1);
+    const query = new URLSearchParams({ from: start.toISOString(), to: end.toISOString(), limit: '100' });
+    const response = await apiFetch(`/api/sales?${query}`);
+    if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Could not load sales history'));
+    const data = await response.json();
+    setHistory(data.data || []);
+  }, [historyDate]);
   useEffect(() => { loadReport(); }, [range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (tab !== 'history') return;
-    const start = new Date(`${historyDate}T00:00:00`); const end = new Date(start); end.setDate(end.getDate() + 1);
-    const query = new URLSearchParams({ from: start.toISOString(), to: end.toISOString(), limit: '100' });
-    apiFetch(`/api/sales?${query}`).then(async (response) => response.ok ? response.json() : Promise.reject(new Error(await getApiErrorMessage(response, 'Could not load sales history')))).then((data) => setHistory(data.data || [])).catch((loadError) => { setHistory([]); toast.error(loadError.message); });
-  }, [tab, historyDate]);
+    loadHistory().catch((loadError) => { setHistory([]); toast.error(loadError.message); });
+  }, [tab, loadHistory]);
+  const openReversal = async (sale) => {
+    setReversalLoading(true);
+    try {
+      const response = await apiFetch(`/api/sales/${sale.id}/reversal-preview`);
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Could not load reversal details'));
+      setReversalPreview(await response.json());
+      setReversalReason('');
+    } catch (previewError) {
+      toast.error(previewError.message || 'Could not load reversal details');
+    } finally {
+      setReversalLoading(false);
+    }
+  };
+  const closeReversal = () => {
+    setReversalPreview(null);
+    setReversalReason('');
+  };
+  const confirmReversal = async (event) => {
+    event.preventDefault();
+    if (!reversalPreview || !reversalReason.trim()) return;
+    setReversalLoading(true);
+    try {
+      const response = await apiFetch(`/api/sales/${reversalPreview.saleId}/reverse`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reversalReason.trim() }),
+      });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Could not reverse sale'));
+      const result = await response.json();
+      const reversedIds = new Set(result.saleIds || [reversalPreview.saleId]);
+      setHistory((current) => current.map((sale) => reversedIds.has(sale.id)
+        ? { ...sale, saleStatus: 'REVERSED' }
+        : sale));
+      closeReversal();
+      await loadReport();
+      toast.success(`Receipt ${result.receiptNumber || ''} reversed. Stock has been restored.`.trim());
+    } catch (reverseError) {
+      toast.error(reverseError.message || 'Could not reverse sale');
+    } finally {
+      setReversalLoading(false);
+    }
+  };
   const loadReconciliations = async () => {
     const response = await apiFetch('/api/cash-reconciliations');
     if (response.ok) setReconciliations(await response.json());
@@ -108,6 +161,7 @@ export default function ReportsPage() {
       <div className="ri-chart-card"><h3 className="ri-chart-title">Revenue and operating expenses — {range.from} to {range.to}</h3><div style={{ height: 320 }}><ResponsiveContainer width="100%" height="100%"><AreaChart data={daily}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis /><Tooltip formatter={(value) => money(value)} /><Area dataKey="revenue" name="Revenue" stroke="#039d83" fill="#d1fae5" /><Area dataKey="operatingExpenses" name="Operating expenses" stroke="#ef4444" fill="none" /></AreaChart></ResponsiveContainer></div></div>
       <div className="ri-chart-card"><h3 className="ri-chart-title">Revenue by product category</h3><div style={{ height: 260 }}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={report?.categories || []} dataKey="value" nameKey="name" outerRadius={90}>{(report?.categories || []).map((item, index) => <Cell key={item.name} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip formatter={(value) => money(value)} /></PieChart></ResponsiveContainer></div></div>
     </div>}
-    {tab === 'history' && <div className="ri-ledger-card"><label>Sale date <input type="date" value={historyDate} onChange={(event) => setHistoryDate(event.target.value)} /></label><div className="ri-ledger-table-wrap"><table className="ri-ledger-table"><thead><tr><th>Time</th><th>Item</th><th>Qty</th><th>Sale total</th><th>Sold by</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{history.map((sale) => <tr key={sale.id}><td>{new Date(sale.date).toLocaleTimeString()}</td><td>{sale.name}</td><td>{sale.quantity}</td><td>{money(sale.totalPrice)}</td><td>{sale.soldBy || '—'}</td><td>{sale.saleStatus || 'COMPLETED'}</td><td>{sale.receiptNumber || '—'}</td></tr>)}{!history.length && <tr><td colSpan="7">No item sales on this date.</td></tr>}</tbody></table></div></div>}
+    {tab === 'history' && <div className="ri-ledger-card"><label>Sale date <input type="date" value={historyDate} onChange={(event) => setHistoryDate(event.target.value)} /></label><div className="ri-ledger-table-wrap"><table className="ri-ledger-table"><thead><tr><th>Time</th><th>Item</th><th>Qty</th><th>Sale total</th><th>Sold by</th><th>Status</th><th>Receipt</th>{userRole === 'admin' && <th>Action</th>}</tr></thead><tbody>{history.map((sale) => <tr key={sale.id}><td>{new Date(sale.date).toLocaleTimeString()}</td><td>{sale.name}</td><td>{sale.quantity}</td><td>{money(sale.totalPrice)}</td><td>{sale.soldBy || '—'}</td><td>{sale.saleStatus || 'COMPLETED'}</td><td>{sale.receiptNumber || '—'}</td>{userRole === 'admin' && <td>{(sale.saleStatus || 'COMPLETED') === 'COMPLETED' ? <button type="button" className="ri-reverse-btn" onClick={() => openReversal(sale)} disabled={reversalLoading}>Reverse</button> : <span className="ri-reversed-label">Reversed</span>}</td>}</tr>)}{!history.length && <tr><td colSpan={userRole === 'admin' ? '8' : '7'}>No item sales on this date.</td></tr>}</tbody></table></div></div>}
+    {reversalPreview && <div className="ri-modal-overlay" role="presentation"><form className="ri-modal-content ri-reversal-modal" onSubmit={confirmReversal} role="dialog" aria-modal="true" aria-labelledby="reverse-sale-title"><h2 id="reverse-sale-title" className="ri-modal-title">Reverse receipt</h2><p className="ri-modal-subtitle">Receipt {reversalPreview.receiptNumber || `sale #${reversalPreview.saleId}`} totals {money(reversalPreview.total)}. This restores the original batches to stock and cannot be undone.</p><div className="ri-reversal-items">{reversalPreview.inventoryImpact.map((item, index) => <p key={`${item.batchNumber}-${index}`}>{item.quantity} × {item.itemName} → batch {item.batchNumber || '—'}</p>)}</div><label className="ri-reversal-reason">Reason for reversal<textarea value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} required minLength="1" maxLength="500" disabled={reversalLoading} /></label><div className="ri-modal-actions"><button type="button" onClick={closeReversal} disabled={reversalLoading}>Cancel</button><button type="submit" className="ri-reverse-btn" disabled={reversalLoading || !reversalReason.trim()}>{reversalLoading ? 'Reversing…' : 'Confirm reversal'}</button></div></form></div>}
   </div>;
 }

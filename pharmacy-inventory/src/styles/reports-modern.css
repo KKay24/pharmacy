@@ -375,3 +375,64 @@
     margin-top: 1.5rem;
 }
 
+.ri-reverse-btn {
+    border: 0;
+    border-radius: 6px;
+    background: #b91c1c;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.45rem 0.75rem;
+}
+
+.ri-reverse-btn:hover:not(:disabled) {
+    background: #991b1b;
+}
+
+.ri-reverse-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.ri-reversed-label {
+    color: #b91c1c;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.ri-reversal-modal {
+    width: min(520px, 90vw);
+}
+
+.ri-reversal-items {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #334155;
+    font-size: 0.85rem;
+    margin: 1rem 0;
+    padding: 0.5rem 0.85rem;
+}
+
+.ri-reversal-items p {
+    margin: 0.45rem 0;
+}
+
+.ri-reversal-reason {
+    color: #334155;
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+    font-weight: 700;
+    gap: 0.4rem;
+}
+
+.ri-reversal-reason textarea {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font: inherit;
+    min-height: 88px;
+    padding: 0.65rem;
+    resize: vertical;
+}

@@ -52,4 +52,54 @@ describe('ReportsPage item sales history', () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/sales\?/)));
     expect(apiFetch.mock.calls.find(([url]) => url.startsWith('/api/sales?'))[0]).toContain('limit=100');
   });
+
+  it('lets an admin preview and confirm a completed receipt reversal', async () => {
+    apiFetch.mockImplementation((url, options) => {
+      if (url === '/api/sales/17/reversal-preview') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            saleId: 17,
+            receiptNumber: 'REC-123',
+            total: 30,
+            inventoryImpact: [{ itemName: 'Paracetamol', batchNumber: 'B-001', quantity: 2 }],
+          }),
+        });
+      }
+      if (url === '/api/sales/17/reverse' && options?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ saleIds: [17], receiptNumber: 'REC-123', saleStatus: 'REVERSED' }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          data: [{
+            id: 17, date: '2026-10-10T09:30:00.000Z', name: 'Paracetamol', quantity: 2,
+            totalPrice: 30, soldBy: 'cashier-one', saleStatus: 'COMPLETED', receiptNumber: 'REC-123',
+          }],
+          pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+        }),
+      });
+    });
+
+    render(
+      <DataContext.Provider value={{ sales: [], expenses: [], userRole: 'admin' }}>
+        <ReportsPage />
+      </DataContext.Provider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /item history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^reverse$/i }));
+    expect(await screen.findByRole('dialog', { name: /reverse receipt/i })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/reason for reversal/i), { target: { value: 'Customer returned the product' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirm reversal/i }));
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
+      '/api/sales/17/reverse',
+      expect.objectContaining({ method: 'PATCH' })
+    ));
+    expect(await screen.findByText('REVERSED')).toBeTruthy();
+  });
 });
