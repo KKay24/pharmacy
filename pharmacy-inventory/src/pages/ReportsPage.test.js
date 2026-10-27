@@ -22,6 +22,7 @@ describe('ReportsPage item sales history', () => {
           totalPrice: 30,
           paymentMethod: 'Cash',
           soldBy: 'cashier-one',
+          saleStatus: 'REVERSED',
           receiptNumber: 'REC-123',
         }],
         pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
@@ -33,19 +34,22 @@ describe('ReportsPage item sales history', () => {
     jest.clearAllMocks();
   });
 
-  it('loads the selected day and shows the item and staff member who recorded it', async () => {
+  it('loads the selected day with cashier and reversal status details', async () => {
     render(
       <DataContext.Provider value={{ sales: [], expenses: [] }}>
         <ReportsPage />
       </DataContext.Provider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /item sales history/i }));
+    fireEvent.click(screen.getByRole('button', { name: /item history/i }));
 
     expect(await screen.findByText('Paracetamol')).toBeTruthy();
-    expect(screen.getByText('cashier-one')).toBeTruthy();
     expect(screen.getByText('REC-123')).toBeTruthy();
+    expect(screen.getByText('cashier-one')).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: /sold by/i })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: /status/i })).toBeTruthy();
+    expect(screen.getByText('REVERSED')).toBeTruthy();
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/sales\?/)));
-    expect(apiFetch.mock.calls[0][0]).toContain('limit=100');
+    expect(apiFetch.mock.calls.find(([url]) => url.startsWith('/api/sales?'))[0]).toContain('limit=100');
   });
 });
