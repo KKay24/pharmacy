@@ -6,7 +6,7 @@ const {
   InternalServerErrorException,
   NotFoundException,
 } = require('@nestjs/common');
-const { Batch, Customer, InventoryMovement, Medicine, SalePayment, Sales, User, sequelize } = require('../../models');
+const { Batch, Customer, InventoryMovement, Medicine, SalePayment, SaleRefund, Sales, User, sequelize } = require('../../models');
 const { Op } = require('sequelize');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
 const { normalizeIdentityValue } = require('../inventory/product-identity');
@@ -220,6 +220,32 @@ class SalesService {
       total: rows.reduce((sum, sale) => sum + Number(sale.totalPrice || 0), 0),
       inventoryImpact,
     };
+  }
+
+  async refundReceipt(id, body, actor) {
+    const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    const method = normalizePaymentMethod(body?.method);
+    const amountMinor = amountToMinorUnits(body?.amount, 'Refund amount', true);
+    if (!reason || reason.length < 3) throw new BadRequestException('A refund reason of at least 3 characters is required');
+    if (!actor?.id) throw new BadRequestException('Authenticated administrator is required');
+    const rows = await this.findReceiptRows(id);
+    if (rows.some((sale) => (sale.saleStatus || 'COMPLETED') !== 'REVERSED')) {
+      throw new ConflictException('A refund can only be recorded after the receipt has been reversed');
+    }
+    const transaction = await sequelize.transaction();
+    try {
+      const lockedRows = await Sales.findAll({ where: rows[0].receiptNumber ? { receiptNumber: rows[0].receiptNumber } : { id: rows[0].id }, transaction, lock: transaction.LOCK.UPDATE });
+      const receiptTotalMinor = lockedRows.reduce((sum, sale) => sum + (Number(sale.totalPriceMinor) || amountToMinorUnits(sale.totalPrice, 'Sale total')), 0);
+      const existingRefunds = await SaleRefund.findAll({ where: { saleId: lockedRows.map((sale) => sale.id) }, transaction, lock: transaction.LOCK.UPDATE });
+      const refundedMinor = existingRefunds.filter((refund) => refund.status === 'CONFIRMED').reduce((sum, refund) => sum + Number(refund.amountMinor || 0), 0);
+      if (amountMinor <= 0 || refundedMinor + amountMinor > receiptTotalMinor) throw new BadRequestException('Refund amount exceeds the unreimbursed receipt total');
+      const refund = await SaleRefund.create({ saleId: lockedRows[0].id, amountMinor, method, status: 'CONFIRMED', financialDate: new Date(), reason, processedByUserId: actor.id }, { transaction });
+      await transaction.commit();
+      return { id: refund.id, receiptNumber: lockedRows[0].receiptNumber || null, amount: amountMinor / 100, method, financialDate: refund.financialDate, reason, revenueImpact: 0, cashImpact: -(amountMinor / 100) };
+    } catch (error) {
+      await transaction.rollback();
+      rethrowSalesPersistenceError(error);
+    }
   }
 
   async reverseSale(id, reasonInput, actor) {
@@ -497,8 +523,10 @@ class SalesService {
           quantity,
           pricePerUnit: totalPrice / quantity,
           totalPrice,
+          totalPriceMinor: amountToMinorUnits(totalPrice, 'Sale total'),
           discount,
           totalCost,
+          totalCostMinor: Math.round(totalCost * 100),
           paymentMethod: payments.length > 1 ? 'Split Payment' : payments[0].method,
           receiptNumber: item.receiptNumber || null,
           date: saleDate,

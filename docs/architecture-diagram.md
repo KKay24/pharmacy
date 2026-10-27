@@ -139,13 +139,15 @@ Batches belong to a medicine and contain `batchNumber`, quantity, expiry date, c
 
 ## 10. Reporting workflow
 
-- `GET /api/analytics/profit-loss` aggregates sales revenue, cost of goods sold and expenses by month.
+- `GET /api/analytics/profit-loss` returns a canonical monthly financial statement from completed sales, verified COGS and active expenses. If any sale lacks verified historical COGS, gross and net profit for that period are unavailable rather than estimated.
+- `GET /api/analytics/financial-report` returns the canonical daily ledger, payment allocations, category totals, refunds and reporting parameters for an inclusive `from`/`to` Africa/Lusaka date range.
 - `GET /api/analytics/predictions` generates a demand forecast from sales history and current inventory.
 - `GET /api/analytics/reorder-suggestions` returns suggested restocking data.
 - `GET /api/analytics/risks` returns stockout, expiry and dead-stock insight sets.
-- `GET /api/reports/analytics` calls the same profit/loss service as the profit-loss endpoint.
+- `GET /api/reports/analytics` calls the same canonical financial-report service.
+- `POST /api/cash-reconciliations` stores one immutable expected/count/variance close for a business date; variance is kept separate from revenue and profit.
 
-The web reports page also groups the loaded sales data into a daily ledger and stores daily shortage entries in local storage. This is client-side state, not a persisted backend report entity.
+Sales values, operating-expense values and refund values use minor currency units in the persisted financial controls. Expense corrections require a reason, and a DELETE request voids rather than deletes the record. The web and mobile report pages use the canonical reporting endpoints; browser caches remain non-authoritative.
 
 ## 11. External integrations
 
@@ -199,17 +201,17 @@ All API paths below are rooted at the same host. Except `POST /api/auth/login`, 
 | `GET` | `/api/inventory/:id/movements` | Movement history | Inventory read permission |
 | `POST` | `/api/inventory/batch` | Add stock batch | Inventory write permission |
 | `PUT`, `DELETE` | `/api/inventory/:id` | Update/delete medicine | Inventory write permission |
-| `GET`, `POST` | `/api/sales` | List/create sales | Sales read/write permission |
+| `GET`, `POST`, `PATCH` | `/api/sales`, `/api/sales/:id/reversal-preview`, `/api/sales/:id/reverse`, `/api/sales/:id/refund` | List/create sales, admin reversal/refund controls | Sales permissions; reversal/refund are admin-only |
 | `GET`, `POST` | `/api/customers` | List/create customers | Admin/manager role plus customer permissions |
 | `GET` | `/api/customers/search`, `/api/customers/:id` | Search/get customer | Admin/manager role plus customer read permission |
 | `GET`, `POST`, `PUT` | `/api/prescriptions`, `/api/prescriptions/:id/status` | List/create/update prescription status | Admin/manager role plus prescription permissions |
 | `GET`, `POST`, `PUT`, `DELETE` | `/api/suppliers[/:id]` | Supplier records | Admin/manager role plus supplier permissions |
-| `GET`, `POST`, `PUT`, `DELETE` | `/api/expenses[/:id]` | Expense records | Admin/manager role plus expense permissions |
-| `GET` | `/api/analytics/profit-loss` | Monthly financial summary | Admin/manager role plus analytics read permission |
+| `GET`, `POST`, `PUT`, `DELETE` | `/api/expenses[/:id]` | Active expense records; update requires a correction reason and DELETE voids with a reason | Admin/manager role plus expense permissions |
+| `GET` | `/api/analytics/profit-loss`, `/api/analytics/financial-report`, `/api/reports/analytics` | Monthly profit/loss and canonical financial ledger | Admin/manager role plus analytics read permission |
+| `GET`, `POST` | `/api/cash-reconciliations` | List/close immutable cash-drawer reconciliations | Admin/manager; analytics read for list, expenses write for close |
 | `GET` | `/api/analytics/predictions` | Forecast output | Admin/manager role plus analytics read permission |
 | `GET` | `/api/analytics/reorder-suggestions` | Reorder suggestions | Admin/manager role plus analytics read permission |
 | `GET` | `/api/analytics/risks` | Stockout/expiry/dead-stock data | Admin/manager role plus analytics read permission |
-| `GET` | `/api/reports/analytics` | Profit/loss report alias | Admin/manager role plus analytics read permission |
 | `POST` | `/api/sync` | Reconcile offline operations | Authenticated; per-operation permissions checked by sync service |
 
 The user-management path family includes `GET/POST /api/auth/users`, `PUT/DELETE /api/auth/users/:id` and `PATCH /api/auth/users/:id/status`. Selected list routes use pagination (`page`, `limit`; default 25, maximum 100) and return `{ data, pagination }`; response envelopes vary across routes. No OpenAPI specification was found.

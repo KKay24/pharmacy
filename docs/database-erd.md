@@ -19,6 +19,8 @@ erDiagram
     MEDICINES o|--o{ SALES : sold_as
     BATCHES o|--o{ SALES : single_batch_reference
     CUSTOMERS o|--o{ SALES : purchases
+    SALES ||--o{ SALE_PAYMENTS : allocated_to
+    SALES ||--o{ SALE_REFUNDS : refunded_by
     CUSTOMERS ||--o{ PRESCRIPTIONS : has
     MEDICINES o|--o{ INVENTORY_MOVEMENTS : records
     BATCHES o|--o{ INVENTORY_MOVEMENTS : affects
@@ -103,6 +105,8 @@ erDiagram
         float pricePerUnit
         float totalPrice
         float totalCost
+        bigint totalPriceMinor
+        bigint totalCostMinor
         float discount
         string paymentMethod
         string receiptNumber
@@ -157,8 +161,49 @@ erDiagram
         int id PK
         string category
         float amount
+        bigint amountMinor
+        int createdByUserId FK
+        datetime voidedAt
+        int voidedByUserId FK
+        text voidReason
+        datetime correctedAt
+        int correctedByUserId FK
+        text correctionReason
         string description
         datetime date
+    }
+
+    SALE_PAYMENTS {
+        int id PK
+        int saleId FK
+        string method
+        int amountMinor
+        string status
+        string transactionReference
+        int confirmedByUserId FK
+        datetime confirmedAt
+    }
+
+    SALE_REFUNDS {
+        int id PK
+        int saleId FK
+        bigint amountMinor
+        string method
+        string status
+        datetime financialDate
+        text reason
+        int processedByUserId FK
+    }
+
+    CASH_DRAWER_RECONCILIATIONS {
+        int id PK
+        string businessDate UK
+        bigint expectedCashMinor
+        bigint countedCashMinor
+        bigint varianceMinor
+        text notes
+        int closedByUserId FK
+        datetime closedAt
     }
 
     AUDIT_LOGS {
@@ -183,11 +228,14 @@ erDiagram
 | `InventoryCategories` | Seeded self-referencing taxonomy: level 1 main categories, level 2 subcategories and level 3 allowed product forms. `path` is unique and stable; migration seeding uses `findOrCreate`. |
 | `Batches` | Stock quantity and expiry/pricing/receiving details for one medicine. A unique index protects `(medicineId, batchNumber)`. |
 | `InventoryMovements` | Quantity delta and movement/reference metadata; optional medicine/batch association; optional client transaction ID for sync. |
-| `Sales` | Sale line/record with quantities, totals, costs, payment method, optional customer/product/batch references and optional client transaction ID. A sale drawing from multiple batches can have a null direct `batchId`; corresponding movements retain per-batch changes. |
+| `Sales` | Sale line/record with quantities, totals, costs, payment method, optional customer/product/batch references and optional client transaction ID. `totalPriceMinor` and `totalCostMinor` preserve financial amounts exactly. A sale drawing from multiple batches can have a null direct `batchId`; corresponding movements retain per-batch changes. |
+| `SalePayments` | Confirmed payment allocations for the first row of a receipt; the backend checks that their minor-unit total matches the receipt total. |
+| `SaleRefunds` | Reasoned, confirmed cash/electronic refunds recorded after a receipt reversal; their cash impact is reported separately from reversal-adjusted revenue. |
+| `CashDrawerReconciliations` | One immutable expected/count/variance close per business date. This is an audit record, not a revenue or profit adjustment. |
 | `Customers` | Contact and optional loyalty, insurance, allergy, chronic-condition and notes fields. Phone is unique when present. |
 | `Prescriptions` | Patient/prescriber information, medication text, optional customer, image path, due date and enumerated status. This schema alone does not establish a complete dispensing workflow. |
 | `Suppliers` | Supplier contact and account-summary fields. Batch records can refer to a supplier. |
-| `Expenses` | Operational expense category, amount, description and date. No direct user relation is modeled. |
+| `Expenses` | Operational expense category, amount, description and date. `amountMinor` preserves the financial amount; create/correct/void user IDs and timestamps/reasons are persisted by migrations for audit controls. |
 | `AuditLogs` | Intercepted request/action metadata, with a nullable `userId` value. No declared ORM association or foreign-key constraint to `Users` was found. |
 
 ## Relationships and deletion behavior
@@ -200,7 +248,7 @@ erDiagram
 - `Customer.hasMany(Prescription)` and `Prescription.belongsTo(Customer)`.
 - `InventoryCategory` self-references through `parentId`; medicines reference category nodes through three role-specific foreign keys. Service validation ensures selected nodes have the expected level and parent relationship.
 - `Medicine` and `Batch` each have many `InventoryMovements`; their movement references are nullable and configured to become null on deletion.
-- No ORM relationships are declared for `Users`, `Expenses` or `AuditLogs`. `AuditLogs.userId` is metadata, not a verified relational association.
+- `Sales` has declared ORM associations to `SalePayments` and `SaleRefunds`. Migration foreign keys also retain user attribution on refunds, reconciliations and expense controls; no ORM associations are declared for those user references. `AuditLogs.userId` remains metadata, not a verified relational association.
 
 ## Integrity and migration notes
 

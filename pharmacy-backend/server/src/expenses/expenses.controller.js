@@ -1,4 +1,4 @@
-const { Body, Controller, Delete, Get, Inject, Param, Post, Put, UseGuards } = require('@nestjs/common');
+const { Body, Controller, Delete, Get, Inject, Param, Post, Put, Req, UseGuards } = require('@nestjs/common');
 const ExpensesService = require('./expenses.service');
 const AuthGuard = require('../auth/auth.guard');
 const Roles = require('../auth/roles.decorator');
@@ -11,9 +11,9 @@ const PermissionsGuard = require('../auth/permissions.guard');
 class ExpensesController {
   constructor(service) { this.service = service; }
   list() { return this.service.list(); }
-  create(body) { return this.service.create(body); }
-  update(params, body) { return this.service.update(params.id, body); }
-  remove(params) { return this.service.remove(params.id); }
+  create(body, request) { return this.service.create(body, request?.user); }
+  update(params, body, request) { return this.service.update(params.id, body, request?.user); }
+  remove(params, body, request) { return this.service.void(params.id, body?.reason, request?.user); }
 }
 
 applyClassDecorator(Controller, ExpensesController, 'api/expenses');
@@ -26,7 +26,11 @@ for (const method of ['list', 'create', 'update', 'remove']) { applyMethodDecora
 RequirePermissions(Permissions.EXPENSES_READ)(ExpensesController.prototype, 'list');
 for (const method of ['create', 'update', 'remove']) RequirePermissions(Permissions.EXPENSES_WRITE)(ExpensesController.prototype, method);
 applyParameterDecorator(Body, ExpensesController.prototype, 'create', 0);
+applyParameterDecorator(Req, ExpensesController.prototype, 'create', 1);
 applyParameterDecorator(Param, ExpensesController.prototype, 'update', 0);
 applyParameterDecorator(Body, ExpensesController.prototype, 'update', 1);
+applyParameterDecorator(Req, ExpensesController.prototype, 'update', 2);
 applyParameterDecorator(Param, ExpensesController.prototype, 'remove', 0);
+applyParameterDecorator(Body, ExpensesController.prototype, 'remove', 1);
+applyParameterDecorator(Req, ExpensesController.prototype, 'remove', 2);
 module.exports = ExpensesController;

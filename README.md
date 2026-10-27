@@ -16,7 +16,7 @@ The system centralizes pharmacy product and batch inventory, stock movements, po
 | Web PWA offline cache and sync queue | **Implemented** | The web client caches selected data in IndexedDB and submits queued sales, restocks and adjustments to `/api/sync`. |
 | Prescription records/status workflow | **Partially implemented** | The API stores and lists prescription records and updates status. A complete prescription fulfillment/e-prescribing workflow is not verified. |
 | Customer support inbox | **Implemented** | Staff can review customer inquiries, search/filter/paginate the inbox, contact customers using their phone/email links, and track New/Contacted/Resolved status. Replies are handled outside the application; an in-app conversation history is not implemented. |
-| Reports and analytics | **Partially implemented** | The API provides monthly profit/loss, forecast, reorder, stockout and expiry-risk data. Some daily-ledger reporting is calculated in the browser. |
+| Reports and analytics | **Partially implemented** | The API provides canonical Africa/Lusaka financial ledgers and monthly profit/loss, including verified-cost status, payment allocations and cash refunds, plus forecast, reorder, stockout and expiry-risk data. |
 | Mobile application | **Partially implemented** | Expo includes login, searchable inventory with hierarchical category filters, POS checkout and profile tabs. It does not implement the web client's offline queue, and mobile checkout currently uses cash. |
 | Product categories, subcategories and forms | **Implemented** | Product classification uses seeded main-category, subcategory and product-form references. New products require a main category; subcategory and form are optional, dependent selections. Legacy values are retained; unrecognized historical products can remain unclassified. |
 | Prescription OCR | **Not currently documented/verified** | OCR is present in web stock/invoice capture; a prescription OCR workflow was not confirmed. |
@@ -29,12 +29,12 @@ This status describes repository code and configuration, not production availabi
 - Medicine catalog with hierarchical main category, subcategory and product form, generic/brand names, strength, pack size, unit of measure, supplier/manufacturer labels, barcode, reorder threshold and image URL.
 - Batch-level stock receiving with quantity, cost/selling prices, supplier reference, warehouse, invoice number, received date and expiry date.
 - Inventory movement history and low-stock queries.
-- Web POS with customer lookup/association, receipts, payment-method fields and offline queueing in the PWA.
+- Web POS with customer lookup/association, receipts, confirmed payment allocations and offline queueing in the PWA.
 - Customer records, including optional contact and health-related fields.
 - Staff support center for customer inquiries submitted through the pharmacy store.
 - Prescription records with patient/prescriber, medication text, due date, optional image path and status.
 - Expense and supplier management.
-- Monthly profit/loss and sales/inventory risk analytics.
+- Canonical daily financial ledger, monthly profit/loss, immutable cash-drawer reconciliations and sales/inventory risk analytics.
 - Administered staff accounts with `admin`, `manager` and `user` roles.
 - Expo mobile login, searchable/filterable inventory view and online POS.
 
@@ -62,11 +62,11 @@ Medicines are catalog records classified by main category, optional subcategory 
 
 ### Sales/POS
 
-The POS client submits sale line items to `POST /api/sales`. The web POS filters products through dependent main-category, subcategory and product-form controls sourced from the shared taxonomy. The API validates stock, deducts it across available batches in ascending expiry-date order, writes sale and movement records transactionally, and stores the selected payment-method label. The mobile POS currently submits online sales with `Cash` as its payment method. The web PWA can queue supported operations while offline for later reconciliation.
+The POS client submits sale line items to `POST /api/sales`. The web POS filters products through dependent main-category, subcategory and product-form controls sourced from the shared taxonomy. The API validates stock, deducts it across available batches in ascending expiry-date order, writes sale and movement records transactionally, and records confirmed payment allocations in minor currency units. The mobile POS currently submits online sales with `Cash` as its payment method. The web PWA can queue supported operations while offline for later reconciliation.
 
 ### Expiry and reporting
 
-Batch expiry dates are stored at batch level. Analytics include expiry-risk, stockout-risk, dead-stock and reorder outputs. Monthly profit/loss is computed from recorded sales and expenses. The web reports screen also derives a daily ledger from the sales data it has loaded and stores manually entered daily shortages in browser local storage.
+Batch expiry dates are stored at batch level. Analytics include expiry-risk, stockout-risk, dead-stock and reorder outputs. Financial reports are calculated by the canonical API in the Africa/Lusaka business timezone: completed sales, verified COGS, active expenses and refunds are kept distinct. Profit is unavailable—not estimated—where legacy sales lack verified historical cost. Expense changes require a correction reason; expense deletion is a reasoned void retained for audit. Cash-drawer variances are reconciliation records and are not revenue or profit.
 
 ## Technology stack
 
@@ -221,9 +221,10 @@ The canonical API is rooted at `/api`; all routes except login and health requir
 - `/api/auth` — login, current user, password change and admin user management.
 - `/api/inventory` — medicines, batch receiving, low stock and per-medicine movements.
 - `/api/inventory/categories` — authenticated hierarchical product-category reference data. Inventory list filters accept `category`/`mainCategoryId`, `subcategory`/`subcategoryId`, and `form`/`productFormId`, along with generic name, brand, supplier, stock status and expiry status.
-- `/api/sales` — sale listing and sale creation.
+- `/api/sales` — sale listing/creation, reversal and post-reversal refunds.
 - `/api/customers`, `/api/prescriptions`, `/api/suppliers`, `/api/expenses` — operational records.
-- `/api/analytics` and `/api/reports` — profit/loss, forecasts, reorder suggestions and risk reports.
+- `/api/analytics` and `/api/reports` — financial ledger/profit-loss, forecasts, reorder suggestions and risk reports.
+- `/api/cash-reconciliations` — authenticated cash-drawer reconciliation records.
 - `/api/sync` — authenticated web offline operation reconciliation.
 - `/health` — backend readiness response.
 

@@ -42,6 +42,17 @@ function taxonomyNode(path) {
   return match;
 }
 
+function currentBusinessDate() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Lusaka',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const value = (type) => parts.find((part) => part.type === type)?.value;
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
 function getAvailablePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -1103,6 +1114,34 @@ test('sales creation is idempotent when clientTransactionId is supplied', async 
     assert.equal(reversedSale.reversalReason, 'Integration test inventory correction');
     assert.equal(reversedSale.ReversedBy.username, 'admin@example.test');
 
+    const unauthorizedRefundResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/refund`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${userLogin.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ amount: '10.50', method: 'Cash', reason: 'Unauthorized refund attempt' }),
+    });
+    assert.equal(unauthorizedRefundResponse.status, 403);
+
+    const refundResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/refund`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ amount: '10.50', method: 'Cash', reason: 'Partial refund after reversal' }),
+    });
+    assert.equal(refundResponse.status, 201);
+    const refund = await refundResponse.json();
+    assert.equal(refund.amount, 10.5);
+    assert.equal(refund.revenueImpact, 0);
+    assert.equal(refund.cashImpact, -10.5);
+
+    const excessRefundResponse = await fetch(`${baseUrl}/api/sales/${sale.id}/refund`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ amount: '9.51', method: 'Cash', reason: 'Would exceed receipt total' }),
+    });
+    assert.equal(excessRefundResponse.status, 400);
+
     const reportsResponse = await fetch(`${baseUrl}/api/analytics/profit-loss?page=1&limit=100`, { headers });
     assert.equal(reportsResponse.status, 200);
     const reportsPayload = await reportsResponse.json();
@@ -1382,3 +1421,126 @@ test('underpayment, overpayment, pending and failed electronic payments are reje
     const stockAfter = refreshedProduct.Batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
     assert.equal(stockAfter, stockBefore);
   });
+
+test('financial reporting, expense audit controls, and cash reconciliation use canonical records', async () => {
+  const headers = {
+    Authorization: `Bearer ${authToken}`,
+    'Content-Type': 'application/json',
+  };
+  const businessDate = currentBusinessDate();
+
+  const unauthenticatedReport = await fetch(`${baseUrl}/api/analytics/financial-report`);
+  assert.equal(unauthenticatedReport.status, 401);
+
+  const initialReportResponse = await fetch(
+    `${baseUrl}/api/analytics/financial-report?from=${businessDate}&to=${businessDate}`,
+    { headers },
+  );
+  assert.equal(initialReportResponse.status, 200);
+  const initialReport = await initialReportResponse.json();
+  const initialExpenses = Number(initialReport.totals.operatingExpenses || 0);
+
+  const createExpenseResponse = await fetch(`${baseUrl}/api/expenses`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      category: 'Operating',
+      amount: '12.34',
+      description: 'Accounting integration test expense',
+      date: businessDate,
+    }),
+  });
+  assert.equal(createExpenseResponse.status, 201);
+  const expense = await createExpenseResponse.json();
+  assert.equal(Number(expense.amountMinor), 1234);
+
+  const missingCorrectionReason = await fetch(`${baseUrl}/api/expenses/${expense.id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({
+      category: 'Operating',
+      amount: '12.35',
+      description: 'Accounting integration test expense',
+      date: businessDate,
+    }),
+  });
+  assert.equal(missingCorrectionReason.status, 400);
+
+  const updateExpenseResponse = await fetch(`${baseUrl}/api/expenses/${expense.id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({
+      category: 'Operating',
+      amount: '12.35',
+      description: 'Accounting integration test expense',
+      date: businessDate,
+      correctionReason: 'Corrected test amount',
+    }),
+  });
+  assert.equal(updateExpenseResponse.status, 200);
+  const correctedExpense = await updateExpenseResponse.json();
+  assert.equal(Number(correctedExpense.amountMinor), 1235);
+  assert.equal(correctedExpense.correctionReason, 'Corrected test amount');
+
+  const reportedExpenseResponse = await fetch(
+    `${baseUrl}/api/analytics/financial-report?from=${businessDate}&to=${businessDate}`,
+    { headers },
+  );
+  assert.equal(reportedExpenseResponse.status, 200);
+  const reportedExpense = await reportedExpenseResponse.json();
+  assert.equal(Number(reportedExpense.totals.operatingExpenses), initialExpenses + 12.35);
+  assert.ok(Array.isArray(reportedExpense.daily));
+  assert.ok(Array.isArray(reportedExpense.payments));
+
+  const invalidVoidResponse = await fetch(`${baseUrl}/api/expenses/${expense.id}`, {
+    method: 'DELETE',
+    headers,
+    body: JSON.stringify({ reason: 'no' }),
+  });
+  assert.equal(invalidVoidResponse.status, 400);
+
+  const voidExpenseResponse = await fetch(`${baseUrl}/api/expenses/${expense.id}`, {
+    method: 'DELETE',
+    headers,
+    body: JSON.stringify({ reason: 'Test expense was entered for verification' }),
+  });
+  assert.equal(voidExpenseResponse.status, 200);
+
+  const expensesResponse = await fetch(`${baseUrl}/api/expenses`, { headers });
+  assert.equal(expensesResponse.status, 200);
+  const activeExpenses = await expensesResponse.json();
+  assert.ok(!activeExpenses.some((item) => item.id === expense.id));
+
+  const voidedExpenseReportResponse = await fetch(
+    `${baseUrl}/api/analytics/financial-report?from=${businessDate}&to=${businessDate}`,
+    { headers },
+  );
+  assert.equal(voidedExpenseReportResponse.status, 200);
+  const voidedExpenseReport = await voidedExpenseReportResponse.json();
+  assert.equal(Number(voidedExpenseReport.totals.operatingExpenses), initialExpenses);
+
+  const incompleteAllocationClose = await fetch(`${baseUrl}/api/cash-reconciliations`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ businessDate, countedCash: '0.00', notes: 'Integration test close' }),
+  });
+  assert.equal(incompleteAllocationClose.status, 409);
+
+  const reconciliationDate = '2000-01-01';
+  const closeDrawerResponse = await fetch(`${baseUrl}/api/cash-reconciliations`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ businessDate: reconciliationDate, countedCash: '0.00', notes: 'Integration test close' }),
+  });
+  assert.equal(closeDrawerResponse.status, 201);
+  const reconciliation = await closeDrawerResponse.json();
+  assert.equal(reconciliation.businessDate, reconciliationDate);
+  assert.equal(Number(reconciliation.countedCashMinor), 0);
+
+  const duplicateCloseResponse = await fetch(`${baseUrl}/api/cash-reconciliations`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ businessDate: reconciliationDate, countedCash: '0.00' }),
+  });
+  assert.equal(duplicateCloseResponse.status, 409);
+});

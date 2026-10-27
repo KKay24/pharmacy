@@ -34,6 +34,8 @@ const SyncController = require('./sync/sync.controller');
 const SyncService = require('./sync/sync.service');
 const StoreController = require('./store/store.controller');
 const StoreService = require('./store/store.service');
+const CashReconciliationController = require('./cash-reconciliation/cash-reconciliation.controller');
+const CashReconciliationService = require('./cash-reconciliation/cash-reconciliation.service');
 
 const localhostOrigins = [
   'http://localhost:3000',
@@ -179,6 +181,7 @@ Module({
     ReportsController,
     SyncController,
     StoreController,
+    CashReconciliationController,
   ],
   providers: [
     AuthService,
@@ -191,6 +194,7 @@ Module({
     AnalyticsService,
     SyncService,
     StoreService,
+    CashReconciliationService,
     AuthGuard,
     RolesGuard,
     PermissionsGuard,

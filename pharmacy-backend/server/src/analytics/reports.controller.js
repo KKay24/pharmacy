@@ -10,7 +10,7 @@ const PermissionsGuard = require('../auth/permissions.guard');
 
 class ReportsController {
   constructor(service) { this.service = service; }
-  analytics(query) { return this.service.profitLoss(query); }
+  analytics(query) { return this.service.reports(query); }
 }
 
 applyClassDecorator(Controller, ReportsController, 'api/reports');

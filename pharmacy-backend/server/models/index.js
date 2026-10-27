@@ -3,6 +3,8 @@ const Medicine = require('./Medicine');
 const Batch = require('./Batch');
 const Sales = require('./Sales');
 const SalePayment = require('./SalePayment');
+const SaleRefund = require('./SaleRefund');
+const CashDrawerReconciliation = require('./CashDrawerReconciliation');
 const User = require('./User');
 const Customer = require('./Customer');
 const Prescription = require('./Prescription');
@@ -37,6 +39,8 @@ Sales.belongsTo(User, { as: 'Cashier', foreignKey: 'soldByUserId' });
 Sales.belongsTo(User, { as: 'ReversedBy', foreignKey: 'reversedByUserId' });
 Sales.hasMany(SalePayment, { as: 'Payments', foreignKey: 'saleId', onDelete: 'CASCADE' });
 SalePayment.belongsTo(Sales, { foreignKey: 'saleId' });
+Sales.hasMany(SaleRefund, { as: 'Refunds', foreignKey: 'saleId', onDelete: 'RESTRICT' });
+SaleRefund.belongsTo(Sales, { foreignKey: 'saleId' });
 SalePayment.belongsTo(User, { as: 'ConfirmedBy', foreignKey: 'confirmedByUserId' });
 
 Customer.hasMany(Prescription, { foreignKey: 'customerId' });
@@ -63,6 +67,8 @@ module.exports = {
   Batch,
   Sales,
   SalePayment,
+  SaleRefund,
+  CashDrawerReconciliation,
   User,
   Customer,
   Prescription,

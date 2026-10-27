@@ -86,11 +86,19 @@ export default function ExpensesPage() {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this expense record?")) return;
+        const reason = window.prompt("Void reason (this record will be retained for audit):");
+        if (!reason || reason.trim().length < 3) {
+            toast.error("A void reason of at least 3 characters is required");
+            return;
+        }
         try {
-            const res = await apiFetch(`/api/expenses/${id}`, { method: "DELETE" });
+            const res = await apiFetch(`/api/expenses/${id}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason }),
+            });
             if (res.ok) {
-                toast.success("Expense deleted");
+                toast.success("Expense voided and retained in the audit trail");
                 fetchExpenses();
                 fetchAnalytics();
             }

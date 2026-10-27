@@ -72,7 +72,7 @@ Customer records can be associated with sales and prescriptions. The model conta
 
 ### 6.5 Analytics and reports
 
-The API builds a monthly profit/loss summary from sales and expenses and provides forecast, reorder, stockout, expiry-risk and dead-stock analytics. The web reports screen creates additional daily/weekly/monthly ledger views from loaded sales and stores daily shortages locally in the browser.
+The API builds canonical Africa/Lusaka daily and monthly financial reports from completed sales, persisted payment allocations, verified COGS, active expenses and separately reported refunds. Historical sales without verified cost make the affected gross/net profit unavailable rather than treating revenue as profit. Expense amendments and voids retain audit information, and a cash-drawer close persists expected/count/variance without changing revenue or profit. The API also provides forecast, reorder, stockout, expiry-risk and dead-stock analytics.
 
 ## 7. API design
 

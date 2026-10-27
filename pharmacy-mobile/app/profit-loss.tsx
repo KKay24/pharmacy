@@ -1,250 +1,28 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  RefreshControl,
-  ViewStyle,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import apiClient from '@/api/client';
 import { router } from 'expo-router';
-import {
-  ArrowLeft,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Calendar,
-  Wallet,
-  Activity,
-  Layers,
-} from 'lucide-react-native';
+import { ArrowLeft, DollarSign, TrendingDown, TrendingUp, Wallet } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RoleGuard } from '@/components/ui/RoleGuard';
+import { StatCard } from '@/components/ui/StatCard';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
-import { StatCard } from '@/components/ui/StatCard';
-import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { RoleGuard } from '@/components/ui/RoleGuard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+type PnlMonth = { month: string; revenue: number; cogs: number | null; grossProfit: number | null; operatingExpenses: number; netProfit: number | null; cashRefunds: number; cogsKnown: boolean; unknownCogsSaleCount: number };
+type PnlPayload = { data: PnlMonth[] };
+const money = (value: number | null | undefined) => value === null || value === undefined ? 'Unavailable' : `K ${Number(value).toFixed(2)}`;
 export default function ProfitLossScreen() {
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme() ?? 'light';
-  const theme = Colors[colorScheme];
-
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadData = useCallback(async () => {
-    try {
-      const response = await apiClient.get('/api/analytics/profit-loss');
-      const rows = Array.isArray(response.data) ? response.data : response.data?.data || [];
-      setData(rows);
-    } catch (err) {
-      console.warn('Failed to load profit loss data', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Current Month Data
-  const currentMonth = useMemo(() => {
-    if (data.length === 0) {
-      return { revenue: 0, cogs: 0, grossProfit: 0, operatingExpenses: 0, netProfit: 0, month: 'N/A' };
-    }
-    return data[data.length - 1];
-  }, [data]);
-
-  const calcChange = (key: string) => {
-    if (data.length < 2) return null;
-    const curr = Number(data[data.length - 1][key] || 0);
-    const prev = Number(data[data.length - 2][key] || 0);
-    if (prev === 0) return null;
-    const diff = ((curr - prev) / prev) * 100;
-    return {
-      direction: (diff >= 0 ? 'up' : 'down') as 'up' | 'down',
-      value: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`,
-    };
-  };
-
-  const revenueTrend = calcChange('revenue');
-  const netProfitTrend = calcChange('netProfit');
-
-  return (
-    <RoleGuard page="profit-loss">
-      <ScrollView
-        style={[styles.container, { backgroundColor: theme.background }]}
-        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadData();
-            }}
-            tintColor={theme.primary}
-          />
-        }
-      >
-        {/* Top Header */}
-        <View style={styles.topHeader}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-            <ArrowLeft size={22} color={theme.text} />
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.navigation }]}>
-              Profit & Loss Summary
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.mutedText }]}>
-              Compare revenue, cost of goods & profit performance
-            </Text>
-          </View>
-        </View>
-  
-        {/* KPI Cards */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statsRow}>
-            <StatCard
-              style={styles.statCard}
-              label="Gross Revenue"
-              value={`K ${Number(currentMonth.revenue || 0).toLocaleString()}`}
-              icon={<DollarSign size={20} color={theme.primary} />}
-              iconBg={theme.primarySoft}
-              trend={revenueTrend || undefined}
-            />
-            <StatCard
-              style={styles.statCard}
-              label="Cost of Goods (COGS)"
-              value={`K ${Number(currentMonth.cogs || 0).toLocaleString()}`}
-              icon={<Wallet size={20} color="#f59e0b" />}
-              iconBg="#fffbeb"
-            />
-          </View>
-  
-          <View style={styles.statsRow}>
-            <StatCard
-              style={styles.statCard}
-              label="Gross Margin Profit"
-              value={`K ${Number(currentMonth.grossProfit || 0).toLocaleString()}`}
-              subValue={`Margin: ${
-                currentMonth.revenue
-                  ? Math.round((currentMonth.grossProfit / currentMonth.revenue) * 100)
-                  : 0
-              }%`}
-              icon={<TrendingUp size={20} color="#10b981" />}
-              iconBg="#ecfdf5"
-            />
-            <StatCard
-              style={styles.statCard}
-              label="Net Operating Profit"
-              value={`K ${Number(currentMonth.netProfit || 0).toLocaleString()}`}
-              icon={<Activity size={20} color={currentMonth.netProfit >= 0 ? '#10b981' : '#ef4444'} />}
-              iconBg={currentMonth.netProfit >= 0 ? '#ecfdf5' : '#fef2f2'}
-              trend={netProfitTrend || undefined}
-            />
-          </View>
-        </View>
-  
-        {/* Monthly Financial Breakdown */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.navigation }]}>
-            Monthly Breakdown History
-          </Text>
-          <Text style={[styles.cardSubtitle, { color: theme.mutedText }]}>
-            Financial records sorted by reporting month
-          </Text>
-  
-          {data.length > 0 ? (
-            data
-              .slice()
-              .reverse()
-              .map((row, idx) => (
-                <View
-                  key={idx}
-                  style={[styles.historyRow, { borderBottomColor: theme.borderLight }]}
-                >
-                  <View style={styles.historyLeft}>
-                    <Text style={[styles.historyMonth, { color: theme.text }]}>
-                      {row.month}
-                    </Text>
-                    <Text style={[styles.historySub, { color: theme.mutedText }]}>
-                      Rev: K {Number(row.revenue || 0).toLocaleString()} · COGS: K{' '}
-                      {Number(row.cogs || 0).toLocaleString()}
-                    </Text>
-                  </View>
-  
-                  <View style={styles.historyRight}>
-                    <Text
-                      style={[
-                        styles.historyProfit,
-                        { color: row.netProfit >= 0 ? theme.primary : theme.danger },
-                      ]}
-                    >
-                      K {Number(row.netProfit || 0).toLocaleString()}
-                    </Text>
-                    <Badge
-                      label={row.netProfit >= 0 ? 'Profitable' : 'Deficit'}
-                      variant={row.netProfit >= 0 ? 'success' : 'danger'}
-                      size="sm"
-                    />
-                  </View>
-                </View>
-              ))
-          ) : (
-            <EmptyState
-              icon={<TrendingUp size={32} color={theme.mutedText} />}
-              title="No financial records"
-              description="Monthly sales and recorded expenses will populate financial reports here."
-            />
-          )}
-        </View>
-  
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </RoleGuard>
-  );
+  const insets = useSafeAreaInsets(); const theme = Colors[useColorScheme() ?? 'light']; const [data, setData] = useState<PnlMonth[]>([]); const [selectedMonth, setSelectedMonth] = useState(''); const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false);
+  const load = useCallback(async () => { try { const response = await apiClient.get<PnlPayload>('/api/analytics/profit-loss'); setData(response.data?.data || []); } finally { setLoading(false); setRefreshing(false); } }, []);
+  useEffect(() => { load(); }, [load]);
+  const current = useMemo(() => data.find((row) => row.month === selectedMonth) || data[data.length - 1], [data, selectedMonth]);
+  return <RoleGuard page="profit-loss"><ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 24, 32) }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.primary} />}>
+    <View style={styles.header}><Pressable onPress={() => router.back()}><ArrowLeft size={22} color={theme.text} /></Pressable><View><Text style={[styles.title, { color: theme.navigation }]}>Profit & Loss</Text><Text style={{ color: theme.mutedText }}>Canonical monthly statement · Africa/Lusaka</Text></View></View>
+    {loading && <ActivityIndicator color={theme.primary} />}{current && <><View style={styles.months}>{data.slice().reverse().map((row) => <Pressable key={row.month} onPress={() => setSelectedMonth(row.month)} style={[styles.month, { backgroundColor: current.month === row.month ? theme.navigation : theme.surface, borderColor: theme.border }]}><Text style={{ color: current.month === row.month ? '#fff' : theme.text }}>{row.month}</Text></Pressable>)}</View>{!current.cogsKnown && <Text style={{ color: '#b45309', marginBottom: 12 }}>Profit is not calculated: {current.unknownCogsSaleCount} sale rows have unverified historical cost.</Text>}<View style={styles.row}><StatCard style={styles.card} label="Net sales" value={money(current.revenue)} icon={<DollarSign size={19} color={theme.primary} />} iconBg={theme.primarySoft} /><StatCard style={styles.card} label="Verified COGS" value={money(current.cogs)} icon={<Wallet size={19} color="#f59e0b" />} iconBg="#fffbeb" /></View><View style={styles.row}><StatCard style={styles.card} label="Gross profit" value={money(current.grossProfit)} icon={<TrendingUp size={19} color="#10b981" />} iconBg="#ecfdf5" /><StatCard style={styles.card} label="Net profit" value={money(current.netProfit)} icon={<TrendingDown size={19} color={current.netProfit !== null && current.netProfit < 0 ? '#ef4444' : '#10b981'} />} iconBg="#fef2f2" /></View><View style={[styles.statement, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.statementTitle, { color: theme.navigation }]}>Statement — {current.month}</Text>{[['Net sales', current.revenue], ['Verified COGS', current.cogs], ['Gross profit', current.grossProfit], ['Operating expenses', current.operatingExpenses], ['Net profit', current.netProfit], ['Cash refunds (separate cash outflow)', current.cashRefunds]].map(([label, value]) => <View style={styles.line} key={String(label)}><Text style={{ color: theme.text }}>{label}</Text><Text style={{ color: theme.text, fontWeight: '800' }}>{money(value as number | null)}</Text></View>)}</View></>}{!loading && !current && <EmptyState icon={<TrendingUp size={32} color={theme.mutedText} />} title="No financial records" description="Completed sales and posted expenses will appear here." />}
+  </ScrollView></RoleGuard>;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: layout.spacing.lg },
-  topHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: layout.spacing.lg,
-  },
-  backBtn: { padding: 4 },
-  headerTitleWrap: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
-  headerSubtitle: { fontSize: 11, marginTop: 2 },
-  statsGrid: { gap: layout.spacing.md, marginBottom: layout.spacing.lg },
-  statsRow: { flexDirection: 'row', gap: layout.spacing.md },
-  statCard: { flex: 1 },
-  card: {
-    borderRadius: layout.radius.xl,
-    padding: layout.spacing.lg,
-    borderWidth: 1,
-  },
-  cardTitle: { fontSize: 16, fontWeight: '800' },
-  cardSubtitle: { fontSize: 12, marginTop: 2, marginBottom: layout.spacing.md },
-  historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  historyLeft: { flex: 1 },
-  historyMonth: { fontSize: 14, fontWeight: '800' },
-  historySub: { fontSize: 11, marginTop: 3 },
-  historyRight: { alignItems: 'flex-end', gap: 4 },
-  historyProfit: { fontSize: 14, fontWeight: '800' },
-});
+const styles = StyleSheet.create({ container: { flex: 1 }, content: { padding: layout.spacing.lg }, header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: layout.spacing.lg }, title: { fontSize: 20, fontWeight: '900' }, months: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 }, month: { borderWidth: 1, borderRadius: 14, paddingVertical: 6, paddingHorizontal: 9 }, row: { flexDirection: 'row', gap: 12, marginBottom: 12 }, card: { flex: 1 }, statement: { borderWidth: 1, borderRadius: layout.radius.xl, padding: layout.spacing.lg }, statementTitle: { fontSize: 16, fontWeight: '800', marginBottom: 10 }, line: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e2e8f0' } });

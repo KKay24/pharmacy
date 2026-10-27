@@ -278,7 +278,7 @@ function ShellLayout() {
               <Route
                 path="profit-loss"
                 element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
                     <ProfitLossPage />
                   </ProtectedRoute>
                 }
@@ -286,7 +286,7 @@ function ShellLayout() {
               <Route
                 path="reports"
                 element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
                     <ReportsPage />
                   </ProtectedRoute>
                 }

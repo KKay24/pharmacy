@@ -55,11 +55,11 @@ The inventory of test files may change; inspect the package before relying on th
 | Authentication | Valid/invalid credentials, expired/invalid token, suspended account, forced password change, password hashing and prohibited role changes. |
 | Inventory/products | Product identity match/ambiguity, unique product/batch behavior, receiving, stock aggregate, low-stock thresholds and movement records. Validate main category requirement, subcategory/form parentage, dependent selector resets, generic/brand/supplier filters and safe legacy-data migration. |
 | Batches/expiry | Expiry date persistence and display, quantity across multiple batches, ordering used by sales, analytics warnings and retained references. Do not assume expiry-sale blocking unless code/tests implement it. |
-| Sales/POS | Cart payload, quantity/total validation, insufficient stock, batch deduction, movement creation, customer association, payment label and sale/movement transaction atomicity. |
+| Sales/POS | Cart payload, quantity/total validation, insufficient stock, batch deduction, movement creation, customer association, exact confirmed payment allocation, refund limits, reversal and sale/movement transaction atomicity. |
 | Offline PWA/sync | Data available from cache, enqueue and persistence across reload, online retry, duplicate idempotency, permission failures, server stock conflicts, failed-operation visibility and queue removal only after success. |
 | Customers/prescriptions | Customer required/optional fields, list/search/detail/create, customer associations, prescription create/list/status validation and sensitive data handling. |
 | Customer support | Public inquiry submission; authenticated staff-only inbox listing with pagination/search/status filtering; valid and invalid status changes; customer contact links and visible API error states. |
-| Reports/analytics | Empty and representative datasets, time windows, monthly totals, COGS/expenses, forecast input, stockout/expiry results, pagination and no sensitive-field leakage. |
+| Reports/analytics | Empty and representative datasets, Africa/Lusaka date boundaries, monthly and daily totals, verified/unknown COGS, active/voided expenses, payment allocation warnings, refunds, cash-reconciliation immutability, forecast input, stockout/expiry results and no sensitive-field leakage. |
 | UI components/pages | Loading/error/empty states, keyboard/accessible interactions where established, API failure messaging and role-based display. |
 | Mobile client | API URL resolution, SecureStore session behavior, login redirect, inventory loading/search and category → subcategory → form filters, online POS success/error and `npm run typecheck`. |
 | Deployment/configuration | Production config checks, build output, CORS/proxy path, `/health`, PostgreSQL connectivity, migration rollout and client-to-backend connectivity. |
@@ -97,8 +97,8 @@ The inventory of test files may change; inspect the package before relying on th
 
 1. Create/search a customer and confirm the optional sales/prescription associations.
 2. Create a prescription record, list it and update its status.
-3. Verify reports from controlled sales/expense rows, including empty months and date boundaries.
-4. Verify client-side daily shortage data persists only in browser local storage and is not represented as a server backup/report record.
+3. Verify financial reports from controlled sales/expense rows, including empty months, Africa/Lusaka date boundaries, unknown historical COGS, voided expenses and payment-allocation warnings.
+4. Close a cash drawer with a controlled count; verify the variance is retained, duplicate closes are rejected and neither revenue nor profit changes.
 
 ## 7. Commands
 

@@ -11,6 +11,7 @@ const PermissionsGuard = require('../auth/permissions.guard');
 class AnalyticsController {
   constructor(service) { this.service = service; }
   profitLoss(query) { return this.service.profitLoss(query); }
+  reports(query) { return this.service.reports(query); }
   predictions(query) { return this.service.predictions(query); }
   reorderSuggestions(query) { return this.service.reorderSuggestions(query); }
   risks(query) { return this.service.risks(query); }
@@ -19,10 +20,12 @@ class AnalyticsController {
 applyClassDecorator(Controller, AnalyticsController, 'api/analytics');
 Inject(AnalyticsService)(AnalyticsController, undefined, 0);
 applyMethodDecorator(Get, AnalyticsController.prototype, 'profitLoss', 'profit-loss');
+applyMethodDecorator(Get, AnalyticsController.prototype, 'reports', 'financial-report');
 applyMethodDecorator(Get, AnalyticsController.prototype, 'predictions', 'predictions');
 applyMethodDecorator(Get, AnalyticsController.prototype, 'reorderSuggestions', 'reorder-suggestions');
 applyMethodDecorator(Get, AnalyticsController.prototype, 'risks', 'risks');
-for (const method of ['profitLoss', 'predictions', 'reorderSuggestions', 'risks']) { applyMethodDecorator(UseGuards, AnalyticsController.prototype, method, AuthGuard, RolesGuard, PermissionsGuard); Roles('admin', 'manager')(AnalyticsController.prototype, method); RequirePermissions(Permissions.ANALYTICS_READ)(AnalyticsController.prototype, method); }
+for (const method of ['profitLoss', 'reports', 'predictions', 'reorderSuggestions', 'risks']) { applyMethodDecorator(UseGuards, AnalyticsController.prototype, method, AuthGuard, RolesGuard, PermissionsGuard); Roles('admin', 'manager')(AnalyticsController.prototype, method); RequirePermissions(Permissions.ANALYTICS_READ)(AnalyticsController.prototype, method); }
 for (const method of ['predictions', 'reorderSuggestions', 'risks']) applyParameterDecorator(Query, AnalyticsController.prototype, method, 0);
 applyParameterDecorator(Query, AnalyticsController.prototype, 'profitLoss', 0);
+applyParameterDecorator(Query, AnalyticsController.prototype, 'reports', 0);
 module.exports = AnalyticsController;

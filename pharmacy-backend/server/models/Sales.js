@@ -49,6 +49,14 @@ const Sales = sequelize.define('Sales', {
     type: DataTypes.FLOAT,
     defaultValue: 0.0
   },
+  totalPriceMinor: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+  },
+  totalCostMinor: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+  },
   discount: {
     type: DataTypes.FLOAT,
     defaultValue: 0.0

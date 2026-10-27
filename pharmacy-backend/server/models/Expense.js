@@ -15,6 +15,17 @@ const Expense = sequelize.define('Expense', {
     type: DataTypes.FLOAT,
     allowNull: false
   },
+  amountMinor: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+  },
+  createdByUserId: { type: DataTypes.INTEGER, allowNull: true },
+  voidedAt: { type: DataTypes.DATE, allowNull: true },
+  voidedByUserId: { type: DataTypes.INTEGER, allowNull: true },
+  voidReason: { type: DataTypes.TEXT, allowNull: true },
+  correctedAt: { type: DataTypes.DATE, allowNull: true },
+  correctedByUserId: { type: DataTypes.INTEGER, allowNull: true },
+  correctionReason: { type: DataTypes.TEXT, allowNull: true },
   description: {
     type: DataTypes.STRING
   },
