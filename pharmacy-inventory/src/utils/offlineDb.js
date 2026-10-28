@@ -315,6 +315,30 @@ export const removePendingOperation = async (clientTransactionId) => {
   });
 };
 
+// An offline sale can contain multiple line records, each with an item-specific
+// transaction ID (for example, `tx_123_0`). Remove every provisional line when
+// its parent queued operation is dismissed after a server-side conflict.
+export const removeOfflineSaleRecordsForTransaction = async (clientTransactionId) => {
+  if (!clientTransactionId) return;
+
+  return runTransaction('recentSales', 'readwrite', (store) => {
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const transactionPrefix = `${clientTransactionId}_`;
+        (request.result || []).forEach((sale) => {
+          const saleTransactionId = String(sale?.clientTransactionId || '');
+          if (saleTransactionId === clientTransactionId || saleTransactionId.startsWith(transactionPrefix)) {
+            store.delete(sale.clientTransactionId);
+          }
+        });
+        resolve();
+      };
+      request.onerror = () => reject(request.error);
+    });
+  });
+};
+
 /* ==========================================================================
    METADATA & DASHBOARD CACHING
    ========================================================================== */

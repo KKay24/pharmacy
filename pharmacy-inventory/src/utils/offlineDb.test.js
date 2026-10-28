@@ -4,9 +4,12 @@ import {
   getOfflineProducts,
   saveOfflineProducts,
   deductOfflineProductStock,
+  getOfflineSales,
+  saveOfflineSaleRecord,
   enqueuePendingOperation,
   getPendingOperations,
   removePendingOperation,
+  removeOfflineSaleRecordsForTransaction,
   getSyncMetadata,
   setSyncMetadata,
 } from './offlineDb';
@@ -139,6 +142,18 @@ describe('offlineDb unit tests', () => {
     await removePendingOperation('tx_test_123');
     const afterRemoval = await getPendingOperations();
     expect(afterRemoval).toHaveLength(0);
+  });
+
+  test('removes all provisional sale lines for a discarded conflicted transaction', async () => {
+    await saveOfflineSaleRecord({ clientTransactionId: 'tx_conflict_0', name: 'Product A' });
+    await saveOfflineSaleRecord({ clientTransactionId: 'tx_conflict_1', name: 'Product B' });
+    await saveOfflineSaleRecord({ clientTransactionId: 'tx_other_0', name: 'Product C' });
+
+    await removeOfflineSaleRecordsForTransaction('tx_conflict');
+
+    const remainingSales = await getOfflineSales();
+    expect(remainingSales).toHaveLength(1);
+    expect(remainingSales[0].clientTransactionId).toBe('tx_other_0');
   });
 
   test('metadata store saves and retrieves key-value entries', async () => {

@@ -14,9 +14,12 @@ import {
 import { DataContext } from '../context/DataContext';
 
 export default function SyncStatusIndicator() {
-  const { syncState, triggerManualSync } = useContext(DataContext);
+  const { syncState, triggerManualSync, getSyncConflicts, discardConflictedSale } = useContext(DataContext);
   const [isOpen, setIsOpen] = useState(false);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [conflicts, setConflicts] = useState([]);
+  const [conflictsError, setConflictsError] = useState('');
+  const [discardingConflictId, setDiscardingConflictId] = useState(null);
   const popoverRef = useRef(null);
 
   const { isOnline, syncStatus, pendingCount, failedCount, conflictCount, lastSyncTime } = syncState || {
@@ -44,6 +47,42 @@ export default function SyncStatusIndicator() {
       await triggerManualSync();
     } finally {
       setIsManualSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    if (!isOpen || conflictCount === 0 || !getSyncConflicts) {
+      setConflicts([]);
+      setConflictsError('');
+      return () => { active = false; };
+    }
+
+    getSyncConflicts()
+      .then((operations) => {
+        if (active) setConflicts(operations);
+      })
+      .catch(() => {
+        if (active) setConflictsError('Unable to load conflict details.');
+      });
+
+    return () => { active = false; };
+  }, [conflictCount, getSyncConflicts, isOpen]);
+
+  const handleDiscardConflict = async (operation) => {
+    if (!discardConflictedSale || !operation?.clientTransactionId) return;
+    const message = operation.lastError || operation.conflictDetails?.message || 'The server rejected this offline operation.';
+    if (!window.confirm(`${message}\n\nDiscard this provisional sale and refresh from the server?`)) return;
+
+    setDiscardingConflictId(operation.clientTransactionId);
+    setConflictsError('');
+    try {
+      await discardConflictedSale(operation.clientTransactionId);
+      setConflicts((current) => current.filter((item) => item.clientTransactionId !== operation.clientTransactionId));
+    } catch (error) {
+      setConflictsError(error.message || 'Could not discard the conflicted operation.');
+    } finally {
+      setDiscardingConflictId(null);
     }
   };
 
@@ -182,7 +221,7 @@ export default function SyncStatusIndicator() {
               </div>
               {conflictCount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#dc2626' }}>
-                  <span>Inventory Conflicts:</span>
+                  <span>Sync Conflicts:</span>
                   <strong>{conflictCount} required review</strong>
                 </div>
               )}
@@ -199,6 +238,34 @@ export default function SyncStatusIndicator() {
                 <span>{formatLastSync(lastSyncTime)}</span>
               </div>
             </div>
+
+            {conflictCount > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
+                  Review each rejected offline sale. Discarding removes its provisional local record and reloads the server inventory; it never changes server data.
+                </p>
+                {conflictsError && (
+                  <p role="alert" style={{ margin: 0, fontSize: '0.76rem', color: '#dc2626' }}>{conflictsError}</p>
+                )}
+                {conflicts.map((operation) => {
+                  const message = operation.lastError || operation.conflictDetails?.message || 'The server rejected this operation.';
+                  const isDiscarding = discardingConflictId === operation.clientTransactionId;
+                  return (
+                    <div key={operation.clientTransactionId} style={{ border: '1px solid #fecaca', borderRadius: '8px', padding: '9px', backgroundColor: '#fff7f7' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: '0.76rem', color: '#991b1b', lineHeight: 1.35 }}>{message}</p>
+                      <button
+                        type="button"
+                        onClick={() => handleDiscardConflict(operation)}
+                        disabled={!isOnline || isDiscarding}
+                        style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#ffffff', color: '#b91c1c', fontSize: '0.74rem', fontWeight: 600, cursor: isOnline && !isDiscarding ? 'pointer' : 'not-allowed' }}
+                      >
+                        {isDiscarding ? 'Refreshing…' : 'Discard & Refresh'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Sync Now button */}
             <button

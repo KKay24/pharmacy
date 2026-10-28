@@ -11,7 +11,9 @@ import {
   getOfflineSales,
   saveOfflineSaleRecord,
   enqueuePendingOperation,
+  getPendingOperations,
   removePendingOperation,
+  removeOfflineSaleRecordsForTransaction,
   getSyncMetadata,
   setSyncMetadata,
 } from "../utils/offlineDb";
@@ -580,16 +582,22 @@ export const DataProvider = ({ children }) => {
     return syncEngine.triggerSync();
   };
 
+  const getSyncConflicts = useCallback(async () => {
+    const operations = await getPendingOperations();
+    return (Array.isArray(operations) ? operations : []).filter((operation) => operation?.status === 'conflict');
+  }, []);
+
   const discardConflictedSale = useCallback(async (clientTransactionId) => {
     if (!clientTransactionId) {
       throw new Error("Cannot clear an offline sale without its transaction ID");
     }
-    await removePendingOperation(clientTransactionId);
-    await syncEngine.refreshCounts();
     const inventoryResult = await fetchInventory();
     if (!inventoryResult?.success || inventoryResult.offline) {
       throw new Error(inventoryResult?.error || "Unable to refresh inventory after the failed sale");
     }
+    await removePendingOperation(clientTransactionId);
+    await removeOfflineSaleRecordsForTransaction(clientTransactionId);
+    await syncEngine.refreshCounts();
     await fetchSales();
     return { success: true };
   }, [fetchInventory, fetchSales]);
@@ -631,6 +639,7 @@ export const DataProvider = ({ children }) => {
         fetchSuppliers,
         syncState,
         triggerManualSync,
+        getSyncConflicts,
         discardConflictedSale,
       }}
     >
