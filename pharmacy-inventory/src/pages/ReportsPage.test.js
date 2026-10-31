@@ -53,6 +53,60 @@ describe('ReportsPage item sales history', () => {
     expect(apiFetch.mock.calls.find(([url]) => url.startsWith('/api/sales?'))[0]).toContain('limit=100');
   });
 
+  it('shows the canonical daily totals and loads every item-history page', async () => {
+    apiFetch.mockImplementation((url) => {
+      if (url.startsWith('/api/analytics/financial-report?')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            totals: {
+              revenue: 150,
+              cogs: 50,
+              grossProfit: 100,
+              cogsKnown: true,
+              receiptCount: 1,
+              unknownCogsSaleCount: 0,
+            },
+          }),
+        });
+      }
+      if (url.includes('page=2')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            data: [{ id: 2, date: '2026-10-10T09:31:00.000Z', name: 'Ibuprofen', quantity: 1, totalPrice: 75 }],
+            pagination: { page: 2, limit: 100, total: 2, totalPages: 2 },
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          data: [{ id: 1, date: '2026-10-10T09:30:00.000Z', name: 'Paracetamol', quantity: 2, totalPrice: 75 }],
+          pagination: { page: 1, limit: 100, total: 2, totalPages: 2 },
+        }),
+      });
+    });
+
+    render(
+      <DataContext.Provider value={{ sales: [], expenses: [] }}>
+        <ReportsPage />
+      </DataContext.Provider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /item history/i }));
+    fireEvent.change(screen.getByLabelText(/sale date/i), { target: { value: '2026-10-10' } });
+
+    expect(await screen.findByText('Ibuprofen')).toBeTruthy();
+    expect(screen.getByText('K150.00')).toBeTruthy();
+    expect(screen.getByText('K50.00')).toBeTruthy();
+    expect(screen.getByText('K100.00')).toBeTruthy();
+    expect(screen.getByText('66.7% gross margin')).toBeTruthy();
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining('/api/sales?')));
+    expect(apiFetch.mock.calls.some(([url]) => url.includes('/api/sales?') && url.includes('page=2'))).toBe(true);
+    expect(apiFetch.mock.calls.some(([url]) => url.includes('/api/analytics/financial-report?from=2026-10-10&to=2026-10-10'))).toBe(true);
+  });
+
   it('lets an admin preview and confirm a completed receipt reversal', async () => {
     apiFetch.mockImplementation((url, options) => {
       if (url === '/api/sales/17/reversal-preview') {

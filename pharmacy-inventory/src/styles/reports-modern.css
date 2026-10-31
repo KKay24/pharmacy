@@ -199,6 +199,66 @@
     overflow: hidden;
 }
 
+.ri-history-toolbar {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+}
+
+.ri-history-toolbar label {
+    color: #334155;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    gap: 0.65rem;
+}
+
+.ri-history-toolbar input {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    color: #0f172a;
+    font: inherit;
+    padding: 0.45rem 0.6rem;
+}
+
+.ri-history-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.ri-history-summary-heading h2 {
+    color: #0f172a;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.ri-history-summary-heading p,
+.ri-history-summary-error {
+    color: #64748b;
+    font-size: 0.85rem;
+    margin: 0.25rem 0 0;
+}
+
+.ri-history-summary-error {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.ri-history-summary-grid {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+    .ri-history-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .ri-ledger-toolbar {
     display: flex;
     justify-content: space-between;

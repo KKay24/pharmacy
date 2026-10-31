@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BarChart3, Download, History, RefreshCw, Table } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -18,6 +18,19 @@ function selectedRange(period) {
   from.setDate(from.getDate() - (period === '7d' ? 6 : period === '30d' ? 29 : 364));
   return { from: localDate(from), to: localDate(to) };
 }
+function nextDate(dateKey) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+// Keep the item rows on the same Africa/Lusaka business day used by the
+// canonical financial report, regardless of the browser's local time zone.
+function itemHistoryRange(dateKey) {
+  return {
+    from: `${dateKey}T00:00:00+02:00`,
+    to: `${nextDate(dateKey)}T00:00:00+02:00`,
+  };
+}
 function paymentAmount(row, method) { return Number(row.payments?.find((payment) => payment.method === method)?.amount || 0); }
 function csvValue(value) { return `"${String(value ?? '').replace(/"/g, '""')}"`; }
 
@@ -30,6 +43,13 @@ export default function ReportsPage() {
   const [error, setError] = useState('');
   const [historyDate, setHistoryDate] = useState(localDate(new Date()));
   const [history, setHistory] = useState([]);
+  const [historySummary, setHistorySummary] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySummaryLoading, setHistorySummaryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historySummaryError, setHistorySummaryError] = useState('');
+  const historyRequestId = useRef(0);
+  const historySummaryRequestId = useRef(0);
   const [cashDate, setCashDate] = useState(localDate(new Date()));
   const [countedCash, setCountedCash] = useState('');
   const [cashNotes, setCashNotes] = useState('');
@@ -50,18 +70,58 @@ export default function ReportsPage() {
     finally { setLoading(false); }
   };
   const loadHistory = useCallback(async () => {
-    const start = new Date(`${historyDate}T00:00:00`); const end = new Date(start); end.setDate(end.getDate() + 1);
-    const query = new URLSearchParams({ from: start.toISOString(), to: end.toISOString(), limit: '100' });
-    const response = await apiFetch(`/api/sales?${query}`);
-    if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Could not load sales history'));
-    const data = await response.json();
-    setHistory(data.data || []);
+    const requestId = historyRequestId.current + 1;
+    historyRequestId.current = requestId;
+    setHistoryLoading(true); setHistoryError('');
+    try {
+      const dateRange = itemHistoryRange(historyDate);
+      const rows = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const query = new URLSearchParams({ ...dateRange, page: String(page), limit: '100' });
+        const response = await apiFetch(`/api/sales?${query}`);
+        if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Could not load sales history'));
+        const data = await response.json();
+        rows.push(...(data.data || []));
+        totalPages = Number(data.pagination?.totalPages || 1);
+        page += 1;
+      } while (page <= totalPages);
+      if (historyRequestId.current === requestId) setHistory(rows);
+    } catch (loadError) {
+      if (historyRequestId.current === requestId) {
+        setHistory([]);
+        setHistoryError(loadError.message || 'Could not load sales history');
+      }
+    } finally {
+      if (historyRequestId.current === requestId) setHistoryLoading(false);
+    }
+  }, [historyDate]);
+  const loadHistorySummary = useCallback(async () => {
+    const requestId = historySummaryRequestId.current + 1;
+    historySummaryRequestId.current = requestId;
+    setHistorySummaryLoading(true); setHistorySummaryError('');
+    try {
+      const query = new URLSearchParams({ from: historyDate, to: historyDate });
+      const response = await apiFetch(`/api/analytics/financial-report?${query}`);
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Could not load the daily financial summary'));
+      const data = await response.json();
+      if (historySummaryRequestId.current === requestId) setHistorySummary(data);
+    } catch (loadError) {
+      if (historySummaryRequestId.current === requestId) {
+        setHistorySummary(null);
+        setHistorySummaryError(loadError.message || 'Could not load the daily financial summary');
+      }
+    } finally {
+      if (historySummaryRequestId.current === requestId) setHistorySummaryLoading(false);
+    }
   }, [historyDate]);
   useEffect(() => { loadReport(); }, [range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (tab !== 'history') return;
-    loadHistory().catch((loadError) => { setHistory([]); toast.error(loadError.message); });
-  }, [tab, loadHistory]);
+    loadHistory();
+    loadHistorySummary();
+  }, [tab, loadHistory, loadHistorySummary]);
   const openReversal = async (sale) => {
     setReversalLoading(true);
     try {
@@ -96,7 +156,7 @@ export default function ReportsPage() {
         ? { ...sale, saleStatus: 'REVERSED' }
         : sale));
       closeReversal();
-      await loadReport();
+      await Promise.all([loadReport(), loadHistorySummary()]);
       toast.success(`Receipt ${result.receiptNumber || ''} reversed. Stock has been restored.`.trim());
     } catch (reverseError) {
       toast.error(reverseError.message || 'Could not reverse sale');
@@ -120,6 +180,12 @@ export default function ReportsPage() {
 
   const daily = report?.daily || EMPTY_ARRAY;
   const totals = report?.totals || {};
+  const historyTotals = historySummary?.totals || null;
+  const historyHasCompletedReceipts = Number(historyTotals?.receiptCount || 0) > 0;
+  const historyCogsKnown = historyTotals?.cogsKnown === true;
+  const historyMargin = historyCogsKnown && Number(historyTotals?.revenue || 0) > 0
+    ? (Number(historyTotals.grossProfit) / Number(historyTotals.revenue)) * 100
+    : null;
   const paymentMethods = useMemo(() => [...new Set(daily.flatMap((row) => (row.payments || []).map((payment) => payment.method)))], [daily]);
   const exportLedger = () => {
     if (!daily.length) return toast.error('There are no report rows to export');
@@ -161,7 +227,20 @@ export default function ReportsPage() {
       <div className="ri-chart-card"><h3 className="ri-chart-title">Revenue and operating expenses — {range.from} to {range.to}</h3><div style={{ height: 320 }}><ResponsiveContainer width="100%" height="100%"><AreaChart data={daily}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis /><Tooltip formatter={(value) => money(value)} /><Area dataKey="revenue" name="Revenue" stroke="#039d83" fill="#d1fae5" /><Area dataKey="operatingExpenses" name="Operating expenses" stroke="#ef4444" fill="none" /></AreaChart></ResponsiveContainer></div></div>
       <div className="ri-chart-card"><h3 className="ri-chart-title">Revenue by product category</h3><div style={{ height: 260 }}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={report?.categories || []} dataKey="value" nameKey="name" outerRadius={90}>{(report?.categories || []).map((item, index) => <Cell key={item.name} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip formatter={(value) => money(value)} /></PieChart></ResponsiveContainer></div></div>
     </div>}
-    {tab === 'history' && <div className="ri-ledger-card"><label>Sale date <input type="date" value={historyDate} onChange={(event) => setHistoryDate(event.target.value)} /></label><div className="ri-ledger-table-wrap"><table className="ri-ledger-table"><thead><tr><th>Time</th><th>Item</th><th>Qty</th><th>Sale total</th><th>Sold by</th><th>Status</th><th>Receipt</th>{userRole === 'admin' && <th>Action</th>}</tr></thead><tbody>{history.map((sale) => <tr key={sale.id}><td>{new Date(sale.date).toLocaleTimeString()}</td><td>{sale.name}</td><td>{sale.quantity}</td><td>{money(sale.totalPrice)}</td><td>{sale.soldBy || '—'}</td><td>{sale.saleStatus || 'COMPLETED'}</td><td>{sale.receiptNumber || '—'}</td>{userRole === 'admin' && <td>{(sale.saleStatus || 'COMPLETED') === 'COMPLETED' ? <button type="button" className="ri-reverse-btn" onClick={() => openReversal(sale)} disabled={reversalLoading}>Reverse</button> : <span className="ri-reversed-label">Reversed</span>}</td>}</tr>)}{!history.length && <tr><td colSpan={userRole === 'admin' ? '8' : '7'}>No item sales on this date.</td></tr>}</tbody></table></div></div>}
+    {tab === 'history' && <>
+      <div className="ri-history-toolbar"><label>Sale date <input type="date" value={historyDate} onChange={(event) => setHistoryDate(event.target.value)} /></label></div>
+      <section className="ri-history-summary" aria-label={`Daily financial summary for ${historyDate}`}>
+        <div className="ri-history-summary-heading"><h2>Daily financial summary</h2><p>Completed receipts for {historyDate} (Africa/Lusaka)</p></div>
+        {historySummaryError && <p className="ri-history-summary-error" role="alert">{historySummaryError}</p>}
+        <div className="ri-history-summary-grid">
+          <div className="ri-stat-card"><span className="ri-stat-label">Total sales</span><span className="ri-stat-value">{historySummaryLoading ? 'Loading…' : historySummaryError ? 'Unavailable' : money(historyTotals?.revenue)}</span><span className="ri-stat-sub">{historySummaryLoading ? 'Loading completed receipts' : historySummaryError ? 'Try changing the date or refreshing' : historyHasCompletedReceipts ? `${historyTotals.receiptCount} completed receipt${historyTotals.receiptCount === 1 ? '' : 's'}` : 'No completed receipts'}</span></div>
+          <div className="ri-stat-card"><span className="ri-stat-label">Total COGS</span><span className="ri-stat-value">{historySummaryLoading ? 'Loading…' : historySummaryError ? 'Unavailable' : historyCogsKnown ? money(historyTotals?.cogs) : 'Review needed'}</span><span className="ri-stat-sub">{historySummaryLoading ? 'Loading historical batch costs' : historySummaryError ? 'Historical COGS could not be verified' : !historyHasCompletedReceipts ? 'No completed receipts' : historyCogsKnown ? 'Historical sale-time batch costs' : `${historyTotals?.unknownCogsSaleCount || 0} sale row${historyTotals?.unknownCogsSaleCount === 1 ? '' : 's'} without verified cost`}</span></div>
+          <div className="ri-stat-card"><span className="ri-stat-label">Gross profit</span><span className="ri-stat-value">{historySummaryLoading ? 'Loading…' : historySummaryError ? 'Unavailable' : historyCogsKnown ? money(historyTotals?.grossProfit) : 'Review needed'}</span><span className="ri-stat-sub">{historySummaryLoading ? 'Calculating gross profit' : historySummaryError ? 'Gross profit could not be verified' : !historyHasCompletedReceipts ? 'No completed receipts' : historyCogsKnown ? `${historyMargin.toFixed(1)}% gross margin` : 'Requires verified historical COGS'}</span></div>
+        </div>
+      </section>
+      {historyError && <p className="ri-history-summary-error" role="alert">{historyError}</p>}
+      <div className="ri-ledger-card"><div className="ri-ledger-table-wrap"><table className="ri-ledger-table"><thead><tr><th>Time</th><th>Item</th><th>Qty</th><th>Sale total</th><th>Sold by</th><th>Status</th><th>Receipt</th>{userRole === 'admin' && <th>Action</th>}</tr></thead><tbody>{history.map((sale) => <tr key={sale.id}><td>{new Date(sale.date).toLocaleTimeString()}</td><td>{sale.name}</td><td>{sale.quantity}</td><td>{money(sale.totalPrice)}</td><td>{sale.soldBy || '—'}</td><td>{sale.saleStatus || 'COMPLETED'}</td><td>{sale.receiptNumber || '—'}</td>{userRole === 'admin' && <td>{(sale.saleStatus || 'COMPLETED') === 'COMPLETED' ? <button type="button" className="ri-reverse-btn" onClick={() => openReversal(sale)} disabled={reversalLoading}>Reverse</button> : <span className="ri-reversed-label">Reversed</span>}</td>}</tr>)}{!historyLoading && !history.length && <tr><td colSpan={userRole === 'admin' ? '8' : '7'}>No item sales on this date.</td></tr>}{historyLoading && <tr><td colSpan={userRole === 'admin' ? '8' : '7'}>Loading item sales…</td></tr>}</tbody></table></div></div>
+    </>}
     {reversalPreview && <div className="ri-modal-overlay" role="presentation"><form className="ri-modal-content ri-reversal-modal" onSubmit={confirmReversal} role="dialog" aria-modal="true" aria-labelledby="reverse-sale-title"><h2 id="reverse-sale-title" className="ri-modal-title">Reverse receipt</h2><p className="ri-modal-subtitle">Receipt {reversalPreview.receiptNumber || `sale #${reversalPreview.saleId}`} totals {money(reversalPreview.total)}. This restores the original batches to stock and cannot be undone.</p><div className="ri-reversal-items">{reversalPreview.inventoryImpact.map((item, index) => <p key={`${item.batchNumber}-${index}`}>{item.quantity} × {item.itemName} → batch {item.batchNumber || '—'}</p>)}</div><label className="ri-reversal-reason">Reason for reversal<textarea value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} required minLength="1" maxLength="500" disabled={reversalLoading} /></label><div className="ri-modal-actions"><button type="button" onClick={closeReversal} disabled={reversalLoading}>Cancel</button><button type="submit" className="ri-reverse-btn" disabled={reversalLoading || !reversalReason.trim()}>{reversalLoading ? 'Reversing…' : 'Confirm reversal'}</button></div></form></div>}
   </div>;
 }
