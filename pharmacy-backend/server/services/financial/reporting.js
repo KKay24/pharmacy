@@ -26,12 +26,32 @@ function nextDateKey(dateKey) {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
 }
+function previousDateKey(dateKey) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
+}
 function parseRange(query = {}) {
+  const hasStartEnd = query.start !== undefined || query.end !== undefined;
+  if (hasStartEnd) {
+    if (!query.start || !query.end) throw new Error('start and end must both use YYYY-MM-DD');
+    const start = assertDateKey(String(query.start).slice(0, 10), 'start');
+    const end = assertDateKey(String(query.end).slice(0, 10), 'end');
+    if (start >= end) throw new Error('start must be before end');
+    // The explicit reporting-period contract is [start, end), so adjacent
+    // calendar periods share a boundary without double-counting activity.
+    return {
+      from: start,
+      to: previousDateKey(end),
+      start,
+      end,
+      salesWhere: { date: { [Op.gte]: businessMidnightUtc(start), [Op.lt]: businessMidnightUtc(end) } },
+    };
+  }
   const from = query.from ? assertDateKey(String(query.from).slice(0, 10), 'from') : null;
   const to = query.to ? assertDateKey(String(query.to).slice(0, 10), 'to') : null;
   if (from && to && from > to) throw new Error('from must be on or before to');
   const date = from || to ? { ...(from ? { [Op.gte]: businessMidnightUtc(from) } : {}), ...(to ? { [Op.lt]: businessMidnightUtc(nextDateKey(to)) } : {}) } : null;
-  return { from, to, salesWhere: date ? { date } : {} };
+  return { from, to, start: from, end: to ? nextDateKey(to) : null, salesWhere: date ? { date } : {} };
 }
 function toMinor(value) { const parsed = Number(value); return Number.isFinite(parsed) ? Math.round(parsed) : null; }
 function amount(minor) { return Number((Number(minor || 0) / 100).toFixed(2)); }
@@ -107,6 +127,6 @@ async function buildFinancialReport(query = {}) {
   const monthly = [...months.values()].sort((a, b) => a.period.localeCompare(b.period)).map(publicBucket);
   const daily = [...days.values()].sort((a, b) => a.period.localeCompare(b.period)).map((bucket) => ({ ...publicBucket(bucket), date: bucket.period }));
   const total = [...months.values()].reduce((result, bucket) => { result.revenueMinor += bucket.revenueMinor; result.cogsMinor += bucket.cogsMinor; result.operatingExpensesMinor += bucket.operatingExpensesMinor; result.cashRefundsMinor += bucket.cashRefundsMinor; result.unknownCogsSaleIds.push(...bucket.unknownCogsSaleIds); bucket.receiptIds.forEach((id) => result.receiptIds.add(id)); bucket.tenderMinor.forEach((minor, method) => result.tenderMinor.set(method, (result.tenderMinor.get(method) || 0) + minor)); return result; }, emptyBucket('total'));
-  return { parameters: { from: range.from, to: range.to, timeZone: BUSINESS_TIME_ZONE }, monthly, daily, totals: publicBucket(total), payments: [...paymentTotals.values()].sort((a, b) => b.amountMinor - a.amountMinor).map((entry) => ({ method: entry.method, amount: amount(entry.amountMinor), receiptCount: entry.receiptIds.size })), categories: [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value: amount(value) })), allocationWarnings };
+  return { parameters: { from: range.from, to: range.to, start: range.start, end: range.end, timeZone: BUSINESS_TIME_ZONE }, monthly, daily, totals: publicBucket(total), payments: [...paymentTotals.values()].sort((a, b) => b.amountMinor - a.amountMinor).map((entry) => ({ method: entry.method, amount: amount(entry.amountMinor), receiptCount: entry.receiptIds.size })), categories: [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value: amount(value) })), allocationWarnings };
 }
 module.exports = { BUSINESS_TIME_ZONE, amount, assertDateKey, buildFinancialReport, businessDate, businessMidnightUtc, parseRange };

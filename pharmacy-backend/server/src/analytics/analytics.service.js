@@ -14,7 +14,7 @@ class AnalyticsService {
   async financialReport(query = {}) {
     try { return await buildFinancialReport(query); }
     catch (error) {
-      if (error?.message?.includes('YYYY-MM-DD') || error?.message?.includes('on or before')) throw new BadRequestException(error.message);
+      if (/YYYY-MM-DD|on or before|before end/.test(error?.message || '')) throw new BadRequestException(error.message);
       throw new InternalServerErrorException('Failed to fetch financial report');
     }
   }

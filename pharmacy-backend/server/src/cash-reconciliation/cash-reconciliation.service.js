@@ -1,4 +1,5 @@
 const { BadRequestException, ConflictException, Injectable, InternalServerErrorException } = require('@nestjs/common');
+const { Op } = require('sequelize');
 const { CashDrawerReconciliation, SaleRefund } = require('../../models');
 const { assertDateKey, buildFinancialReport, businessMidnightUtc, parseRange } = require('../../services/financial/reporting');
 
@@ -17,7 +18,15 @@ class CashReconciliationService {
     const cashRefundMinor = cashRefunds.reduce((sum, refund) => sum + Number(refund.amountMinor || 0), 0);
     return { expectedCashMinor: cashPaymentsMinor - cashRefundMinor, allocationWarnings: report.allocationWarnings };
   }
-  async list() { return CashDrawerReconciliation.findAll({ order: [['businessDate', 'DESC']] }); }
+  async list(query = {}) {
+    let range;
+    try { range = parseRange(query); } catch (error) { throw new BadRequestException(error.message); }
+    const where = range.start || range.end
+      ? { ...(range.start ? { businessDate: { [Op.gte]: range.start } } : {}), ...(range.end ? { businessDate: { [Op.lt]: range.end } } : {}) }
+      : {};
+    if (range.start && range.end) where.businessDate = { [Op.gte]: range.start, [Op.lt]: range.end };
+    return CashDrawerReconciliation.findAll({ where, order: [['businessDate', 'DESC']] });
+  }
   async close(body, actor) {
     let businessDate;
     try { businessDate = assertDateKey(String(body?.businessDate || '').slice(0, 10), 'businessDate'); } catch (error) { throw new BadRequestException(error.message); }

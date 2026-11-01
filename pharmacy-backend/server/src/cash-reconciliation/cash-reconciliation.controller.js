@@ -1,4 +1,4 @@
-const { Body, Controller, Get, Inject, Post, Req, UseGuards } = require('@nestjs/common');
+const { Body, Controller, Get, Inject, Post, Query, Req, UseGuards } = require('@nestjs/common');
 const CashReconciliationService = require('./cash-reconciliation.service');
 const AuthGuard = require('../auth/auth.guard');
 const Roles = require('../auth/roles.decorator');
@@ -10,7 +10,7 @@ const PermissionsGuard = require('../auth/permissions.guard');
 
 class CashReconciliationController {
   constructor(service) { this.service = service; }
-  list() { return this.service.list(); }
+  list(query) { return this.service.list(query); }
   close(body, request) { return this.service.close(body, request?.user); }
 }
 applyClassDecorator(Controller, CashReconciliationController, 'api/cash-reconciliations');
@@ -22,4 +22,5 @@ RequirePermissions(Permissions.ANALYTICS_READ)(CashReconciliationController.prot
 RequirePermissions(Permissions.EXPENSES_WRITE)(CashReconciliationController.prototype, 'close');
 applyParameterDecorator(Body, CashReconciliationController.prototype, 'close', 0);
 applyParameterDecorator(Req, CashReconciliationController.prototype, 'close', 1);
+applyParameterDecorator(Query, CashReconciliationController.prototype, 'list', 0);
 module.exports = CashReconciliationController;

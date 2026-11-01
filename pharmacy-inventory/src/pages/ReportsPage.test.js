@@ -53,7 +53,7 @@ describe('ReportsPage item sales history', () => {
     expect(apiFetch.mock.calls.find(([url]) => url.startsWith('/api/sales?'))[0]).toContain('limit=100');
   });
 
-  it('shows the canonical daily totals and loads every item-history page', async () => {
+  it('shares the selected calendar period across canonical totals, history pagination, and reconciliations', async () => {
     apiFetch.mockImplementation((url) => {
       if (url.startsWith('/api/analytics/financial-report?')) {
         return Promise.resolve({
@@ -94,8 +94,8 @@ describe('ReportsPage item sales history', () => {
       </DataContext.Provider>
     );
 
+    fireEvent.click(screen.getByRole('button', { name: /previous month/i }));
     fireEvent.click(screen.getByRole('button', { name: /item history/i }));
-    fireEvent.change(screen.getByLabelText(/sale date/i), { target: { value: '2026-10-10' } });
 
     expect(await screen.findByText('Ibuprofen')).toBeTruthy();
     expect(screen.getByText('K150.00')).toBeTruthy();
@@ -104,7 +104,16 @@ describe('ReportsPage item sales history', () => {
     expect(screen.getByText('66.7% gross margin')).toBeTruthy();
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining('/api/sales?')));
     expect(apiFetch.mock.calls.some(([url]) => url.includes('/api/sales?') && url.includes('page=2'))).toBe(true);
-    expect(apiFetch.mock.calls.some(([url]) => url.includes('/api/analytics/financial-report?from=2026-10-10&to=2026-10-10'))).toBe(true);
+    const lastUrl = (prefix) => apiFetch.mock.calls.map(([url]) => url).filter((url) => url.startsWith(prefix)).pop();
+    const financialRange = new URLSearchParams(lastUrl('/api/analytics/financial-report?').split('?')[1]);
+    const salesRange = new URLSearchParams(lastUrl('/api/sales?').split('?')[1]);
+    const reconciliationRange = new URLSearchParams(lastUrl('/api/cash-reconciliations?').split('?')[1]);
+    expect(financialRange.get('start')).toBeTruthy();
+    expect(financialRange.get('end')).toBeTruthy();
+    expect(reconciliationRange.get('start')).toBe(financialRange.get('start'));
+    expect(reconciliationRange.get('end')).toBe(financialRange.get('end'));
+    expect(salesRange.get('from')).toBe(`${financialRange.get('start')}T00:00:00+02:00`);
+    expect(salesRange.get('to')).toBe(`${financialRange.get('end')}T00:00:00+02:00`);
   });
 
   it('lets an admin preview and confirm a completed receipt reversal', async () => {

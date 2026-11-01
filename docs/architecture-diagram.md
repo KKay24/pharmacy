@@ -140,12 +140,12 @@ Batches belong to a medicine and contain `batchNumber`, quantity, expiry date, c
 ## 10. Reporting workflow
 
 - `GET /api/analytics/profit-loss` returns a canonical monthly financial statement from completed sales, verified COGS and active expenses. If any sale lacks verified historical COGS, gross and net profit for that period are unavailable rather than estimated.
-- `GET /api/analytics/financial-report` returns the canonical daily ledger, payment allocations, category totals, refunds and reporting parameters for an inclusive `from`/`to` Africa/Lusaka date range.
+- `GET /api/analytics/financial-report` returns the canonical daily/monthly ledger, payment allocations, category totals, refunds and reporting parameters. Existing `from`/`to` date keys remain inclusive for compatibility; reporting clients use explicit Africa/Lusaka `start`/`end` date keys as a half-open interval `[start, end)`.
 - `GET /api/analytics/predictions` generates a demand forecast from sales history and current inventory.
 - `GET /api/analytics/reorder-suggestions` returns suggested restocking data.
 - `GET /api/analytics/risks` returns stockout, expiry and dead-stock insight sets.
 - `GET /api/reports/analytics` calls the same canonical financial-report service.
-- `POST /api/cash-reconciliations` stores one immutable expected/count/variance close for a business date; variance is kept separate from revenue and profit.
+- `GET /api/cash-reconciliations?start=<date>&end=<date>` filters immutable cash-drawer closes to the same half-open reporting period. `POST /api/cash-reconciliations` stores one immutable expected/count/variance close for a business date; variance is kept separate from revenue and profit.
 
 Sales values, operating-expense values and refund values use minor currency units in the persisted financial controls. Expense corrections require a reason, and a DELETE request voids rather than deletes the record. The web and mobile report pages use the canonical reporting endpoints; browser caches remain non-authoritative.
 
