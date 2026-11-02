@@ -3,6 +3,7 @@ const { buildForecastDataset, parseAnalyticsOptions, roundNumber } = require('..
 const { buildStockInsights } = require('../../services/analytics/stockout');
 const { buildExpiryRiskReport } = require('../../services/analytics/expiry');
 const { buildFinancialReport } = require('../../services/financial/reporting');
+const { logUnexpectedError } = require('../common/error-handling');
 
 class AnalyticsService {
   async profitLoss(query) {
@@ -15,6 +16,7 @@ class AnalyticsService {
     try { return await buildFinancialReport(query); }
     catch (error) {
       if (/YYYY-MM-DD|on or before|before end/.test(error?.message || '')) throw new BadRequestException(error.message);
+      logUnexpectedError('Financial report generation failed:', error);
       throw new InternalServerErrorException('Failed to fetch financial report');
     }
   }

@@ -16,6 +16,7 @@ const {
   normalizeIdentityValue,
   sameProductIdentity,
 } = require('./product-identity');
+const { DuplicateResourceException } = require('../common/errors');
 
 const MEDICINE_UPDATE_FIELDS = [
   'name', 'genericName', 'brandName', 'category', 'dosage', 'strength', 'supplier',
@@ -134,7 +135,7 @@ function isUniqueConstraintError(error) {
 function rethrowPersistenceError(error, fallbackMessage) {
   if (error instanceof HttpException) throw error;
   if (isUniqueConstraintError(error)) {
-    throw new ConflictException('This medicine or batch already exists. Refresh inventory and try again.');
+    throw new DuplicateResourceException('This medicine or batch already exists. Refresh inventory and try again.');
   }
 
   // Names/codes aid operations without exposing database URLs, credentials, SQL, or values.
@@ -467,7 +468,7 @@ class InventoryService {
       transaction,
       lock: transaction.LOCK.UPDATE,
     });
-    if (existingBatch) throw new ConflictException('This batch already exists for this medicine.');
+    if (existingBatch) throw new DuplicateResourceException('This batch already exists for this medicine.');
 
     const batch = await Batch.create({
       medicineId: medicine.id,
@@ -555,7 +556,7 @@ class InventoryService {
       let medicine = await this.findMedicineByIdentity(attributes, transaction);
       const receivedWithBatch = hasBatchPayload(body);
 
-      if (medicine && !receivedWithBatch) throw new ConflictException('This medicine already exists.');
+      if (medicine && !receivedWithBatch) throw new DuplicateResourceException('This medicine already exists.');
       if (!medicine) {
         medicine = await Medicine.create({
           ...attributes,
@@ -603,7 +604,7 @@ class InventoryService {
         ? { ...mergedAttributes, dosage: classification.dosage }
         : mergedAttributes;
       const matchingMedicine = await this.findMedicineByIdentity(identityAttributes, transaction, medicine.id);
-      if (matchingMedicine) throw new ConflictException('This medicine already exists.');
+      if (matchingMedicine) throw new DuplicateResourceException('This medicine already exists.');
 
       const changes = {};
       for (const field of MEDICINE_UPDATE_FIELDS) {

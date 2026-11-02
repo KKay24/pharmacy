@@ -11,6 +11,7 @@ const { Op } = require('sequelize');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
 const { normalizeIdentityValue } = require('../inventory/product-identity');
 const { buildReceiptEmailHtml, sendReceiptEmail } = require('./receipt-email');
+const { InsufficientStockException } = require('../common/errors');
 
 const PAYMENT_METHODS = new Set(['Cash', 'Airtel Money', 'MTN Mobile Money', 'Card']);
 const ELECTRONIC_PAYMENT_METHODS = new Set(['Airtel Money', 'MTN Mobile Money', 'Card']);
@@ -494,7 +495,7 @@ class SalesService {
           lock: transaction.LOCK.UPDATE,
         });
         const available = batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
-        if (available < quantity) throw new BadRequestException(`Not enough stock for ${medicine.name}`);
+        if (available < quantity) throw new InsufficientStockException(`Not enough stock for ${medicine.name}`);
 
         let remaining = quantity;
         let totalCost = 0;

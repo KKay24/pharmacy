@@ -2,6 +2,7 @@ const { Injectable, BadRequestException, InternalServerErrorException, NotFoundE
 const { Op } = require('sequelize');
 const { Customer, Sales } = require('../../models');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
+const { logUnexpectedError, safePersistenceException } = require('../common/error-handling');
 
 class CustomersService {
   async list(query) {
@@ -10,7 +11,7 @@ class CustomersService {
     return paginatedResponse(result.rows, result.count, pagination);
   }
   async search(query) { return Customer.findAll({ where: { [Op.or]: [{ name: { [Op.like]: `%${query}%` } }, { phone: { [Op.like]: `%${query}%` } }] } }); }
-  async create(body) { try { return await Customer.create(body); } catch (error) { throw new BadRequestException('Failed to add customer'); } }
+  async create(body) { try { return await Customer.create(body); } catch (error) { const publicError = safePersistenceException(error, 'Failed to add customer', 'Customer data is invalid'); if (publicError.getStatus() >= 500) logUnexpectedError('Customer creation failed:', error); throw publicError; } }
   async get(id) {
     try {
       const customer = await Customer.findByPk(id, { include: [Sales] });
@@ -18,6 +19,7 @@ class CustomersService {
       return customer;
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
+      logUnexpectedError('Customer lookup failed:', error);
       throw new InternalServerErrorException('Error fetching customer');
     }
   }

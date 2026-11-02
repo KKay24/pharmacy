@@ -8,6 +8,7 @@ const {
   NotFoundException,
 } = require('@nestjs/common');
 const { randomBytes } = require('node:crypto');
+const { InsufficientStockException, OrderStateException } = require('../common/errors');
 const { Op } = require('sequelize');
 const {
   Batch,
@@ -529,14 +530,14 @@ class StoreService {
       });
       if (!order) throw new NotFoundException('Order not found');
       if (order.orderStatus === 'Cancelled') {
-        throw new ConflictException('This order has already been cancelled');
+        throw new OrderStateException('This order has already been cancelled');
       }
       if (order.orderStatus === status) return order;
       if (
         order.orderStatus === 'Order Placed'
         && ['Preparing', 'Ready', 'Out for Delivery', 'Delivered'].includes(status)
       ) {
-        throw new ConflictException('Confirm the order before continuing fulfillment');
+        throw new OrderStateException('Confirm the order before continuing fulfillment');
       }
 
       const updates = { orderStatus: status };
@@ -600,7 +601,7 @@ class StoreService {
           const additionalQuantity = Math.max(0, requestedQuantity - alreadyAllocated);
 
           if (availableStock < additionalQuantity) {
-            throw new ConflictException(
+            throw new InsufficientStockException(
               `Insufficient stock to confirm ${item.name || medicine.name}. `
               + `Required: ${requestedQuantity}, available: ${alreadyAllocated + availableStock}.`
             );
