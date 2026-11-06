@@ -15,6 +15,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import "../styles/inventory-modern.css";
 import { getInventoryStockValue } from "../utils/inventoryValuation";
+import { apiFetch, getApiErrorMessage } from "../utils/api";
 
 export default function InventoryPage() {
   const {
@@ -22,6 +23,7 @@ export default function InventoryPage() {
     inventoryCategories = [],
     updateInventoryItem,
     deleteInventoryItem,
+    fetchInventory,
     userRole,
     riskInsights = {},
   } = useContext(DataContext);
@@ -130,6 +132,44 @@ export default function InventoryPage() {
 
     return result;
   }, [inventory, filters, searchQuery, riskInsights]);
+
+  const addBatchToMedicine = async (medicineId, batch) => {
+    try {
+      const response = await apiFetch(`/api/inventory/${medicineId}/batches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(batch),
+      });
+      if (!response.ok) return { success: false, error: await getApiErrorMessage(response, "Failed to add stock batch") };
+
+      const medicine = await response.json();
+      const refresh = await fetchInventory();
+      setSelectedMedicine(medicine);
+      return refresh?.success === false
+        ? { success: false, error: `Batch was added, but ${refresh.error.toLowerCase()}` }
+        : { success: true, medicine };
+    } catch (error) {
+      return { success: false, error: "Unable to reach the inventory service" };
+    }
+  };
+
+  const removeBatchFromMedicine = async (medicineId, batchId) => {
+    try {
+      const response = await apiFetch(`/api/inventory/${medicineId}/batches/${batchId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) return { success: false, error: await getApiErrorMessage(response, "Failed to remove stock batch") };
+
+      const medicine = await response.json();
+      const refresh = await fetchInventory();
+      setSelectedMedicine(medicine);
+      return refresh?.success === false
+        ? { success: false, error: `Batch was removed, but ${refresh.error.toLowerCase()}` }
+        : { success: true, medicine };
+    } catch (error) {
+      return { success: false, error: "Unable to reach the inventory service" };
+    }
+  };
 
   return (
     <div className="inv-container">
@@ -270,6 +310,8 @@ export default function InventoryPage() {
         medicine={selectedMedicine}
         onClose={() => setSelectedMedicine(null)}
         onUpdate={updateInventoryItem}
+        onAddBatch={addBatchToMedicine}
+        onRemoveBatch={removeBatchFromMedicine}
         categories={inventoryCategories}
       />
     </div>

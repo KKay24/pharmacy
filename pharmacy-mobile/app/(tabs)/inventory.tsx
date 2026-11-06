@@ -73,6 +73,14 @@ interface MedicineItem {
   ProductForm?: { id: number; name: string };
 }
 
+const EMPTY_BATCH_DRAFT = {
+  batchNumber: '',
+  quantity: '',
+  costPrice: '',
+  sellingPrice: '',
+  expiryDate: '',
+};
+
 export default function InventoryScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -96,6 +104,8 @@ export default function InventoryScreen() {
   const [editStrength, setEditStrength] = useState('');
   const [editThreshold, setEditThreshold] = useState('10');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [batchDraft, setBatchDraft] = useState(EMPTY_BATCH_DRAFT);
+  const [savingBatch, setSavingBatch] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadInventory = useCallback(async () => {
@@ -293,6 +303,86 @@ export default function InventoryScreen() {
     setEditGeneric(med.genericName || '');
     setEditStrength(med.strength || '');
     setEditThreshold(String(med.lowStockThreshold || 10));
+    setBatchDraft(EMPTY_BATCH_DRAFT);
+  };
+
+  const applyBatchResponse = (updatedMedicine: MedicineItem) => {
+    setEditingItem((current) => {
+      if (!current || current.id !== updatedMedicine.id) return current;
+      return {
+        ...current,
+        Batches: updatedMedicine.Batches || [],
+        totalQuantity: updatedMedicine.totalQuantity,
+      };
+    });
+  };
+
+  const handleAddBatch = async () => {
+    if (!editingItem) return;
+    const quantity = Number(batchDraft.quantity);
+    const costPrice = Number(batchDraft.costPrice);
+    const sellingPrice = Number(batchDraft.sellingPrice);
+    if (!batchDraft.batchNumber.trim()) {
+      Alert.alert('Validation Error', 'Batch number is required.');
+      return;
+    }
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      Alert.alert('Validation Error', 'Quantity must be a positive whole number.');
+      return;
+    }
+    if (!Number.isFinite(costPrice) || costPrice < 0 || !Number.isFinite(sellingPrice) || sellingPrice < 0) {
+      Alert.alert('Validation Error', 'Cost price and selling price must be non-negative numbers.');
+      return;
+    }
+
+    setSavingBatch(true);
+    try {
+      const response = await apiClient.post<MedicineItem>(`/api/inventory/${editingItem.id}/batches`, {
+        batchNumber: batchDraft.batchNumber.trim(),
+        quantity,
+        costPrice,
+        sellingPrice,
+        expiryDate: batchDraft.expiryDate.trim() || undefined,
+      });
+      applyBatchResponse(response.data);
+      setBatchDraft(EMPTY_BATCH_DRAFT);
+      await loadInventory();
+      Alert.alert('Batch Added', 'The new batch is now available in inventory.');
+    } catch (err: unknown) {
+      const reqErr = err as { response?: { data?: { message?: string; error?: string } } };
+      Alert.alert('Error', reqErr.response?.data?.message || reqErr.response?.data?.error || 'Failed to add stock batch.');
+    } finally {
+      setSavingBatch(false);
+    }
+  };
+
+  const handleRemoveBatch = (batch: Batch) => {
+    if (!editingItem || !batch.id) return;
+    Alert.alert(
+      'Remove Batch',
+      `Remove the remaining ${batch.quantity || 0} units from batch ${batch.batchNumber || batch.id}? This is recorded as an inventory adjustment.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setSavingBatch(true);
+            try {
+              const response = await apiClient.delete<MedicineItem>(`/api/inventory/${editingItem.id}/batches/${batch.id}`);
+              applyBatchResponse(response.data);
+              await loadInventory();
+              Alert.alert('Batch Removed', 'The batch was removed from active inventory.');
+            } catch (err: unknown) {
+              const reqErr = err as { response?: { data?: { message?: string; error?: string } } };
+              Alert.alert('Error', reqErr.response?.data?.message || reqErr.response?.data?.error || 'Failed to remove stock batch.');
+            } finally {
+              setSavingBatch(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSaveEdit = async () => {
@@ -625,6 +715,36 @@ export default function InventoryScreen() {
                   keyboardType="numeric"
                   style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
                 />
+
+                <View style={[styles.batchManager, { borderTopColor: theme.borderLight }]}>
+                  <Text style={[styles.batchManagerTitle, { color: theme.text }]}>Active Batches</Text>
+                  <Text style={[styles.batchManagerHint, { color: theme.mutedText }]}>Add received stock or remove a batch from active inventory.</Text>
+                  {(editingItem?.Batches || [])
+                    .filter((batch) => Number(batch.quantity || 0) > 0)
+                    .map((batch) => (
+                      <View key={batch.id || batch.batchNumber} style={[styles.editBatchRow, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}> 
+                        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+                          <Text style={[styles.editBatchName, { color: theme.text }]}>{batch.batchNumber || 'Unnumbered batch'}</Text>
+                          <Text style={[styles.editBatchMeta, { color: theme.mutedText }]}>{batch.quantity || 0} units · expires {batch.expiryDate || 'not recorded'}</Text>
+                        </View>
+                        <Pressable disabled={savingBatch} onPress={() => handleRemoveBatch(batch)} hitSlop={8}>
+                          <Trash2 size={18} color={theme.danger} />
+                        </Pressable>
+                      </View>
+                    ))}
+
+                  <Text style={[styles.batchManagerTitle, { color: theme.text, marginTop: 16 }]}>Add Batch</Text>
+                  <TextInput value={batchDraft.batchNumber} onChangeText={(batchNumber) => setBatchDraft((current) => ({ ...current, batchNumber }))} placeholder="Batch number" placeholderTextColor={theme.mutedText} style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]} />
+                  <View style={styles.batchInputRow}>
+                    <TextInput value={batchDraft.quantity} onChangeText={(quantity) => setBatchDraft((current) => ({ ...current, quantity }))} placeholder="Quantity" keyboardType="numeric" placeholderTextColor={theme.mutedText} style={[styles.input, styles.batchInput, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]} />
+                    <TextInput value={batchDraft.costPrice} onChangeText={(costPrice) => setBatchDraft((current) => ({ ...current, costPrice }))} placeholder="Cost / unit" keyboardType="decimal-pad" placeholderTextColor={theme.mutedText} style={[styles.input, styles.batchInput, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]} />
+                  </View>
+                  <View style={styles.batchInputRow}>
+                    <TextInput value={batchDraft.sellingPrice} onChangeText={(sellingPrice) => setBatchDraft((current) => ({ ...current, sellingPrice }))} placeholder="Selling / unit" keyboardType="decimal-pad" placeholderTextColor={theme.mutedText} style={[styles.input, styles.batchInput, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]} />
+                    <TextInput value={batchDraft.expiryDate} onChangeText={(expiryDate) => setBatchDraft((current) => ({ ...current, expiryDate }))} placeholder="Expiry (YYYY-MM-DD)" placeholderTextColor={theme.mutedText} style={[styles.input, styles.batchInput, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]} />
+                  </View>
+                  <Button title={savingBatch ? 'Saving Batch...' : 'Add Batch'} onPress={handleAddBatch} loading={savingBatch} variant="secondary" fullWidth />
+                </View>
   
                 <View style={{ marginTop: 16 }}>
                   <Button
@@ -777,4 +897,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 14,
   },
+  batchManager: { borderTopWidth: 1, marginTop: 20, paddingTop: 16 },
+  batchManagerTitle: { fontSize: 14, fontWeight: '800' },
+  batchManagerHint: { fontSize: 12, marginTop: 3, marginBottom: 10 },
+  editBatchRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: layout.radius.sm, padding: 10, marginBottom: 8 },
+  editBatchName: { fontSize: 13, fontWeight: '700' },
+  editBatchMeta: { fontSize: 11, marginTop: 2 },
+  batchInputRow: { flexDirection: 'row', gap: 8 },
+  batchInput: { flex: 1 },
 });

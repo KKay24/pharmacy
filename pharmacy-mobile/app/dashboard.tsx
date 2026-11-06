@@ -33,9 +33,48 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { getMedicineBatches, getMedicineTotalQuantity } from '@/utils/inventory';
+import { getMedicineBatches, getMedicineStockValue, getMedicineTotalQuantity } from '@/utils/inventory';
 import { RoleGuard } from '@/components/ui/RoleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+type InventoryMedicine = {
+  Batches?: unknown;
+  lowStockThreshold?: number | string | null;
+};
+
+type InventoryPageResponse = {
+  data?: InventoryMedicine[];
+  pagination?: {
+    totalPages?: number;
+  };
+};
+
+const INVENTORY_PAGE_SIZE = 100;
+
+async function fetchAllInventoryPages() {
+  const medicines: InventoryMedicine[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const response = await apiClient.get<InventoryPageResponse | InventoryMedicine[]>('/api/inventory', {
+      params: { page, limit: INVENTORY_PAGE_SIZE },
+    });
+    const payload = response.data;
+    const rows = Array.isArray(payload) ? payload : payload.data;
+
+    if (!Array.isArray(rows)) {
+      throw new Error('The inventory service returned an invalid inventory page');
+    }
+
+    medicines.push(...rows);
+    const reportedTotalPages = Array.isArray(payload) ? 1 : Number(payload.pagination?.totalPages || 1);
+    totalPages = Number.isInteger(reportedTotalPages) && reportedTotalPages > 0 ? reportedTotalPages : 1;
+    page += 1;
+  } while (page <= totalPages);
+
+  return medicines;
+}
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -45,7 +84,7 @@ export default function DashboardScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [medicines, setMedicines] = useState<any[]>([]);
+  const [medicines, setMedicines] = useState<InventoryMedicine[]>([]);
   const [profitLossData, setProfitLossData] = useState<any[]>([]);
   const [reorderInsights, setReorderInsights] = useState<{ items?: any[] }>({});
   const [riskInsights, setRiskInsights] = useState<{
@@ -62,17 +101,14 @@ export default function DashboardScreen() {
     }
     try {
       const [invRes, plRes, reorderRes, riskRes] = await Promise.allSettled([
-        apiClient.get('/api/inventory?limit=100'),
+        fetchAllInventoryPages(),
         apiClient.get('/api/analytics/profit-loss'),
         apiClient.get('/api/analytics/reorder-suggestions'),
         apiClient.get('/api/analytics/risks'),
       ]);
 
       if (invRes.status === 'fulfilled') {
-        const rows = Array.isArray(invRes.value.data)
-          ? invRes.value.data
-          : invRes.value.data?.data || [];
-        setMedicines(rows);
+        setMedicines(invRes.value);
       }
       if (plRes.status === 'fulfilled') {
         const rows = Array.isArray(plRes.value.data)
@@ -115,15 +151,15 @@ export default function DashboardScreen() {
     medicines.forEach((med) => {
       const batches = getMedicineBatches(med.Batches);
       const totalQty = getMedicineTotalQuantity(batches);
-      const threshold = med.lowStockThreshold || 10;
+      const threshold = Number(med.lowStockThreshold || 10);
 
       if (totalQty === 0) outOfStockCount++;
       else if (totalQty <= threshold) lowStockCount++;
 
-      batches.forEach((b: any) => {
+      stockValue += getMedicineStockValue(med.Batches);
+
+      batches.forEach((b) => {
         const qty = Number(b.quantity || 0);
-        const cost = Number(b.costPrice || 0);
-        stockValue += qty * cost;
 
         if (
           b.expiryDate &&

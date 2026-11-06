@@ -12,7 +12,8 @@ import {
     Edit,
     Save,
     ImagePlus,
-    Trash2
+    Trash2,
+    Plus
 } from "lucide-react";
 import { useRef } from "react";
 import toast from "react-hot-toast";
@@ -25,9 +26,11 @@ const safeFormatDate = (dateString) => {
     return d.toISOString().split('T')[0];
 };
 
-export default function StockCardSidebar({ medicine, onClose, onUpdate, categories = [] }) {
+export default function StockCardSidebar({ medicine, onClose, onUpdate, onAddBatch, onRemoveBatch, categories = [] }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editedData, setEditedData] = useState(null);
+    const [batchDraft, setBatchDraft] = useState({ batchNumber: '', quantity: '', costPrice: '', sellingPrice: '', expiryDate: '' });
+    const [batchSaving, setBatchSaving] = useState(false);
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -42,6 +45,7 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate, categori
                 costPrice: currentCost
             });
             setIsEditing(false);
+            setBatchDraft({ batchNumber: '', quantity: '', costPrice: '', sellingPrice: '', expiryDate: '' });
         }
     }, [medicine]);
 
@@ -89,6 +93,49 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate, categori
 
     const removeImage = () => {
         setEditedData({ ...editedData, imageUrl: null });
+    };
+
+    const replaceActiveBatches = (updatedMedicine) => {
+        setEditedData((current) => current && current.id === updatedMedicine.id
+            ? { ...current, Batches: updatedMedicine.Batches || [], totalQuantity: updatedMedicine.totalQuantity }
+            : current);
+    };
+
+    const handleAddBatch = async () => {
+        const quantity = Number(batchDraft.quantity);
+        const costPrice = Number(batchDraft.costPrice);
+        const sellingPrice = Number(batchDraft.sellingPrice);
+        if (!batchDraft.batchNumber.trim()) return toast.error('Batch number is required.');
+        if (!Number.isInteger(quantity) || quantity <= 0) return toast.error('Quantity must be a positive whole number.');
+        if (!Number.isFinite(costPrice) || costPrice < 0 || !Number.isFinite(sellingPrice) || sellingPrice < 0) {
+            return toast.error('Cost price and selling price must be non-negative numbers.');
+        }
+
+        setBatchSaving(true);
+        const result = await onAddBatch?.(medicine.id, {
+            batchNumber: batchDraft.batchNumber.trim(),
+            quantity,
+            costPrice,
+            sellingPrice,
+            expiryDate: batchDraft.expiryDate.trim() || undefined,
+        });
+        setBatchSaving(false);
+        if (!result?.success) return toast.error(result?.error || 'Failed to add stock batch.');
+        replaceActiveBatches(result.medicine);
+        setBatchDraft({ batchNumber: '', quantity: '', costPrice: '', sellingPrice: '', expiryDate: '' });
+        toast.success('Batch added to active inventory.');
+    };
+
+    const handleRemoveBatch = async (batch) => {
+        if (!batch?.id) return;
+        if (!window.confirm(`Remove the remaining ${batch.quantity || 0} units from batch ${batch.batchNumber || batch.id}? This is recorded as an inventory adjustment.`)) return;
+
+        setBatchSaving(true);
+        const result = await onRemoveBatch?.(medicine.id, batch.id);
+        setBatchSaving(false);
+        if (!result?.success) return toast.error(result?.error || 'Failed to remove stock batch.');
+        replaceActiveBatches(result.medicine);
+        toast.success('Batch removed from active inventory.');
     };
 
     return (
@@ -381,6 +428,19 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate, categori
                     {/* Batch Log */}
                     <div className="inv-sidebar-section">
                         <h3><History size={16} color="var(--primary)" /> Batch Logs & Provenance</h3>
+                        {isEditing && (
+                            <div style={{padding:'0.85rem', border:'1px solid #dbeafe', background:'#f8fbff', borderRadius:'8px', marginBottom:'0.75rem'}}>
+                                <div style={{fontWeight:700, fontSize:'0.85rem', color:'#1e3a8a', marginBottom:'0.6rem'}}>Add stock batch</div>
+                                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.5rem'}}>
+                                    <input className="asm-input" value={batchDraft.batchNumber} onChange={e => setBatchDraft({...batchDraft, batchNumber: e.target.value})} placeholder="Batch number" />
+                                    <input className="asm-input" type="number" min="1" step="1" value={batchDraft.quantity} onChange={e => setBatchDraft({...batchDraft, quantity: e.target.value})} placeholder="Quantity" />
+                                    <input className="asm-input" type="number" min="0" step="0.01" value={batchDraft.costPrice} onChange={e => setBatchDraft({...batchDraft, costPrice: e.target.value})} placeholder="Cost / unit" />
+                                    <input className="asm-input" type="number" min="0" step="0.01" value={batchDraft.sellingPrice} onChange={e => setBatchDraft({...batchDraft, sellingPrice: e.target.value})} placeholder="Selling / unit" />
+                                    <input className="asm-input" type="date" value={batchDraft.expiryDate} onChange={e => setBatchDraft({...batchDraft, expiryDate: e.target.value})} />
+                                    <button type="button" className="asm-btn asm-btn-secondary" disabled={batchSaving} onClick={handleAddBatch}><Plus size={16} /> {batchSaving ? 'Saving…' : 'Add Batch'}</button>
+                                </div>
+                            </div>
+                        )}
                         <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
                             {(editedData.Batches || []).map((batch, index) => (
                                 <div key={batch.id} style={{padding:'0.85rem', border:'1px solid #f1f5f9', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -439,6 +499,9 @@ export default function StockCardSidebar({ medicine, onClose, onUpdate, categori
                                     <div style={{textAlign:'right'}}>
                                         <div style={{fontWeight:800, color:'var(--primary)'}}>{batch.quantity} Units</div>
                                         <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>K{batch.costPrice} / unit</div>
+                                        {isEditing && Number(batch.quantity || 0) > 0 && (
+                                            <button type="button" disabled={batchSaving} onClick={() => handleRemoveBatch(batch)} style={{marginTop:'0.4rem', border:0, background:'transparent', color:'#dc2626', cursor:'pointer', fontSize:'0.75rem', fontWeight:700}}>Remove batch</button>
+                                        )}
                                     </div>
                                 </div>
                             ))}

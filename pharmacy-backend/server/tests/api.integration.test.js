@@ -819,6 +819,32 @@ test('inventory persists across refresh/login, rejects duplicate products, and p
   assert.equal(secondBatchProduct.id, created.id);
   assert.equal(secondBatchProduct.Batches.length, 2);
 
+  const addBatchResponse = await fetch(`${baseUrl}/api/inventory/${created.id}/batches`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      batchNumber: 'PERSIST-500-C',
+      quantity: 3,
+      costPrice: 2.5,
+      sellingPrice: 4.5,
+      expiryDate: '2029-01-31',
+    }),
+  });
+  assert.equal(addBatchResponse.status, 201);
+  const withAddedBatch = await addBatchResponse.json();
+  const addedBatch = withAddedBatch.Batches.find((batch) => batch.batchNumber === 'PERSIST-500-C');
+  assert.ok(addedBatch);
+  assert.equal(withAddedBatch.Batches.reduce((total, batch) => total + batch.quantity, 0), 23);
+
+  const removeBatchResponse = await fetch(`${baseUrl}/api/inventory/${created.id}/batches/${addedBatch.id}`, {
+    method: 'DELETE',
+    headers,
+  });
+  assert.equal(removeBatchResponse.status, 200);
+  const withRemovedBatch = await removeBatchResponse.json();
+  assert.equal(withRemovedBatch.Batches.some((batch) => batch.id === addedBatch.id), false);
+  assert.equal(withRemovedBatch.Batches.reduce((total, batch) => total + batch.quantity, 0), 20);
+
   const differentStrengthResponse = await fetch(`${baseUrl}/api/inventory`, {
     method: 'POST',
     headers,
@@ -845,6 +871,7 @@ test('inventory persists across refresh/login, rejects duplicate products, and p
   const movements = await movementsResponse.json();
   assert.ok(movements.data.some((movement) => movement.movementType === 'PURCHASE'));
   assert.ok(movements.data.some((movement) => movement.movementType === 'ADJUSTMENT'));
+  assert.ok(movements.data.some((movement) => movement.reason === 'Batch PERSIST-500-C removed from active inventory'));
 
   const loginAgainResponse = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',

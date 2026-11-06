@@ -546,6 +546,65 @@ class InventoryService {
     }
   }
 
+  async addBatchToMedicine(id, body) {
+    const transaction = await sequelize.transaction();
+    try {
+      const medicine = await Medicine.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!medicine) throw new NotFoundException('Medicine not found');
+
+      await this.createBatchForMedicine(medicine, body, body, transaction);
+      await transaction.commit();
+      return Medicine.findByPk(id, {
+        include: [{ model: Batch, where: { quantity: { [Op.gt]: 0 } }, required: false }],
+      });
+    } catch (error) {
+      await transaction.rollback();
+      rethrowPersistenceError(error, 'Failed to add stock batch');
+    }
+  }
+
+  async removeBatch(id, batchId) {
+    const transaction = await sequelize.transaction();
+    try {
+      const medicine = await Medicine.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!medicine) throw new NotFoundException('Medicine not found');
+
+      const batch = await Batch.findOne({
+        where: { id: batchId, medicineId: id },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!batch) throw new NotFoundException('Batch not found for this medicine');
+
+      const quantity = Number(batch.quantity || 0);
+      if (quantity <= 0) throw new BadRequestException('This batch has no remaining stock to remove');
+
+      await batch.update({ quantity: 0 }, { transaction });
+      await InventoryMovement.create({
+        medicineId: medicine.id,
+        batchId: batch.id,
+        movementType: 'ADJUSTMENT',
+        quantityChange: -quantity,
+        referenceType: 'MEDICINE',
+        referenceId: Number(id),
+        reason: `Batch ${batch.batchNumber} removed from active inventory`,
+      }, { transaction });
+      const remainingQuantity = await Batch.sum('quantity', {
+        where: { medicineId: id },
+        transaction,
+      });
+      await medicine.update({ totalQuantity: Number(remainingQuantity || 0) }, { transaction });
+
+      await transaction.commit();
+      return Medicine.findByPk(id, {
+        include: [{ model: Batch, where: { quantity: { [Op.gt]: 0 } }, required: false }],
+      });
+    } catch (error) {
+      await transaction.rollback();
+      rethrowPersistenceError(error, 'Failed to remove stock batch');
+    }
+  }
+
   async add(body) {
     const transaction = await sequelize.transaction();
     try {
