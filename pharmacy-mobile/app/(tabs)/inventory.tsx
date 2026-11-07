@@ -445,14 +445,14 @@ export default function InventoryScreen() {
               leftIcon={<Plus size={16} color="#ffffff" />}
             />
           </View>
-  
+
           <SearchInput
             value={search}
             onChangeText={setSearch}
             placeholder="Search by brand, generic, strength..."
             style={{ marginTop: 8 }}
           />
-  
+
           {/* Categories Bar */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
             <Pressable
@@ -500,7 +500,7 @@ export default function InventoryScreen() {
               );
             })}
           </ScrollView>
-  
+
           {/* Stock Status Pills */}
           <View style={styles.statusFilters}>
             {(['all', 'in', 'low', 'out'] as const).map((s) => {
@@ -531,7 +531,7 @@ export default function InventoryScreen() {
             })}
           </View>
         </View>
-  
+
         {/* Medicines List */}
         <FlatList
           data={filtered}
@@ -552,7 +552,7 @@ export default function InventoryScreen() {
             const batches = item.Batches || [];
             const outOfStock = item.totalQuantity <= 0;
             const lowStock = !outOfStock && item.totalQuantity <= (item.lowStockThreshold || 10);
-  
+
             return (
               <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <Pressable
@@ -571,7 +571,7 @@ export default function InventoryScreen() {
                         'Pharmacy Item'}
                     </Text>
                   </View>
-  
+
                   <View style={styles.cardRightCol}>
                     <Text style={[styles.priceTag, { color: theme.navigation }]}>
                       K {item.price.toFixed(2)}
@@ -587,7 +587,7 @@ export default function InventoryScreen() {
                     </View>
                   </View>
                 </Pressable>
-  
+
                 {/* Expansion Details */}
                 {isExpanded ? (
                   <View style={[styles.expandedArea, { borderTopColor: theme.borderLight }]}>
@@ -612,7 +612,7 @@ export default function InventoryScreen() {
                         </Pressable>
                       </View>
                     </View>
-  
+
                     {batches.length > 0 ? (
                       batches.map((b, idx) => (
                         <View
@@ -672,7 +672,7 @@ export default function InventoryScreen() {
             ) : null
           }
         />
-  
+
         {/* Edit Modal */}
         <Modal visible={!!editingItem} transparent animationType="slide">
           <View style={styles.modalOverlay}>
@@ -685,7 +685,7 @@ export default function InventoryScreen() {
                   <X size={20} color={theme.mutedText} />
                 </Pressable>
               </View>
-  
+
               <ScrollView style={{ marginTop: 12 }}>
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Medicine Name</Text>
                 <TextInput
@@ -693,21 +693,21 @@ export default function InventoryScreen() {
                   onChangeText={setEditName}
                   style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
                 />
-  
+
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Generic Name</Text>
                 <TextInput
                   value={editGeneric}
                   onChangeText={setEditGeneric}
                   style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
                 />
-  
+
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Strength / Dosage</Text>
                 <TextInput
                   value={editStrength}
                   onChangeText={setEditStrength}
                   style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]}
                 />
-  
+
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Low Stock Alert Threshold</Text>
                 <TextInput
                   value={editThreshold}
@@ -719,19 +719,17 @@ export default function InventoryScreen() {
                 <View style={[styles.batchManager, { borderTopColor: theme.borderLight }]}>
                   <Text style={[styles.batchManagerTitle, { color: theme.text }]}>Active Batches</Text>
                   <Text style={[styles.batchManagerHint, { color: theme.mutedText }]}>Add received stock or remove a batch from active inventory.</Text>
-                  {(editingItem?.Batches || [])
-                    .filter((batch) => Number(batch.quantity || 0) > 0)
-                    .map((batch) => (
-                      <View key={batch.id || batch.batchNumber} style={[styles.editBatchRow, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}> 
-                        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-                          <Text style={[styles.editBatchName, { color: theme.text }]}>{batch.batchNumber || 'Unnumbered batch'}</Text>
-                          <Text style={[styles.editBatchMeta, { color: theme.mutedText }]}>{batch.quantity || 0} units · expires {batch.expiryDate || 'not recorded'}</Text>
-                        </View>
-                        <Pressable disabled={savingBatch} onPress={() => handleRemoveBatch(batch)} hitSlop={8}>
-                          <Trash2 size={18} color={theme.danger} />
-                        </Pressable>
+                  {(editingItem?.Batches || []).map((batch) => (
+                    <View key={batch.id || batch.batchNumber} style={[styles.editBatchRow, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+                        <Text style={[styles.editBatchName, { color: theme.text }]}>{batch.batchNumber || 'Unnumbered batch'}</Text>
+                        <Text style={[styles.editBatchMeta, { color: theme.mutedText }]}>{batch.quantity || 0} units · expires {batch.expiryDate || 'not recorded'}</Text>
                       </View>
-                    ))}
+                      <Pressable disabled={savingBatch} onPress={() => handleRemoveBatch(batch)} hitSlop={8}>
+                        <Trash2 size={18} color={theme.danger} />
+                      </Pressable>
+                    </View>
+                  ))}
 
                   <Text style={[styles.batchManagerTitle, { color: theme.text, marginTop: 16 }]}>Add Batch</Text>
                   <TextInput value={batchDraft.batchNumber} onChangeText={(batchNumber) => setBatchDraft((current) => ({ ...current, batchNumber }))} placeholder="Batch number" placeholderTextColor={theme.mutedText} style={[styles.input, { backgroundColor: theme.surfaceMuted, borderColor: theme.border, color: theme.text }]} />
@@ -745,7 +743,7 @@ export default function InventoryScreen() {
                   </View>
                   <Button title={savingBatch ? 'Saving Batch...' : 'Add Batch'} onPress={handleAddBatch} loading={savingBatch} variant="secondary" fullWidth />
                 </View>
-  
+
                 <View style={{ marginTop: 16 }}>
                   <Button
                     title={savingEdit ? 'Saving...' : 'Save Changes'}
