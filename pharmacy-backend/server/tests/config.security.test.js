@@ -56,3 +56,31 @@ test('development still supports SQLite', () => {
     rmSync(databasePath, { force: true });
   }
 });
+
+test('production allows mediquick.online and www.mediquick.online CORS origins', () => {
+  execFileSync(
+    process.execPath,
+    [
+      '-e',
+      `
+        const { isAllowedOrigin } = require('./src/app.module');
+        const allowed1 = isAllowedOrigin('https://www.mediquick.online');
+        const allowed2 = isAllowedOrigin('https://mediquick.online');
+        const allowed3 = isAllowedOrigin('https://www.mediquick.online/');
+        const forbidden = isAllowedOrigin('https://evil-phishing.online');
+        if (!allowed1 || !allowed2 || !allowed3 || forbidden) {
+          process.exit(1);
+        }
+      `,
+    ],
+    {
+      cwd: serverDirectory,
+      env: {
+        NODE_ENV: 'production',
+        JWT_SECRET: 'test-secret',
+        DATABASE_URL: 'postgres://db.example.test/pharmacy',
+      },
+      stdio: 'pipe',
+    }
+  );
+});

@@ -46,6 +46,11 @@ const localhostOrigins = [
   'http://localhost:19006',
 ];
 
+const defaultProductionOrigins = [
+  'https://www.mediquick.online',
+  'https://mediquick.online',
+];
+
 const configuredOrigins = [
   process.env.FRONTEND_URL,
   ...(process.env.FRONTEND_URLS || '')
@@ -71,13 +76,19 @@ function isAllowedOrigin(origin) {
     return true;
   }
 
-  if (localhostOrigins.includes(origin) || configuredOrigins.includes(origin)) {
+  const normalized = String(origin).trim().replace(/\/$/, '');
+
+  if (
+    localhostOrigins.some((allowed) => allowed.replace(/\/$/, '') === normalized) ||
+    defaultProductionOrigins.some((allowed) => allowed.replace(/\/$/, '') === normalized) ||
+    configuredOrigins.some((allowed) => allowed.replace(/\/$/, '') === normalized)
+  ) {
     return true;
   }
 
   if (allowVercelPreviews) {
     try {
-      const { hostname, protocol } = new URL(origin);
+      const { hostname, protocol } = new URL(normalized);
       return protocol === 'https:' && hostname.endsWith('.vercel.app');
     } catch (error) {
       return false;
