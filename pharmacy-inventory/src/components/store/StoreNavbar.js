@@ -42,7 +42,7 @@ export default function StoreNavbar({ onCartOpen }) {
             <img src="/logo512.png" alt="" />
           </span> */}
           <span className="customer-navbar__brand-copy">
-            <strong>MediQuick <em><img src="/logo512.png" alt="" /></em></strong>
+            <strong>MediQuick </strong>
             <small>Better health. Delivered.</small>
           </span>
         </Link>
