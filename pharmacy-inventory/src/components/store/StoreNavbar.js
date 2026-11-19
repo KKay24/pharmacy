@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, Search, ShoppingCart, User, X } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
@@ -19,11 +19,48 @@ export default function StoreNavbar({ onCartOpen }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const isHomePage = location.pathname === "/";
   const activePath = location.hash
     ? `${location.pathname}${location.hash}`
     : location.pathname;
+
+  useEffect(() => {
+    if (!isHomePage) {
+      setScrolledPastHero(false);
+      return undefined;
+    }
+
+    const updateVisibility = () => {
+      const heroEl =
+        document.querySelector(".hp-hero-carousel") ||
+        document.querySelector(".hp-hero");
+      const navbarEl = document.querySelector(".customer-navbar");
+      const navbarHeight = navbarEl?.getBoundingClientRect().height || 88;
+
+      const pastHero = heroEl
+        ? heroEl.getBoundingClientRect().bottom <= navbarHeight
+        : window.scrollY > 360;
+
+      setScrolledPastHero(pastHero);
+      if (!pastHero) {
+        setSearchOpen(false);
+      }
+    };
+
+    updateVisibility();
+    window.addEventListener("scroll", updateVisibility, { passive: true });
+    window.addEventListener("resize", updateVisibility, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", updateVisibility);
+      window.removeEventListener("resize", updateVisibility);
+    };
+  }, [isHomePage]);
+
+  const showSearchIcon = !isHomePage || scrolledPastHero;
 
   const handleSearchSubmit = (query) => {
     navigate(`/shop?search=${encodeURIComponent(query)}`);
@@ -61,14 +98,16 @@ export default function StoreNavbar({ onCartOpen }) {
         </nav>
 
         <div className="customer-navbar__actions">
-          <button
-            type="button"
-            className="customer-navbar__icon"
-            aria-label={searchOpen ? "Close product search" : "Search products"}
-            onClick={() => setSearchOpen((open) => !open)}
-          >
-            {searchOpen ? <X size={22} /> : <Search size={22} />}
-          </button>
+          {showSearchIcon && (
+            <button
+              type="button"
+              className="customer-navbar__icon"
+              aria-label={searchOpen ? "Close product search" : "Search products"}
+              onClick={() => setSearchOpen((open) => !open)}
+            >
+              {searchOpen ? <X size={22} /> : <Search size={22} />}
+            </button>
+          )}
           {storeUser ? (
             <Link to="/account" className="customer-navbar__account">
               <User size={21} />
@@ -105,7 +144,7 @@ export default function StoreNavbar({ onCartOpen }) {
         </div>
       </div>
 
-      {searchOpen && (
+      {showSearchIcon && searchOpen && (
         <StoreSearchAutocomplete
           autoFocus
           onSearchSubmit={handleSearchSubmit}
