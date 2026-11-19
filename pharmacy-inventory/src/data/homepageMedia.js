@@ -18,6 +18,7 @@ export const MEDICAL_DEVICE_IMAGES = [
     label: "Blood Pressure Monitors",
     src: "/images/medical-devices/blood-pressure-monitor.jpg",
     alt: "Automatic digital blood pressure monitor",
+    mediaType: "live-bp-monitor",
   },
   {
     id: "stethoscope",
@@ -99,6 +100,7 @@ export const MEDICINES_IMAGES = [
     label: "Prescription Medicines",
     src: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=700&q=80",
     alt: "Assorted pharmacy medications",
+    mediaType: "live-capsules",
   },
 ];
 
@@ -188,6 +190,7 @@ export const HERO_BANNERS = [
       "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=1200&q=80",
     fallbackImageUrl: DEFAULT_CATEGORY_FALLBACK_IMAGE,
     imageAlt: "Pharmacist organizing verified prescription medications",
+    mediaType: "live-capsules",
   },
   {
     id: "vitamins-daily-wellness",
@@ -219,6 +222,7 @@ export const HERO_BANNERS = [
     imageUrl: MEDICAL_DEVICE_IMAGES[1].src,
     fallbackImageUrl: MEDICAL_DEVICE_IMAGES[0].src,
     imageAlt: MEDICAL_DEVICE_IMAGES[1].alt,
+    mediaType: "live-bp-monitor",
   },
 ];
 

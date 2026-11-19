@@ -154,7 +154,7 @@ describe("CategoryCarousel", () => {
       const categorySrcs = new Set();
       imageIds.forEach((id, idx) => {
         const img = screen.getByTestId(`category-img-${slug}-${id}`);
-        const src = img.getAttribute("src");
+        const src = img.getAttribute("src") || img.getAttribute("data-src");
         categorySrcs.add(src);
         allSrcs.add(src);
         expect(img).toHaveAttribute("data-active", idx === 0 ? "true" : "false");

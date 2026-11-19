@@ -5,6 +5,8 @@ import {
   DEFAULT_CATEGORY_FALLBACK_IMAGE,
   getCategoryImages,
 } from "../../data/homepageMedia";
+import LiveBpMonitorMedia from "./LiveBpMonitorMedia";
+import LiveCapsulesMedia from "./LiveCapsulesMedia";
 
 const SWIPE_THRESHOLD_PX = 35;
 const CARD_GALLERY_INTERVAL_MS = 3500;
@@ -61,6 +63,30 @@ function CategoryCardMedia({ category, categoryKey }) {
       {images.map((item, idx) => {
         const imgKey = `${categoryKey}-${item.id}`;
         const isActive = idx === activeImgIndex;
+        if (item.mediaType === "live-bp-monitor" && !failedSrcMap[imgKey]) {
+          return (
+            <LiveBpMonitorMedia
+              key={item.id}
+              src={item.src}
+              decorative
+              isActive={isActive}
+              className={`hp-category-card__slide-img${isActive ? " is-active" : ""}`}
+              testId={`category-img-${slug}-${item.id}`}
+            />
+          );
+        }
+        if (item.mediaType === "live-capsules" && !failedSrcMap[imgKey]) {
+          return (
+            <LiveCapsulesMedia
+              key={item.id}
+              src={item.src}
+              decorative
+              isActive={isActive}
+              className={`hp-category-card__slide-img${isActive ? " is-active" : ""}`}
+              testId={`category-img-${slug}-${item.id}`}
+            />
+          );
+        }
         return (
           <img
             key={item.id}

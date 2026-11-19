@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { DEFAULT_HERO_FALLBACK_IMAGE, HERO_BANNERS } from "../../data/homepageMedia";
+import LiveBpMonitorMedia from "./LiveBpMonitorMedia";
+import LiveCapsulesMedia from "./LiveCapsulesMedia";
 
 const SWIPE_THRESHOLD_PX = 40;
 
@@ -197,14 +199,32 @@ export default function HeroBannerCarousel({
                 </div>
 
                 <div className="hp-hero-media">
-                  <img
-                    src={imageSrc}
-                    alt={banner.imageAlt || banner.title || "MediQuick Pharmacy"}
-                    className="hp-hero-media__img"
-                    loading={index === 0 ? "eager" : "lazy"}
-                    decoding="async"
-                    onError={() => handleImageError(slideKey, banner.fallbackImageUrl)}
-                  />
+                  {banner.mediaType === "live-bp-monitor" && !failedImages[slideKey] ? (
+                    <LiveBpMonitorMedia
+                      src={imageSrc}
+                      alt={banner.imageAlt || banner.title || "MediQuick Pharmacy"}
+                      className="hp-hero-media__img"
+                      isActive={isActive}
+                      testId={`hero-live-bp-${slideKey}`}
+                    />
+                  ) : banner.mediaType === "live-capsules" && !failedImages[slideKey] ? (
+                    <LiveCapsulesMedia
+                      src={imageSrc}
+                      alt={banner.imageAlt || banner.title || "MediQuick Pharmacy"}
+                      className="hp-hero-media__img"
+                      isActive={isActive}
+                      testId={`hero-live-capsules-${slideKey}`}
+                    />
+                  ) : (
+                    <img
+                      src={imageSrc}
+                      alt={banner.imageAlt || banner.title || "MediQuick Pharmacy"}
+                      className="hp-hero-media__img"
+                      loading={index === 0 ? "eager" : "lazy"}
+                      decoding="async"
+                      onError={() => handleImageError(slideKey, banner.fallbackImageUrl)}
+                    />
+                  )}
                   <div className="hp-hero-media__fade" aria-hidden="true" />
                 </div>
               </div>
