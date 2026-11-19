@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, Search, ShoppingCart, User, X } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import StoreAuthModal from "./StoreAuthModal";
+import StoreSearchAutocomplete from "./StoreSearchAutocomplete";
 
 const NAV_LINKS = [
   { label: "Home", href: "/", activePath: "/" },
@@ -18,19 +19,14 @@ export default function StoreNavbar({ onCartOpen }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
-  const [search, setSearch] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
   const activePath = location.hash
     ? `${location.pathname}${location.hash}`
     : location.pathname;
 
-  const handleSearch = (event) => {
-    event.preventDefault();
-    const query = search.trim();
-    if (!query) return;
+  const handleSearchSubmit = (query) => {
     navigate(`/shop?search=${encodeURIComponent(query)}`);
-    setSearch("");
     setSearchOpen(false);
     setMenuOpen(false);
   };
@@ -45,10 +41,10 @@ export default function StoreNavbar({ onCartOpen }) {
           <span className="customer-navbar__logo">
             <img src="/logo512.png" alt="" />
           </span>
-          <span className="customer-navbar__brand-copy">
+          {/* <span className="customer-navbar__brand-copy">
             <strong>MediQuick <em>Pharmacy</em></strong>
             <small>Better health. Delivered.</small>
-          </span>
+          </span> */}
         </Link>
 
         <nav className="customer-navbar__links" aria-label="Customer navigation">
@@ -104,24 +100,16 @@ export default function StoreNavbar({ onCartOpen }) {
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
           >
-            {menuOpen ? <X size={23} /> : <Menu size={23} />}
+                  {menuOpen ? <X size={23} /> : <Menu size={23} />}
           </button>
         </div>
       </div>
 
       {searchOpen && (
-        <form className="customer-navbar__search" onSubmit={handleSearch}>
-          <Search size={18} aria-hidden="true" />
-          <input
-            type="search"
-            aria-label="Search pharmacy products"
-            placeholder="Search medicines and health products..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            autoFocus
-          />
-          <button type="submit">Search</button>
-        </form>
+        <StoreSearchAutocomplete
+          autoFocus
+          onSearchSubmit={handleSearchSubmit}
+        />
       )}
 
       <nav

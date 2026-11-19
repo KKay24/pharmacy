@@ -19,6 +19,7 @@ const migrationDefinitions = [
   require('../migrations/016-add-order-cancellation-audit'),
   require('../migrations/017-financial-reporting-integrity'),
   require('../migrations/018-expense-accounting-controls'),
+  require('../migrations/019-search-enhancements-and-analytics'),
 ];
 
 function normalizeTableName(table) {

@@ -24,6 +24,7 @@ const {
   sequelize,
 } = require('../../models');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
+const searchService = require('./search.service');
 
 function validatePrescriptionFile(fileData) {
   if (!fileData) return null;
@@ -89,20 +90,91 @@ function formatProduct(medicine) {
 class StoreService {
   async listProducts(query = {}) {
     const pagination = parsePagination(query);
+
+    if (query.search) {
+      const searchResult = await searchService.searchProducts({
+        query: query.search,
+        category: query.category,
+        subcategoryId: query.subcategoryId,
+        productFormId: query.productFormId,
+        prescriptionRequired: query.prescriptionRequired,
+        sort: query.sort,
+        minPrice: query.minPrice,
+        maxPrice: query.maxPrice,
+        page: pagination.page,
+        limit: pagination.limit,
+        sessionId: query.sessionId,
+      });
+
+      if (searchResult) {
+        let scoredItems = searchResult.scoredProducts;
+
+        if (query.mainCategoryId || query.category) {
+          const catParam = String(query.mainCategoryId || query.category).toLowerCase();
+          scoredItems = scoredItems.filter((item) => {
+            const m = item.medicine;
+            if (!isNaN(Number(catParam))) return m.mainCategoryId === Number(catParam);
+            return (
+              (m.MainCategory && m.MainCategory.slug === catParam) ||
+              (m.category && m.category.toLowerCase().includes(catParam))
+            );
+          });
+        }
+
+        if (query.subcategoryId) {
+          scoredItems = scoredItems.filter((item) => item.medicine.subcategoryId === Number(query.subcategoryId));
+        }
+
+        if (query.productFormId) {
+          scoredItems = scoredItems.filter((item) => item.medicine.productFormId === Number(query.productFormId));
+        }
+
+        let formatted = scoredItems.map(({ medicine, score, matchType }) => ({
+          ...formatProduct(medicine),
+          searchScore: score,
+          searchMatchType: matchType,
+        }));
+
+        if (query.minPrice !== undefined && !isNaN(Number(query.minPrice))) {
+          formatted = formatted.filter((p) => p.price >= Number(query.minPrice));
+        }
+        if (query.maxPrice !== undefined && !isNaN(Number(query.maxPrice))) {
+          formatted = formatted.filter((p) => p.price <= Number(query.maxPrice));
+        }
+
+        if (query.sort === 'price_asc') {
+          formatted.sort((a, b) => a.price - b.price || a.name.localeCompare(b.name));
+        } else if (query.sort === 'price_desc') {
+          formatted.sort((a, b) => b.price - a.price || a.name.localeCompare(b.name));
+        } else if (query.sort === 'newest') {
+          formatted.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        }
+
+        const total = formatted.length;
+        const pagedRows = formatted.slice(pagination.offset, pagination.offset + pagination.limit);
+
+        const response = paginatedResponse(pagedRows, total, pagination);
+        response.search = {
+          query: query.search,
+          spellingSuggestion: searchResult.spellingSuggestion,
+          categorySuggestions: searchResult.categorySuggestions,
+          suggestedSearchTerms: searchResult.suggestedSearchTerms || [],
+          expandedSynonyms: searchResult.expandedSynonyms,
+        };
+
+        if (total === 0) {
+          const related = await this.getSuggestedProductsForEmptySearch(searchResult.categorySuggestions);
+          response.search.relatedProducts = related;
+        }
+
+        return response;
+      }
+    }
+
     const where = {
       isCustomerVisible: true,
     };
     const clauses = [];
-
-    if (query.search) {
-      const search = String(query.search).trim();
-      clauses.push({ [Op.or]: [
-        { name: { [Op.like]: `%${search}%` } },
-        { genericName: { [Op.like]: `%${search}%` } },
-        { brandName: { [Op.like]: `%${search}%` } },
-        { category: { [Op.like]: `%${search}%` } },
-      ] });
-    }
 
     if (query.mainCategoryId || query.category) {
       const catParam = query.mainCategoryId || query.category;
@@ -256,6 +328,84 @@ class StoreService {
       order: [['id', 'ASC']],
     });
     return categories;
+  }
+
+  async getSuggestedProductsForEmptySearch(categorySuggestions = []) {
+    try {
+      const includes = [
+        { model: Batch },
+        { model: InventoryCategory, as: 'MainCategory', attributes: ['id', 'name', 'slug'] },
+        { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug'] },
+      ];
+      let candidates = [];
+
+      if (categorySuggestions.length > 0) {
+        const orClauses = categorySuggestions.map((cat) =>
+          searchService.buildCaseInsensitiveLike('category', `%${cat}%`)
+        );
+        candidates = await Medicine.findAll({
+          where: {
+            isCustomerVisible: true,
+            [Op.or]: orClauses,
+          },
+          include: includes,
+          limit: 12,
+        });
+      }
+
+      if (candidates.length === 0) {
+        candidates = await Medicine.findAll({
+          where: { isCustomerVisible: true },
+          include: includes,
+          limit: 12,
+        });
+      }
+
+      candidates.sort((a, b) => {
+        const aInStock = searchService.calculateAvailableStock(a) > 0 ? 1 : 0;
+        const bInStock = searchService.calculateAvailableStock(b) > 0 ? 1 : 0;
+        if (bInStock !== aInStock) return bInStock - aInStock;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+
+      return candidates.slice(0, 6).map(formatProduct);
+    } catch (err) {
+      return [];
+    }
+  }
+
+  async getAutocomplete(query) {
+    return searchService.getAutocompleteSuggestions(query?.q || query?.search, query?.limit ? Number(query.limit) : 8);
+  }
+
+  async getProductAlternatives(id) {
+    const result = await searchService.getProductAlternatives(id);
+    if (!result) {
+      throw new NotFoundException('Product not found');
+    }
+    return {
+      targetProduct: result.targetProduct,
+      directEquivalents: result.directEquivalents.map((alt) => ({
+        ...alt,
+        medicine: formatProduct(alt.medicine),
+      })),
+      differentStrengthOrForm: result.differentStrengthOrForm.map((alt) => ({
+        ...alt,
+        medicine: formatProduct(alt.medicine),
+      })),
+      relatedTherapeutic: result.relatedTherapeutic.map((alt) => ({
+        ...alt,
+        medicine: formatProduct(alt.medicine),
+      })),
+    };
+  }
+
+  async recordSearchClick(body) {
+    return searchService.recordSearchClick(body || {});
+  }
+
+  async getSearchAnalytics(query) {
+    return searchService.getSearchAnalyticsSummary(query?.days ? Number(query.days) : 30);
   }
 
   async createOrder(payload, user = null) {

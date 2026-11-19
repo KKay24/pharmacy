@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useOutletContext } from "react-router-dom";
-import { ShoppingCart, Heart, FileText, ArrowLeft, Shield, Truck, Package } from "lucide-react";
+import { ShoppingCart, Heart, FileText, ArrowLeft, Shield, Truck, Package, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import { showToast } from "../../components/store/StoreToast";
+import { ProductCard } from "../../components/store/ProductCard";
 
 export default function StoreProductDetailPage() {
   const { id } = useParams();
   const { openCart } = useOutletContext() || {};
   const { apiFetch, addToCart, toggleWishlist, isWishlisted } = useStore();
   const [product, setProduct] = useState(null);
+  const [alternatives, setAlternatives] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [qty, setQty] = useState(1);
@@ -22,6 +24,10 @@ export default function StoreProductDetailPage() {
       .then(data => setProduct(data))
       .catch(err => setError(err.message || "Product not found"))
       .finally(() => setLoading(false));
+
+    apiFetch(`/api/products/${id}/alternatives`)
+      .then(data => setAlternatives(data))
+      .catch(() => setAlternatives(null));
   }, [id, apiFetch]);
 
   if (loading) return (
@@ -187,6 +193,86 @@ export default function StoreProductDetailPage() {
             {activeTab === "sideeffects" && <p>{sideEffectsContent}</p>}
           </div>
         </div>
+
+        {/* Similar Products & Alternatives with Medical Safety Distinctions */}
+        {alternatives && (
+          <div className="store-alternatives-container" style={{ marginTop: "3.5rem", borderTop: "1px solid var(--border)", paddingTop: "2.5rem" }}>
+            {/* Level 1: Direct Bio-Equivalent Generic Alternatives */}
+            {alternatives.directEquivalents?.length > 0 && (
+              <div style={{ marginBottom: "2.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <h3 style={{ fontSize: "1.2rem", fontWeight: "800", color: "var(--text-primary)" }}>
+                    Generic Alternatives
+                  </h3>
+                  <span className="store-badge store-badge--green" style={{ fontSize: "0.75rem", padding: "0.2rem 0.6rem" }}>
+                    Same Active Ingredient ({product.genericName || "Equivalent"})
+                  </span>
+                </div>
+                <div className="store-safety-box store-safety-box--green" style={{ marginBottom: "1.25rem", padding: "0.75rem 1rem", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "flex-start", gap: "0.6rem", background: "var(--green-light)", border: "1px solid #a7f3d0" }}>
+                  <CheckCircle2 size={18} style={{ color: "var(--green)", flexShrink: 0, marginTop: 2 }} />
+                  <p style={{ fontSize: "0.85rem", color: "#065f46", margin: 0 }}>
+                    <strong>Medical Safety Note:</strong> These products contain the exact same active ingredient ({product.genericName || "generic"}), strength, and form. They can serve as direct substitutes under pharmacist supervision.
+                  </p>
+                </div>
+                <div className="store-product-grid store-product-grid--5">
+                  {alternatives.directEquivalents.map(({ medicine }) => (
+                    <ProductCard key={medicine.id} product={medicine} onCartOpen={openCart} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Level 2: Same Active Ingredient, Different Strength or Form */}
+            {alternatives.differentStrengthOrForm?.length > 0 && (
+              <div style={{ marginBottom: "2.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <h3 style={{ fontSize: "1.2rem", fontWeight: "800", color: "var(--text-primary)" }}>
+                    Different Strengths &amp; Forms
+                  </h3>
+                  <span className="store-badge" style={{ fontSize: "0.75rem", padding: "0.2rem 0.6rem", background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
+                    Dose Adjustment Required
+                  </span>
+                </div>
+                <div className="store-safety-box" style={{ marginBottom: "1.25rem", padding: "0.75rem 1rem", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "flex-start", gap: "0.6rem", background: "#fffbeb", border: "1px solid #fde68a" }}>
+                  <AlertTriangle size={18} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                  <p style={{ fontSize: "0.85rem", color: "#92400e", margin: 0 }}>
+                    <strong>Dosage Notice:</strong> Contains {product.genericName || "the same ingredient"} in a different strength or formulation. Do not substitute without consulting your doctor or pharmacist for correct dosing.
+                  </p>
+                </div>
+                <div className="store-product-grid store-product-grid--5">
+                  {alternatives.differentStrengthOrForm.map(({ medicine }) => (
+                    <ProductCard key={medicine.id} product={medicine} onCartOpen={openCart} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Level 3: Same Therapeutic Category */}
+            {alternatives.relatedTherapeutic?.length > 0 && (
+              <div style={{ marginBottom: "2rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <h3 style={{ fontSize: "1.2rem", fontWeight: "800", color: "var(--text-primary)" }}>
+                    Related Products in {product.MainCategory?.name || product.category || "Same Category"}
+                  </h3>
+                  <span className="store-badge" style={{ fontSize: "0.75rem", padding: "0.2rem 0.6rem", background: "var(--brand-blue-light)", color: "var(--brand-blue)" }}>
+                    Related Category
+                  </span>
+                </div>
+                <div className="store-safety-box" style={{ marginBottom: "1.25rem", padding: "0.75rem 1rem", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "flex-start", gap: "0.6rem", background: "var(--brand-blue-light)", border: "1px solid #bfdbfe" }}>
+                  <Info size={18} style={{ color: "var(--brand-blue)", flexShrink: 0, marginTop: 2 }} />
+                  <p style={{ fontSize: "0.85rem", color: "var(--brand-blue)", margin: 0 }}>
+                    <strong>Pharmacist Consultation Required:</strong> These products treat similar conditions but contain DIFFERENT active ingredients. They are not direct substitutes.
+                  </p>
+                </div>
+                <div className="store-product-grid store-product-grid--5">
+                  {alternatives.relatedTherapeutic.map(({ medicine }) => (
+                    <ProductCard key={medicine.id} product={medicine} onCartOpen={openCart} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

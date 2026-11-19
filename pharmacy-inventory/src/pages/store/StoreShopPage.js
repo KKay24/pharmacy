@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X, Sparkles } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import { ProductCard, ProductCardSkeleton } from "../../components/store/ProductCard";
 import { useOutletContext } from "react-router-dom";
@@ -8,10 +8,11 @@ import { useOutletContext } from "react-router-dom";
 export default function StoreShopPage() {
   const { openCart } = useOutletContext() || {};
   const { apiFetch } = useStore();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
+  const [searchMeta, setSearchMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
   const [categoriesError, setCategoriesError] = useState("");
@@ -61,9 +62,11 @@ export default function StoreShopPage() {
       const rows = data.data || data.products || data.rows || (Array.isArray(data) ? data : []);
       setProducts(rows);
       setTotal(data.pagination?.total ?? data.total ?? data.count ?? rows.length);
+      setSearchMeta(data.search || null);
       setProductsError("");
     } catch (error) {
       setProducts([]);
+      setSearchMeta(null);
       setProductsError(error.message || "Products could not be loaded.");
     } finally {
       setLoading(false);
@@ -74,11 +77,13 @@ export default function StoreShopPage() {
 
   // Sync URL search param → filter
   useEffect(() => {
-    const s = searchParams.get("search");
-    const c = searchParams.get("category");
-    if (s || c) {
-      setFilters(f => ({ ...f, search: s || f.search, category: c || f.category }));
-    }
+    const s = searchParams.get("search") || "";
+    const c = searchParams.get("category") || "";
+    setFilters((f) => {
+      if (f.search === s && f.category === c) return f;
+      return { ...f, search: s, category: c };
+    });
+    setPage(1);
   }, [searchParams]);
 
   const setFilter = (key, value) => {
@@ -88,8 +93,26 @@ export default function StoreShopPage() {
       ...(key === "category" ? { subcategoryId: "", productFormId: "" } : {}),
       ...(key === "subcategoryId" ? { productFormId: "" } : {}),
     }));
+    if (key === "search" || key === "category") {
+      const nextParams = new URLSearchParams(searchParams);
+      if (value) nextParams.set(key, value);
+      else nextParams.delete(key);
+      setSearchParams(nextParams, { replace: true });
+    }
     setPage(1);
   };
+
+  const trackSearchResultClick = useCallback((productId) => {
+    if (!filters.search || !productId) return;
+    try {
+      apiFetch?.("/api/products/search/click", {
+        method: "POST",
+        body: JSON.stringify({ query: filters.search, productId }),
+      })?.catch?.(() => {});
+    } catch (e) {
+      // Non-blocking analytics
+    }
+  }, [filters.search, apiFetch]);
   const totalPages = Math.ceil(total / PER_PAGE);
   const selectedCategory = categories.find((category) => (
     category.slug === filters.category || String(category.id) === filters.category
@@ -141,7 +164,7 @@ export default function StoreShopPage() {
 
         {/* Active filters */}
         {(filters.search || filters.category || filters.subcategoryId || filters.productFormId || filters.prescriptionRequired !== "") && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1.25rem" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1rem" }}>
             {filters.search && (
               <span style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.3rem 0.75rem", background: "var(--brand-blue-light)", color: "var(--brand-blue)", borderRadius: "999px", fontSize: "0.82rem", fontWeight: 600 }}>
                 Search: {filters.search}
@@ -160,6 +183,39 @@ export default function StoreShopPage() {
                 <button onClick={() => setFilter("prescriptionRequired", "")} style={{ color: "var(--green)", display: "flex" }}><X size={12} /></button>
               </span>
             )}
+          </div>
+        )}
+
+        {/* Spelling suggestion banner ("Did you mean?") */}
+        {filters.search && searchMeta?.spellingSuggestion && (
+          <div className="store-did-you-mean-banner">
+            <Sparkles size={16} className="store-did-you-mean-icon" />
+            <span>Did you mean:</span>
+            <button
+              type="button"
+              className="store-did-you-mean-link"
+              onClick={() => setFilter("search", searchMeta.spellingSuggestion)}
+            >
+              <strong>{searchMeta.spellingSuggestion}</strong>
+            </button>
+            <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>?</span>
+          </div>
+        )}
+
+        {/* Related Category Suggestions from Search */}
+        {filters.search && searchMeta?.categorySuggestions && searchMeta.categorySuggestions.length > 0 && (
+          <div className="store-search-cat-suggestions">
+            <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)", fontWeight: 600 }}>Suggested Categories:</span>
+            {searchMeta.categorySuggestions.map((catName) => (
+              <button
+                key={catName}
+                type="button"
+                className="store-search-cat-pill"
+                onClick={() => setFilter("category", catName)}
+              >
+                {catName}
+              </button>
+            ))}
           </div>
         )}
 
@@ -239,17 +295,113 @@ export default function StoreShopPage() {
               ? null
               : products.length === 0
               ? (
-                <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "4rem 1rem", color: "var(--text-muted)" }}>
-                  <p style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🔍</p>
-                  <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem" }}>No products found</h3>
-                  <p style={{ fontSize: "0.9rem" }}>Try adjusting your filters or search term.</p>
-                  <button onClick={() => { setFilters({ search: "", category: "", subcategoryId: "", productFormId: "", prescriptionRequired: "", sort: "", minPrice: "", maxPrice: "" }); setPage(1); }}
-                    style={{ marginTop: "1rem", padding: "0.6rem 1.25rem", background: "var(--brand-blue)", color: "white", border: "none", borderRadius: "var(--radius)", cursor: "pointer", fontWeight: 600, fontSize: "0.88rem" }}>
-                    Clear Filters
+                <div className="store-no-results">
+                  <p style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🔍</p>
+                  <h3 style={{ fontSize: "1.2rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem" }}>
+                    No products found {filters.search && <span>for &ldquo;<strong>{filters.search}</strong>&rdquo;</span>}
+                  </h3>
+
+                  {/* Spelling correction prompt */}
+                  {searchMeta?.spellingSuggestion && (
+                    <div className="store-no-results__correction">
+                      <p style={{ fontSize: "0.92rem", marginBottom: "0.5rem", color: "var(--brand-blue)" }}>
+                        Did you mean to search for:
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setFilter("search", searchMeta.spellingSuggestion)}
+                        className="store-no-results__correction-btn"
+                      >
+                        Search for &ldquo;{searchMeta.spellingSuggestion}&rdquo; &rarr;
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Suggested Related Search Terms */}
+                  {searchMeta?.suggestedSearchTerms && searchMeta.suggestedSearchTerms.length > 0 && (
+                    <div style={{ marginTop: "1rem", marginBottom: "0.75rem" }}>
+                      <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
+                        Try searching for:
+                      </p>
+                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "wrap" }}>
+                        {searchMeta.suggestedSearchTerms.map((term) => (
+                          <button
+                            key={term}
+                            type="button"
+                            className="store-search-cat-pill"
+                            onClick={() => setFilter("search", term)}
+                          >
+                            {term}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Related search category pills */}
+                  {searchMeta?.categorySuggestions && searchMeta.categorySuggestions.length > 0 && (
+                    <div style={{ marginTop: "1rem", marginBottom: "1rem" }}>
+                      <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
+                        Browse related categories:
+                      </p>
+                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "wrap" }}>
+                        {searchMeta.categorySuggestions.map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            className="store-search-cat-pill"
+                            onClick={() => {
+                              setFilters((current) => ({ ...current, category: cat, search: "", subcategoryId: "", productFormId: "" }));
+                              setSearchParams({ category: cat }, { replace: true });
+                              setPage(1);
+                            }}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p style={{ fontSize: "0.88rem", marginTop: "0.5rem", color: "var(--text-secondary)" }}>
+                    Check your spelling, or try searching by generic active ingredient or brand name.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setFilters({ search: "", category: "", subcategoryId: "", productFormId: "", prescriptionRequired: "", sort: "", minPrice: "", maxPrice: "" });
+                      setSearchParams({}, { replace: true });
+                      setPage(1);
+                    }}
+                    className="store-no-results__clear-btn"
+                  >
+                    Clear All Filters
                   </button>
+
+                  {/* Related products when no exact match */}
+                  {searchMeta?.relatedProducts && searchMeta.relatedProducts.length > 0 && (
+                    <div style={{ marginTop: "3rem", textAlign: "left" }}>
+                      <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1.75rem", marginBottom: "1.25rem" }}>
+                        <h4 style={{ fontSize: "1.1rem", fontWeight: "800", color: "var(--text-primary)" }}>
+                          Related Products You Might Be Interested In
+                        </h4>
+                        <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
+                          Health products related to your search
+                        </p>
+                      </div>
+                      <div className="store-product-grid store-product-grid--5">
+                        {searchMeta.relatedProducts.map((p) => (
+                          <ProductCard key={p.id} product={p} onCartOpen={openCart} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
-              : products.map(p => <ProductCard key={p.id} product={p} onCartOpen={openCart} />)
+              : products.map(p => (
+                <div key={p.id} onClickCapture={() => trackSearchResultClick(p.id)}>
+                  <ProductCard product={p} onCartOpen={openCart} />
+                </div>
+              ))
           }
         </div>
 

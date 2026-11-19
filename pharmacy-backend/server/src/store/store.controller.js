@@ -39,6 +39,22 @@ class StoreController {
     return this.service.getCategories();
   }
 
+  autocomplete(query) {
+    return this.service.getAutocomplete(query);
+  }
+
+  searchAnalytics(query) {
+    return this.service.getSearchAnalytics(query);
+  }
+
+  recordSearchClick(body) {
+    return this.service.recordSearchClick(body);
+  }
+
+  getProductAlternatives(params) {
+    return this.service.getProductAlternatives(params.id);
+  }
+
   getProduct(params) {
     return this.service.getProduct(params.id);
   }
@@ -98,6 +114,20 @@ applyMethodDecorator(Get, StoreController.prototype, 'popularProducts', 'product
 applyParameterDecorator(Query, StoreController.prototype, 'popularProducts', 0);
 
 applyMethodDecorator(Get, StoreController.prototype, 'categories', 'products/categories');
+
+applyMethodDecorator(Get, StoreController.prototype, 'autocomplete', 'products/autocomplete');
+applyParameterDecorator(Query, StoreController.prototype, 'autocomplete', 0);
+
+applyMethodDecorator(Get, StoreController.prototype, 'searchAnalytics', 'products/search/analytics');
+applyParameterDecorator(Query, StoreController.prototype, 'searchAnalytics', 0);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'searchAnalytics', AuthGuard, RolesGuard);
+applyMethodDecorator(Roles, StoreController.prototype, 'searchAnalytics', 'admin', 'manager');
+
+applyMethodDecorator(Post, StoreController.prototype, 'recordSearchClick', 'products/search/click');
+applyParameterDecorator(Body, StoreController.prototype, 'recordSearchClick', 0);
+
+applyMethodDecorator(Get, StoreController.prototype, 'getProductAlternatives', 'products/:id/alternatives');
+applyParameterDecorator(Param, StoreController.prototype, 'getProductAlternatives', 0);
 
 applyMethodDecorator(Get, StoreController.prototype, 'getProduct', 'products/:id');
 applyParameterDecorator(Param, StoreController.prototype, 'getProduct', 0);

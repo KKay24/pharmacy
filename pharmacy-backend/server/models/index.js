@@ -15,6 +15,8 @@ const InventoryMovement = require('./InventoryMovement');
 const InventoryCategory = require('./InventoryCategory');
 const Order = require('./Order');
 const SupportInquiry = require('./SupportInquiry');
+const SearchSynonym = require('./SearchSynonym');
+const SearchAnalytics = require('./SearchAnalytics');
 
 // Associations
 Medicine.hasMany(Batch, { foreignKey: 'medicineId', onDelete: 'CASCADE' });
@@ -61,6 +63,9 @@ InventoryMovement.belongsTo(Medicine, { foreignKey: 'medicineId' });
 Batch.hasMany(InventoryMovement, { foreignKey: 'batchId', onDelete: 'SET NULL' });
 InventoryMovement.belongsTo(Batch, { foreignKey: 'batchId' });
 
+Medicine.hasMany(SearchAnalytics, { foreignKey: 'clickedProductId', onDelete: 'SET NULL' });
+SearchAnalytics.belongsTo(Medicine, { foreignKey: 'clickedProductId' });
+
 module.exports = {
   sequelize,
   Medicine,
@@ -79,4 +84,6 @@ module.exports = {
   InventoryCategory,
   Order,
   SupportInquiry,
+  SearchSynonym,
+  SearchAnalytics,
 };
