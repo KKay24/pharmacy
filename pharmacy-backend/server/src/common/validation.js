@@ -13,6 +13,10 @@ const schemas = [
   { method: 'POST', path: '/api/auth/login', schema: z.object({ username: z.string().min(1), password: z.string().min(1) }).passthrough() },
   { method: 'POST', path: '/api/auth/change-password', schema: z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(12) }).passthrough() },
   { method: 'POST', path: '/api/auth/users', schema: z.object({ username: z.string().min(1), password: z.string().min(12), role: z.enum(['admin', 'manager', 'user']).optional(), email: z.string().email().nullable().optional(), locations: z.array(z.string()).optional() }).passthrough() },
+  { method: 'POST', path: '/api/ai/chat', schema: z.object({
+    message: z.string().trim().min(1).max(1000),
+    sessionId: z.string().max(80).optional(),
+  }).passthrough() },
   { method: 'POST', path: '/api/sales', schema: z.union([
     z.object({ quantity: z.coerce.number().positive(), totalPrice: z.coerce.number().nonnegative() }).passthrough(),
     z.object({

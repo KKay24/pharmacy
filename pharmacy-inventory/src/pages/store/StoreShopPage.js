@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, useOutletContext } from "react-router-dom";
 import { SlidersHorizontal, X, Sparkles } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import { ProductCard, ProductCardSkeleton } from "../../components/store/ProductCard";
-import { useOutletContext } from "react-router-dom";
+import ShopHeaderBanner from "../../components/store/ShopHeaderBanner";
 
 export default function StoreShopPage() {
   const { openCart } = useOutletContext() || {};
@@ -128,63 +128,114 @@ export default function StoreShopPage() {
     { label: "Newest First", value: "newest" },
   ];
 
-  return (
-    <div className="store-section" style={{ paddingTop: "1.5rem" }}>
-      <div className="store-container">
-        {/* Breadcrumb */}
-        <div className="store-breadcrumb">
-          <Link to="/">Home</Link>
-          <span className="store-breadcrumb__sep">›</span>
-          <span>Shop</span>
-          {filters.search && <><span className="store-breadcrumb__sep">›</span><span>"{filters.search}"</span></>}
-        </div>
+  const formattedCategoryTitle = selectedCategory?.name
+    || (filters.category
+      ? filters.category
+          .split("-")
+          .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : ""))
+          .join(" ")
+      : "");
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", marginBottom: "1.5rem" }}>
-          <div>
-            <h1 style={{ fontSize: "1.4rem", fontWeight: "800" }}>
-              {filters.search ? `Search: "${filters.search}"` : filters.category ? `${filters.category.charAt(0).toUpperCase() + filters.category.slice(1)}` : "All Products"}
-            </h1>
-            {!loading && <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>{total} product{total !== 1 ? "s" : ""} found</p>}
+  const headerTitle = filters.search
+    ? `Search: "${filters.search}"`
+    : formattedCategoryTitle || "All Products";
+
+  const activeFilterCount = [
+    filters.category,
+    filters.subcategoryId,
+    filters.productFormId,
+    filters.prescriptionRequired,
+    filters.minPrice,
+    filters.maxPrice,
+  ].filter(Boolean).length;
+
+  return (
+    <div className="store-section store-shop-section">
+      <div className="store-container">
+        <ShopHeaderBanner
+          heading={headerTitle}
+          total={total}
+          loading={loading}
+          searchQuery={filters.search}
+          categoryName={formattedCategoryTitle}
+        />
+
+        {/* Toolbar row below banner: active filter chips left, Filters & Sort right */}
+        <div className="store-shop-toolbar">
+          <div className="store-shop-toolbar__chips">
+            {filters.search && (
+              <span className="store-shop-chip">
+                Search: {filters.search}
+                <button
+                  type="button"
+                  aria-label="Clear search filter"
+                  onClick={() => setFilter("search", "")}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+            {filters.category && (
+              <span className="store-shop-chip">
+                Category: {formattedCategoryTitle || filters.category}
+                <button
+                  type="button"
+                  aria-label="Clear category filter"
+                  onClick={() => setFilter("category", "")}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+            {filters.prescriptionRequired === "false" && (
+              <span className="store-shop-chip store-shop-chip--otc">
+                OTC Only
+                <button
+                  type="button"
+                  aria-label="Clear OTC filter"
+                  onClick={() => setFilter("prescriptionRequired", "")}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+            {filters.prescriptionRequired === "true" && (
+              <span className="store-shop-chip store-shop-chip--rx">
+                Prescription Only
+                <button
+                  type="button"
+                  aria-label="Clear prescription filter"
+                  onClick={() => setFilter("prescriptionRequired", "")}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
           </div>
 
-          <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-            <button className="store-filter-option" style={{ gap: "0.4rem", padding: "0.5rem 0.85rem", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
-              onClick={() => setFiltersOpen(!filtersOpen)}>
-              <SlidersHorizontal size={15} /> Filters
+          <div className="store-shop-toolbar__controls">
+            <button
+              type="button"
+              className={`store-shop-toolbar__filter-btn${filtersOpen ? " is-open" : ""}`}
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen(!filtersOpen)}
+            >
+              <SlidersHorizontal size={15} aria-hidden="true" />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="store-shop-toolbar__filter-badge">{activeFilterCount}</span>
+              )}
             </button>
             <select
+              aria-label="Sort products"
+              className="store-shop-toolbar__sort-select"
               value={filters.sort}
               onChange={e => setFilter("sort", e.target.value)}
-              style={{ padding: "0.5rem 0.75rem", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.85rem", fontFamily: "inherit", cursor: "pointer", outline: "none" }}
             >
               {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
         </div>
-
-        {/* Active filters */}
-        {(filters.search || filters.category || filters.subcategoryId || filters.productFormId || filters.prescriptionRequired !== "") && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1rem" }}>
-            {filters.search && (
-              <span style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.3rem 0.75rem", background: "var(--brand-blue-light)", color: "var(--brand-blue)", borderRadius: "999px", fontSize: "0.82rem", fontWeight: 600 }}>
-                Search: {filters.search}
-                <button onClick={() => setFilter("search", "")} style={{ color: "var(--brand-blue)", display: "flex" }}><X size={12} /></button>
-              </span>
-            )}
-            {filters.category && (
-              <span style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.3rem 0.75rem", background: "var(--brand-blue-light)", color: "var(--brand-blue)", borderRadius: "999px", fontSize: "0.82rem", fontWeight: 600 }}>
-                Category: {filters.category}
-                <button onClick={() => setFilter("category", "")} style={{ color: "var(--brand-blue)", display: "flex" }}><X size={12} /></button>
-              </span>
-            )}
-            {filters.prescriptionRequired === "false" && (
-              <span style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.3rem 0.75rem", background: "var(--green-light)", color: "var(--green)", borderRadius: "999px", fontSize: "0.82rem", fontWeight: 600 }}>
-                OTC Only
-                <button onClick={() => setFilter("prescriptionRequired", "")} style={{ color: "var(--green)", display: "flex" }}><X size={12} /></button>
-              </span>
-            )}
-          </div>
-        )}
 
         {/* Spelling suggestion banner ("Did you mean?") */}
         {filters.search && searchMeta?.spellingSuggestion && (
