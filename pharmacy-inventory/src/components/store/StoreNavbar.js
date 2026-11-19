@@ -38,13 +38,13 @@ export default function StoreNavbar({ onCartOpen }) {
       <div className="customer-navbar__topline" />
       <div className="customer-navbar__bar">
         <Link to="/" className="customer-navbar__brand" aria-label="MediQuick Pharmacy home">
-          <span className="customer-navbar__logo">
+          {/* <span className="customer-navbar__logo">
             <img src="/logo512.png" alt="" />
-          </span>
-          {/* <span className="customer-navbar__brand-copy">
-            <strong>MediQuick <em>Pharmacy</em></strong>
-            <small>Better health. Delivered.</small>
           </span> */}
+          <span className="customer-navbar__brand-copy">
+            <strong>MediQuick</strong>
+            <small>Better health. Delivered.</small>
+          </span>
         </Link>
 
         <nav className="customer-navbar__links" aria-label="Customer navigation">
@@ -100,7 +100,7 @@ export default function StoreNavbar({ onCartOpen }) {
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
           >
-                  {menuOpen ? <X size={23} /> : <Menu size={23} />}
+            {menuOpen ? <X size={23} /> : <Menu size={23} />}
           </button>
         </div>
       </div>
