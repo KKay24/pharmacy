@@ -22,6 +22,14 @@ services:
         value: "false"
       - key: ALLOW_VERCEL_PREVIEWS
         value: "true"
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: IP_GEO_ENABLED
+        value: "true"
+      - key: AUTH_AUDIT_RETENTION_DAYS
+        value: "90"
+      - key: PROXY_SHARED_SECRET
+        sync: false
       - key: FRONTEND_URL
         sync: false
       - key: FRONTEND_URLS

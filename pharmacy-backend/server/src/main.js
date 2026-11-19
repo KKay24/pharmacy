@@ -10,12 +10,16 @@ const {
   mountApiFallback,
   mountLegacyApi,
 } = require('./app.module');
+const { resolveTrustProxySetting } = require('./security/request-context');
 
 async function createApplication() {
   const app = await NestFactory.create(AppModule, {
     bodyParser: true,
     logger: ['error', 'warn', 'log'],
   });
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', resolveTrustProxySetting());
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -28,10 +32,10 @@ async function createApplication() {
     credentials: true,
   });
 
-  mountLegacyApi(app.getHttpAdapter().getInstance(), { deferFallback: true });
+  mountLegacyApi(expressApp, { deferFallback: true });
   await ensureApplicationReady();
   await app.init();
-  mountApiFallback(app.getHttpAdapter().getInstance());
+  mountApiFallback(expressApp);
   return app;
 }
 

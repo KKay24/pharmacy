@@ -26,7 +26,7 @@ class AuthController {
     this.authService = authService;
   }
 
-  login(body) { return this.authService.login(body?.username, body?.password); }
+  login(body, request) { return this.authService.login(body?.username, body?.password, request); }
   changePassword(body, request) { return this.authService.changePassword(request.user, body?.currentPassword, body?.newPassword); }
   me(request) { return this.authService.getCurrentUser(request.user); }
   listUsers() { return this.authService.listUsers(); }
@@ -55,6 +55,7 @@ Put('users/:id')(AuthController.prototype, 'updateUser', Object.getOwnPropertyDe
 Delete('users/:id')(AuthController.prototype, 'deleteUser', Object.getOwnPropertyDescriptor(AuthController.prototype, 'deleteUser'));
 
 Body()(AuthController.prototype, 'login', 0);
+Req()(AuthController.prototype, 'login', 1);
 Body()(AuthController.prototype, 'changePassword', 0);
 Req()(AuthController.prototype, 'changePassword', 1);
 Req()(AuthController.prototype, 'me', 0);

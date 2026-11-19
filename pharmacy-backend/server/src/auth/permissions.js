@@ -16,11 +16,14 @@ const Permissions = Object.freeze({
   SUPPLIERS_READ: 'suppliers:read',
   SUPPLIERS_WRITE: 'suppliers:write',
   ANALYTICS_READ: 'analytics:read',
+  SECURITY_READ: 'security:read',
 });
 
 const ROLE_PERMISSIONS = Object.freeze({
   admin: Object.values(Permissions),
-  manager: Object.values(Permissions).filter((permission) => !permission.startsWith('users:')),
+  manager: Object.values(Permissions).filter(
+    (permission) => !permission.startsWith('users:') && !permission.startsWith('security:')
+  ),
   user: [
     Permissions.INVENTORY_READ,
     Permissions.SALES_READ,

@@ -17,6 +17,7 @@ import {
   Home,
   LogOut,
   Settings,
+  ShieldAlert,
   User,
   ChevronDown,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import SuppliersPage from "./pages/SuppliersPage";
 import CustomersPage from "./pages/CustomersPage";
 import OrderManagementPage from "./pages/OrderManagementPage";
 import SupportCenterPage from "./pages/SupportCenterPage";
+import SecurityAuditPage from "./pages/SecurityAuditPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // ─── Customer Store ───────────────────────────────────────
@@ -111,6 +113,12 @@ const PAGE_META = [
     title: "Team Administration & HR Hub",
     subtitle: "Provision staff accounts, manage access levels, and monitor system security.",
     icon: UserPlus,
+  },
+  {
+    match: (pathname) => pathname.startsWith("/security"),
+    title: "Security & Login Activity",
+    subtitle: "Review authentication attempts, suspicious login alerts, and IP investigations.",
+    icon: ShieldAlert,
   },
   {
     match: (pathname) => pathname.startsWith("/expenses"),
@@ -304,6 +312,14 @@ function ShellLayout() {
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AddUserPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="security"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <SecurityAuditPage />
                   </ProtectedRoute>
                 }
               />

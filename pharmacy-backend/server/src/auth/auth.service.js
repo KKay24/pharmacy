@@ -1,5 +1,9 @@
 const {
   Injectable,
+  Inject,
+  Optional,
+  HttpException,
+  HttpStatus,
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
@@ -14,26 +18,112 @@ const {
   normalizeUsernameInput,
   serializeUser,
 } = require('../../lib/users');
+const AuthSecurityService = require('../security/auth-security.service');
+const { extractRequestContext } = require('../security/request-context');
 
 class AuthService {
-  async login(usernameInput, password) {
+  constructor(authSecurityService) {
+    this.authSecurityService = authSecurityService || null;
+  }
+
+  async login(usernameInput, password, request = null) {
     const username = normalizeUsernameInput(usernameInput);
+    const security = this.authSecurityService;
+
     if (!username || !password) {
+      if (security) {
+        await security.recordLoginAttempt({
+          request,
+          userId: null,
+          attemptedEmail: username || 'missing',
+          status: 'FAILED',
+          failureReason: 'missing_credentials',
+        });
+      }
       throw new BadRequestException('Username and password are required');
     }
 
-    console.log(`[AUTH] Login attempt for user: "${username}"`);
+    if (security) {
+      const { ipAddress } = extractRequestContext(request);
+      const allowance = security.checkLoginAllowance({
+        ipAddress,
+        attemptedEmail: username,
+      });
+
+      if (!allowance.allowed) {
+        await security.recordLoginAttempt({
+          request,
+          userId: null,
+          attemptedEmail: username,
+          status: 'FAILED',
+          failureReason: 'rate_limited',
+        });
+
+        const retryMinutes = Math.max(1, Math.ceil(allowance.retryAfterSeconds / 60));
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.TOO_MANY_REQUESTS,
+            error: 'Too Many Requests',
+            message: `Too many failed login attempts. Please wait about ${retryMinutes} minute${retryMinutes === 1 ? '' : 's'} and try again.`,
+            retryAfterSeconds: allowance.retryAfterSeconds,
+          },
+          HttpStatus.TOO_MANY_REQUESTS
+        );
+      }
+    }
+
     const user = await findUserByUsername(username);
-    if (!user || !verifyPassword(password, user.password)) {
+    if (!user) {
+      if (security) {
+        await security.recordLoginAttempt({
+          request,
+          userId: null,
+          attemptedEmail: username,
+          status: 'FAILED',
+          failureReason: 'unknown_user',
+        });
+      }
+      throw new UnauthorizedException('Invalid username or password');
+    }
+
+    if (!verifyPassword(password, user.password)) {
+      if (security) {
+        await security.recordLoginAttempt({
+          request,
+          userId: user.id,
+          attemptedEmail: username,
+          status: 'FAILED',
+          failureReason: 'incorrect_password',
+        });
+      }
       throw new UnauthorizedException('Invalid username or password');
     }
 
     if (user.status !== 'active') {
+      if (security) {
+        await security.recordLoginAttempt({
+          request,
+          userId: user.id,
+          attemptedEmail: username,
+          status: 'FAILED',
+          failureReason: 'disabled_account',
+        });
+      }
       throw new ForbiddenException('Account is suspended. Please contact administrator.');
     }
 
     user.lastLogin = new Date();
     await user.save();
+
+    if (security) {
+      await security.recordLoginAttempt({
+        request,
+        userId: user.id,
+        attemptedEmail: username,
+        status: 'SUCCESS',
+        failureReason: null,
+      });
+    }
 
     return {
       success: true,
@@ -271,5 +361,7 @@ const Customer = require('../../models/Customer');
 
 const { ConflictException, NotFoundException } = require('@nestjs/common');
 Injectable()(AuthService);
+Optional()(AuthService, undefined, 0);
+Inject(AuthSecurityService)(AuthService, undefined, 0);
 
 module.exports = AuthService;

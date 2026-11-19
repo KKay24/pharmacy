@@ -3,7 +3,28 @@ const HOP_BY_HOP_HEADERS = new Set([
   'content-length',
   'host',
   'transfer-encoding',
+  'x-mediquick-proxy-secret',
+  'x-mediquick-client-ip',
 ]);
+
+function extractVercelClientIp(req) {
+  // Vercel sets x-vercel-forwarded-for / x-real-ip at the edge from the true peer connection.
+  const vercelForwarded = req.headers['x-vercel-forwarded-for'];
+  if (typeof vercelForwarded === 'string' && vercelForwarded.trim()) {
+    const parts = vercelForwarded.split(',').map((item) => item.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  const realIp = req.headers['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim()) {
+    return realIp.trim();
+  }
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    const parts = forwarded.split(',').map((item) => item.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return req.socket?.remoteAddress || '';
+}
 
 async function readRequestBody(req) {
   const chunks = [];
@@ -56,6 +77,15 @@ const proxyHandler = async (req, res) => {
 
       requestHeaders.set(key, Array.isArray(value) ? value.join(', ') : value);
     });
+
+    const proxySharedSecret = process.env.PROXY_SHARED_SECRET;
+    if (proxySharedSecret) {
+      const clientIp = extractVercelClientIp(req);
+      if (clientIp) {
+        requestHeaders.set('x-mediquick-proxy-secret', proxySharedSecret);
+        requestHeaders.set('x-mediquick-client-ip', clientIp);
+      }
+    }
 
     const response = await fetch(targetUrl, {
       method: req.method,

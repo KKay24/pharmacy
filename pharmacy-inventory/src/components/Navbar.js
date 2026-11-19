@@ -16,6 +16,7 @@ import {
   Heart,
   Headset,
   Home,
+  ShieldAlert,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -97,6 +98,12 @@ function Navbar({ collapsed = false, onToggleCollapsed }) {
       path: "/add-user",
       icon: UserPlus,
       label: "Team & HR",
+    },
+    {
+      show: userRole === "admin",
+      path: "/security",
+      icon: ShieldAlert,
+      label: "Security & Login Activity",
     },
     {
       show: userRole === "admin" || userRole === "manager",

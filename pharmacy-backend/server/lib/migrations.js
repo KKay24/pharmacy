@@ -20,6 +20,7 @@ const migrationDefinitions = [
   require('../migrations/017-financial-reporting-integrity'),
   require('../migrations/018-expense-accounting-controls'),
   require('../migrations/019-search-enhancements-and-analytics'),
+  require('../migrations/020-add-auth-audit-logs'),
 ];
 
 function normalizeTableName(table) {

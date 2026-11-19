@@ -36,6 +36,9 @@ const StoreController = require('./store/store.controller');
 const StoreService = require('./store/store.service');
 const AiController = require('./ai/ai.controller');
 const AiService = require('./ai/ai.service');
+const SecurityController = require('./security/security.controller');
+const AuthSecurityService = require('./security/auth-security.service');
+const IpGeolocationService = require('./security/ip-geolocation.service');
 const CashReconciliationController = require('./cash-reconciliation/cash-reconciliation.controller');
 const CashReconciliationService = require('./cash-reconciliation/cash-reconciliation.service');
 
@@ -195,6 +198,7 @@ Module({
     SyncController,
     StoreController,
     AiController,
+    SecurityController,
     CashReconciliationController,
   ],
   providers: [
@@ -209,6 +213,8 @@ Module({
     SyncService,
     StoreService,
     AiService,
+    IpGeolocationService,
+    AuthSecurityService,
     CashReconciliationService,
     AuthGuard,
     RolesGuard,
