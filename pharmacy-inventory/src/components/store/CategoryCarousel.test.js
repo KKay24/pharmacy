@@ -137,34 +137,48 @@ describe("CategoryCarousel", () => {
     expect(img).toHaveAttribute("src", DEFAULT_CATEGORY_FALLBACK_IMAGE);
   });
 
-  it("renders 3 distinct rotating images for Medical Devices (thermometer, blood pressure monitor, stethoscope)", () => {
+  it("renders 3 distinct rotating images for each main category (18 unique images total)", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
-    const thermometerImg = screen.getByTestId("category-img-medical-devices-digital-thermometer");
-    const bpImg = screen.getByTestId("category-img-medical-devices-blood-pressure-monitor");
-    const stethoscopeImg = screen.getByTestId("category-img-medical-devices-stethoscope");
+    const expectedGalleries = [
+      ["medicines", ["tablets-blister", "capsules-vial", "dispensary-medicines"]],
+      ["medical-supplies", ["first-aid-supplies", "protective-gloves-syringes", "clinical-care-supplies"]],
+      ["personal-care", ["skincare-lotion", "gentle-cleansers", "oral-hygiene"]],
+      ["baby-products", ["baby-diapers", "baby-bath-care", "baby-feeding"]],
+      ["vitamins-supplements", ["daily-vitamins", "supplement-bottles", "wellness-minerals"]],
+      ["medical-devices", ["digital-thermometer", "blood-pressure-monitor", "stethoscope"]],
+    ];
 
-    const srcs = new Set([
-      thermometerImg.getAttribute("src"),
-      bpImg.getAttribute("src"),
-      stethoscopeImg.getAttribute("src"),
-    ]);
-    expect(srcs.size).toBe(3);
-    expect(thermometerImg).toHaveAttribute("data-active", "true");
-    expect(bpImg).toHaveAttribute("data-active", "false");
-    expect(stethoscopeImg).toHaveAttribute("data-active", "false");
+    const allSrcs = new Set();
+    for (const [slug, imageIds] of expectedGalleries) {
+      const categorySrcs = new Set();
+      imageIds.forEach((id, idx) => {
+        const img = screen.getByTestId(`category-img-${slug}-${id}`);
+        const src = img.getAttribute("src");
+        categorySrcs.add(src);
+        allSrcs.add(src);
+        expect(img).toHaveAttribute("data-active", idx === 0 ? "true" : "false");
+      });
+      expect(categorySrcs.size).toBe(3);
+    }
 
-    // Advance 3.5s -> blood pressure monitor active
+    expect(allSrcs.size).toBe(18);
+
+    // Advance 3.5s -> second image becomes active across galleries
     act(() => {
       jest.advanceTimersByTime(3500);
     });
-    expect(bpImg).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("category-img-medical-devices-blood-pressure-monitor")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("category-img-personal-care-gentle-cleansers")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("category-img-baby-products-baby-bath-care")).toHaveAttribute("data-active", "true");
 
-    // Advance 3.5s -> stethoscope active
+    // Advance 3.5s -> third image becomes active across galleries
     act(() => {
       jest.advanceTimersByTime(3500);
     });
-    expect(stethoscopeImg).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("category-img-medical-devices-stethoscope")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("category-img-personal-care-oral-hygiene")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("category-img-baby-products-baby-feeding")).toHaveAttribute("data-active", "true");
   });
 
   it("renders error state with retry callback", () => {

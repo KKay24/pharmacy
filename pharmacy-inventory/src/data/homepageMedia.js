@@ -1,7 +1,6 @@
 export const DEFAULT_HERO_FALLBACK_IMAGE = "/logo512.png";
 
-export const DEFAULT_CATEGORY_FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=700&q=80";
+export const DEFAULT_CATEGORY_FALLBACK_IMAGE = "/images/medicines/tablets-blister.jpg";
 
 /**
  * Three distinct studio images for Medical Devices:
@@ -25,6 +24,131 @@ export const MEDICAL_DEVICE_IMAGES = [
     label: "Stethoscopes",
     src: "/images/medical-devices/stethoscope.jpg",
     alt: "Clinical dual-head stethoscope",
+  },
+];
+
+/**
+ * Three distinct studio images for Personal Care:
+ * skincare & lotions, gentle cleansers & soaps, and oral hygiene essentials.
+ */
+export const PERSONAL_CARE_IMAGES = [
+  {
+    id: "skincare-lotion",
+    label: "Skincare & Lotions",
+    src: "/images/personal-care/skincare-lotion.jpg",
+    alt: "Moisturizing skincare lotion bottle and facial cream jar",
+  },
+  {
+    id: "gentle-cleansers",
+    label: "Cleansers & Soaps",
+    src: "/images/personal-care/gentle-cleansers.jpg",
+    alt: "Gentle dermatological wash bottle and soap bars",
+  },
+  {
+    id: "oral-hygiene",
+    label: "Oral Hygiene",
+    src: "/images/personal-care/oral-hygiene.jpg",
+    alt: "Toothbrushes, toothpaste, and dental floss essentials",
+  },
+];
+
+/**
+ * Three distinct studio images for Baby Products:
+ * diapers & wipes, baby bath & skin care, and baby feeding essentials.
+ */
+export const BABY_PRODUCTS_IMAGES = [
+  {
+    id: "baby-diapers",
+    label: "Diapers & Wipes",
+    src: "/images/baby-products/baby-diapers.jpg",
+    alt: "Soft baby diapers and gentle baby wipes",
+  },
+  {
+    id: "baby-bath-care",
+    label: "Baby Bath & Lotion",
+    src: "/images/baby-products/baby-bath-care.jpg",
+    alt: "Gentle baby lotion, shampoo, and soft bath sponge",
+  },
+  {
+    id: "baby-feeding",
+    label: "Baby Feeding",
+    src: "/images/baby-products/baby-feeding.jpg",
+    alt: "Baby feeding bottle and silicone pacifier",
+  },
+];
+
+/**
+ * Three distinct images for Medicines:
+ * tablets & blister packs, capsules & vials, and prescription pharmacy medications.
+ */
+export const MEDICINES_IMAGES = [
+  {
+    id: "tablets-blister",
+    label: "Tablets & Blister Packs",
+    src: "/images/medicines/tablets-blister.jpg",
+    alt: "Pharmaceutical tablet blister packs and medicine bottle",
+  },
+  {
+    id: "capsules-vial",
+    label: "Capsules & Vials",
+    src: "/images/medicines/capsules-vial.jpg",
+    alt: "Pharmaceutical capsules beside medicine vial",
+  },
+  {
+    id: "dispensary-medicines",
+    label: "Prescription Medicines",
+    src: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=700&q=80",
+    alt: "Assorted pharmacy medications",
+  },
+];
+
+/**
+ * Three distinct images for Medical Supplies:
+ * first aid & dressings, protective gloves/masks & syringes, and clinical wound care.
+ */
+export const MEDICAL_SUPPLIES_IMAGES = [
+  {
+    id: "first-aid-supplies",
+    label: "First Aid Supplies",
+    src: "https://images.unsplash.com/photo-1550572017-edd951b55104?auto=format&fit=crop&w=700&q=80",
+    alt: "First aid and pharmacy medical supplies",
+  },
+  {
+    id: "protective-gloves-syringes",
+    label: "Gloves, Masks & Syringes",
+    src: "https://images.unsplash.com/photo-1651760301007-5080dc7fc6a9?auto=format&fit=crop&w=700&q=80",
+    alt: "Protective medical gloves, face mask, and sterile syringe",
+  },
+  {
+    id: "clinical-care-supplies",
+    label: "Clinical Care Packaging",
+    src: "https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=700&q=80",
+    alt: "Clinical medical care supplies and sprays",
+  },
+];
+
+/**
+ * Three distinct images for Vitamins & Supplements:
+ * daily vitamins, supplement bottles & tablets, and wellness/mineral capsules.
+ */
+export const VITAMINS_SUPPLEMENTS_IMAGES = [
+  {
+    id: "daily-vitamins",
+    label: "Daily Vitamins",
+    src: "https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?auto=format&fit=crop&w=700&q=80",
+    alt: "Daily vitamins and nutritional supplements",
+  },
+  {
+    id: "supplement-bottles",
+    label: "Vitamin Bottles & Tablets",
+    src: "https://images.unsplash.com/photo-1584362917165-526a968579e8?auto=format&fit=crop&w=700&q=80",
+    alt: "Nutritional supplement bottles and tablets",
+  },
+  {
+    id: "wellness-minerals",
+    label: "Omega & Minerals",
+    src: "https://images.unsplash.com/photo-1577401239170-897942555fb3?auto=format&fit=crop&w=700&q=80",
+    alt: "Wellness vitamins and mineral supplements",
   },
 ];
 
@@ -99,19 +223,14 @@ export const HERO_BANNERS = [
 ];
 
 /**
- * Category image map + coverage for all taxonomy categories and specific medical device types.
+ * Primary category image map + specific subcategory/device slug mappings.
  */
 export const CATEGORY_IMAGES = {
-  medicines:
-    "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=700&q=80",
-  "medical-supplies":
-    "https://images.unsplash.com/photo-1550572017-edd951b55104?auto=format&fit=crop&w=700&q=80",
-  "vitamins-supplements":
-    "https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?auto=format&fit=crop&w=700&q=80",
-  "personal-care":
-    "https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?auto=format&fit=crop&w=700&q=80",
-  "baby-products":
-    "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=700&q=80",
+  medicines: MEDICINES_IMAGES[0].src,
+  "medical-supplies": MEDICAL_SUPPLIES_IMAGES[0].src,
+  "vitamins-supplements": VITAMINS_SUPPLEMENTS_IMAGES[0].src,
+  "personal-care": PERSONAL_CARE_IMAGES[0].src,
+  "baby-products": BABY_PRODUCTS_IMAGES[0].src,
   "medical-devices": MEDICAL_DEVICE_IMAGES[0].src,
   "digital-thermometers": MEDICAL_DEVICE_IMAGES[0].src,
   thermometer: MEDICAL_DEVICE_IMAGES[0].src,
@@ -122,9 +241,14 @@ export const CATEGORY_IMAGES = {
 };
 
 /**
- * Multi-image category galleries for categories that showcase multiple distinct product types.
+ * Multi-image category galleries (3 distinct images per main pharmacy category).
  */
 export const CATEGORY_IMAGE_GALLERIES = {
+  medicines: MEDICINES_IMAGES,
+  "medical-supplies": MEDICAL_SUPPLIES_IMAGES,
+  "personal-care": PERSONAL_CARE_IMAGES,
+  "baby-products": BABY_PRODUCTS_IMAGES,
+  "vitamins-supplements": VITAMINS_SUPPLEMENTS_IMAGES,
   "medical-devices": MEDICAL_DEVICE_IMAGES,
 };
 
@@ -172,9 +296,12 @@ export function getCategoryImages(category) {
   }
 
   const name = String(category.name || "").toLowerCase();
-  if (name.includes("medical device")) {
-    return MEDICAL_DEVICE_IMAGES;
-  }
+  if (name.includes("medical device")) return MEDICAL_DEVICE_IMAGES;
+  if (name.includes("personal care")) return PERSONAL_CARE_IMAGES;
+  if (name.includes("baby")) return BABY_PRODUCTS_IMAGES;
+  if (name.includes("medical suppl")) return MEDICAL_SUPPLIES_IMAGES;
+  if (name.includes("vitamin") || name.includes("supplement")) return VITAMINS_SUPPLEMENTS_IMAGES;
+  if (name === "medicines" || name === "medicine") return MEDICINES_IMAGES;
 
   return [{ id: slug || "default", src: getCategoryImage(category), label: category.name || "" }];
 }

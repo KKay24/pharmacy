@@ -32,7 +32,6 @@ function CategoryCardMedia({ category, categoryKey }) {
   };
 
   const slug = category.slug || categoryKey;
-  const activeItem = images[activeImgIndex] || images[0];
 
   if (!hasGallery) {
     const single = images[0];
@@ -76,19 +75,6 @@ function CategoryCardMedia({ category, categoryKey }) {
           />
         );
       })}
-      {activeItem?.label && (
-        <span className="hp-category-card__device-tag" aria-hidden="true">
-          {activeItem.label}
-        </span>
-      )}
-      <span className="hp-category-card__mini-dots" aria-hidden="true">
-        {images.map((item, idx) => (
-          <span
-            key={item.id}
-            className={`hp-category-card__mini-dot${idx === activeImgIndex ? " is-active" : ""}`}
-          />
-        ))}
-      </span>
     </div>
   );
 }
