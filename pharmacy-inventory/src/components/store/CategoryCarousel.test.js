@@ -137,6 +137,36 @@ describe("CategoryCarousel", () => {
     expect(img).toHaveAttribute("src", DEFAULT_CATEGORY_FALLBACK_IMAGE);
   });
 
+  it("renders 3 distinct rotating images for Medical Devices (thermometer, blood pressure monitor, stethoscope)", () => {
+    render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
+
+    const thermometerImg = screen.getByTestId("category-img-medical-devices-digital-thermometer");
+    const bpImg = screen.getByTestId("category-img-medical-devices-blood-pressure-monitor");
+    const stethoscopeImg = screen.getByTestId("category-img-medical-devices-stethoscope");
+
+    const srcs = new Set([
+      thermometerImg.getAttribute("src"),
+      bpImg.getAttribute("src"),
+      stethoscopeImg.getAttribute("src"),
+    ]);
+    expect(srcs.size).toBe(3);
+    expect(thermometerImg).toHaveAttribute("data-active", "true");
+    expect(bpImg).toHaveAttribute("data-active", "false");
+    expect(stethoscopeImg).toHaveAttribute("data-active", "false");
+
+    // Advance 3.5s -> blood pressure monitor active
+    act(() => {
+      jest.advanceTimersByTime(3500);
+    });
+    expect(bpImg).toHaveAttribute("data-active", "true");
+
+    // Advance 3.5s -> stethoscope active
+    act(() => {
+      jest.advanceTimersByTime(3500);
+    });
+    expect(stethoscopeImg).toHaveAttribute("data-active", "true");
+  });
+
   it("renders error state with retry callback", () => {
     const onRetry = jest.fn();
     render(<CategoryCarousel categories={[]} error="Failed to load" onRetry={onRetry} />);

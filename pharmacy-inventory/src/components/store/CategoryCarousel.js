@@ -3,10 +3,95 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   DEFAULT_CATEGORY_FALLBACK_IMAGE,
-  getCategoryImage,
+  getCategoryImages,
 } from "../../data/homepageMedia";
 
 const SWIPE_THRESHOLD_PX = 35;
+const CARD_GALLERY_INTERVAL_MS = 3500;
+
+function CategoryCardMedia({ category, categoryKey }) {
+  const images = getCategoryImages(category);
+  const hasGallery = images.length > 1;
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
+  const [isCardHovered, setIsCardHovered] = useState(false);
+  const [failedSrcMap, setFailedSrcMap] = useState({});
+
+  useEffect(() => {
+    if (!hasGallery || isCardHovered) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveImgIndex((prev) => (prev + 1) % images.length);
+    }, CARD_GALLERY_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [hasGallery, isCardHovered, images.length]);
+
+  const handleImgError = (imgKey) => {
+    setFailedSrcMap((prev) => {
+      if (prev[imgKey] === DEFAULT_CATEGORY_FALLBACK_IMAGE) return prev;
+      return { ...prev, [imgKey]: DEFAULT_CATEGORY_FALLBACK_IMAGE };
+    });
+  };
+
+  const slug = category.slug || categoryKey;
+  const activeItem = images[activeImgIndex] || images[0];
+
+  if (!hasGallery) {
+    const single = images[0];
+    const singleKey = `${categoryKey}-${single.id}`;
+    return (
+      <div className="hp-category-card__media">
+        <img
+          src={failedSrcMap[singleKey] || single.src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          data-testid={`category-img-${slug}`}
+          onError={() => handleImgError(singleKey)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="hp-category-card__media hp-category-card__media--gallery"
+      onMouseEnter={() => setIsCardHovered(true)}
+      onMouseLeave={() => setIsCardHovered(false)}
+      data-testid={`category-gallery-${slug}`}
+      data-active-image={activeImgIndex}
+    >
+      {images.map((item, idx) => {
+        const imgKey = `${categoryKey}-${item.id}`;
+        const isActive = idx === activeImgIndex;
+        return (
+          <img
+            key={item.id}
+            src={failedSrcMap[imgKey] || item.src}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className={`hp-category-card__slide-img${isActive ? " is-active" : ""}`}
+            data-testid={`category-img-${slug}-${item.id}`}
+            data-active={isActive ? "true" : "false"}
+            onError={() => handleImgError(imgKey)}
+          />
+        );
+      })}
+      {activeItem?.label && (
+        <span className="hp-category-card__device-tag" aria-hidden="true">
+          {activeItem.label}
+        </span>
+      )}
+      <span className="hp-category-card__mini-dots" aria-hidden="true">
+        {images.map((item, idx) => (
+          <span
+            key={item.id}
+            className={`hp-category-card__mini-dot${idx === activeImgIndex ? " is-active" : ""}`}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
 
 function getVisibleCardsForWidth(width, totalItems) {
   if (width >= 1400) {
@@ -37,7 +122,6 @@ export default function CategoryCarousel({
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
-  const [failedImages, setFailedImages] = useState({});
 
   const interactionResumeRef = useRef(null);
   const wheelLockRef = useRef(0);
@@ -168,13 +252,6 @@ export default function CategoryCarousel({
     }
   };
 
-  const handleImageError = (categoryKey) => {
-    setFailedImages((prev) => {
-      if (prev[categoryKey] === DEFAULT_CATEGORY_FALLBACK_IMAGE) return prev;
-      return { ...prev, [categoryKey]: DEFAULT_CATEGORY_FALLBACK_IMAGE };
-    });
-  };
-
   const totalPositions = maxIndex + 1;
 
   return (
@@ -290,7 +367,6 @@ export default function CategoryCarousel({
             >
               {safeCategories.map((category, index) => {
                 const key = category.id ?? category.slug ?? index;
-                const imageSrc = failedImages[key] || getCategoryImage(category);
                 const slugParam = encodeURIComponent(category.slug || category.name || "");
 
                 return (
@@ -299,16 +375,7 @@ export default function CategoryCarousel({
                       to={`/shop?category=${slugParam}`}
                       className="hp-category-card"
                     >
-                      <div className="hp-category-card__media">
-                        <img
-                          src={imageSrc}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          data-testid={`category-img-${category.slug || key}`}
-                          onError={() => handleImageError(key)}
-                        />
-                      </div>
+                      <CategoryCardMedia category={category} categoryKey={key} />
                       <span className="hp-category-card__footer">
                         <span className="hp-category-card__name">{category.name}</span>
                         <ChevronRight size={16} aria-hidden="true" />

@@ -4,6 +4,31 @@ export const DEFAULT_CATEGORY_FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=700&q=80";
 
 /**
+ * Three distinct studio images for Medical Devices:
+ * digital thermometers, blood pressure monitors, and stethoscopes.
+ */
+export const MEDICAL_DEVICE_IMAGES = [
+  {
+    id: "digital-thermometer",
+    label: "Digital Thermometers",
+    src: "/images/medical-devices/digital-thermometer.jpg",
+    alt: "Digital medical thermometer",
+  },
+  {
+    id: "blood-pressure-monitor",
+    label: "Blood Pressure Monitors",
+    src: "/images/medical-devices/blood-pressure-monitor.jpg",
+    alt: "Automatic digital blood pressure monitor",
+  },
+  {
+    id: "stethoscope",
+    label: "Stethoscopes",
+    src: "/images/medical-devices/stethoscope.jpg",
+    alt: "Clinical dual-head stethoscope",
+  },
+];
+
+/**
  * Array-based hero banner configuration.
  * Add, reorder, or remove banner objects here without changing carousel component logic.
  */
@@ -62,20 +87,19 @@ export const HERO_BANNERS = [
     title: "Medical Devices &",
     highlight: "Family Care Essentials.",
     description:
-      "Shop thermometers, blood pressure monitors, first-aid supplies, personal care, and baby essentials curated for home care.",
-    ctaLabel: "Browse Supplies",
-    ctaTo: "/shop?category=medical-supplies",
+      "Shop digital thermometers, blood pressure monitors, stethoscopes, and everyday diagnostic equipment curated for reliable care.",
+    ctaLabel: "Browse Medical Devices",
+    ctaTo: "/shop?category=medical-devices",
     secondaryCtaLabel: "View All Products",
     secondaryCtaTo: "/shop",
-    imageUrl:
-      "https://images.unsplash.com/photo-1584982751601-97dcc096659c?auto=format&fit=crop&w=1200&q=80",
-    fallbackImageUrl: DEFAULT_CATEGORY_FALLBACK_IMAGE,
-    imageAlt: "Medical monitoring devices and pharmacy supplies",
+    imageUrl: MEDICAL_DEVICE_IMAGES[1].src,
+    fallbackImageUrl: MEDICAL_DEVICE_IMAGES[0].src,
+    imageAlt: MEDICAL_DEVICE_IMAGES[1].alt,
   },
 ];
 
 /**
- * Existing category image map + coverage for all taxonomy categories and fallback.
+ * Category image map + coverage for all taxonomy categories and specific medical device types.
  */
 export const CATEGORY_IMAGES = {
   medicines:
@@ -88,8 +112,20 @@ export const CATEGORY_IMAGES = {
     "https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?auto=format&fit=crop&w=700&q=80",
   "baby-products":
     "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=700&q=80",
-  "medical-devices":
-    "https://images.unsplash.com/photo-1584982751601-97dcc096659c?auto=format&fit=crop&w=700&q=80",
+  "medical-devices": MEDICAL_DEVICE_IMAGES[0].src,
+  "digital-thermometers": MEDICAL_DEVICE_IMAGES[0].src,
+  thermometer: MEDICAL_DEVICE_IMAGES[0].src,
+  "blood-pressure-monitors": MEDICAL_DEVICE_IMAGES[1].src,
+  "bp-machine": MEDICAL_DEVICE_IMAGES[1].src,
+  stethoscopes: MEDICAL_DEVICE_IMAGES[2].src,
+  stethoscope: MEDICAL_DEVICE_IMAGES[2].src,
+};
+
+/**
+ * Multi-image category galleries for categories that showcase multiple distinct product types.
+ */
+export const CATEGORY_IMAGE_GALLERIES = {
+  "medical-devices": MEDICAL_DEVICE_IMAGES,
 };
 
 export function getCategoryImage(category) {
@@ -100,6 +136,9 @@ export function getCategoryImage(category) {
   if (CATEGORY_IMAGES[slug]) return CATEGORY_IMAGES[slug];
 
   const name = String(category.name || "").toLowerCase();
+  if (name.includes("thermometer")) return MEDICAL_DEVICE_IMAGES[0].src;
+  if (name.includes("blood pressure") || name.includes("bp")) return MEDICAL_DEVICE_IMAGES[1].src;
+  if (name.includes("stethoscope")) return MEDICAL_DEVICE_IMAGES[2].src;
   if (name.includes("vitamin") || name.includes("supplement")) {
     return CATEGORY_IMAGES["vitamins-supplements"];
   }
@@ -117,4 +156,25 @@ export function getCategoryImage(category) {
   }
 
   return DEFAULT_CATEGORY_FALLBACK_IMAGE;
+}
+
+export function getCategoryImages(category) {
+  if (!category) {
+    return [{ id: "default", src: DEFAULT_CATEGORY_FALLBACK_IMAGE, label: "" }];
+  }
+  if (category.imageUrl) {
+    return [{ id: category.slug || "custom", src: category.imageUrl, label: category.name || "" }];
+  }
+
+  const slug = String(category.slug || "").toLowerCase();
+  if (CATEGORY_IMAGE_GALLERIES[slug]) {
+    return CATEGORY_IMAGE_GALLERIES[slug];
+  }
+
+  const name = String(category.name || "").toLowerCase();
+  if (name.includes("medical device")) {
+    return MEDICAL_DEVICE_IMAGES;
+  }
+
+  return [{ id: slug || "default", src: getCategoryImage(category), label: category.name || "" }];
 }
