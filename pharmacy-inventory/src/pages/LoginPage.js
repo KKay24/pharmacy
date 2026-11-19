@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate, useOutletContext } from "react-router-d
 import {
   ArrowRight,
   Check,
-  ChevronRight,
   HeartPulse,
   Lock,
   Pill,
@@ -17,15 +16,10 @@ import { apiFetch as staffApiFetch } from "../utils/api";
 import { DataContext } from "../context/DataContext";
 import { useStore } from "../context/StoreContext";
 import { ProductCard, ProductCardSkeleton } from "../components/store/ProductCard";
+import HeroBannerCarousel from "../components/store/HeroBannerCarousel";
+import CategoryCarousel from "../components/store/CategoryCarousel";
+import { HERO_BANNERS } from "../data/homepageMedia";
 import "../styles/login-modern.css";
-
-const CATEGORY_IMAGES = {
-  medicines: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=700&q=80",
-  "medical-supplies": "https://images.unsplash.com/photo-1550572017-edd951b55104?auto=format&fit=crop&w=700&q=80",
-  "vitamins-supplements": "https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?auto=format&fit=crop&w=700&q=80",
-  "personal-care": "https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?auto=format&fit=crop&w=700&q=80",
-  "baby-products": "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=700&q=80",
-};
 
 function StaffLogin({ onSubmit, username, password, setUsername, setPassword, loading }) {
   return (
@@ -54,7 +48,7 @@ function StaffLogin({ onSubmit, username, password, setUsername, setPassword, lo
   );
 }
 
-export default function LoginPage({ staffMode = false }) {
+export default function LoginPage({ staffMode = false, heroBanners = HERO_BANNERS }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -129,7 +123,14 @@ export default function LoginPage({ staffMode = false }) {
   if (isStaffLogin) {
     return (
       <div className="hp-page">
-        <StaffLogin onSubmit={handleStaffLogin} username={username} password={password} setUsername={setUsername} setPassword={setPassword} loading={isLoading} />
+        <StaffLogin
+          onSubmit={handleStaffLogin}
+          username={username}
+          password={password}
+          setUsername={setUsername}
+          setPassword={setPassword}
+          loading={isLoading}
+        />
       </div>
     );
   }
@@ -140,27 +141,27 @@ export default function LoginPage({ staffMode = false }) {
     if (query) navigate(`/shop?search=${encodeURIComponent(query)}`);
   };
 
+  const heroSearchBar = (
+    <form className="hp-search-bar" onSubmit={submitSearch} role="search">
+      <Search size={19} aria-hidden="true" />
+      <input
+        aria-label="Search medicines"
+        placeholder="Search medicines, brands, or active ingredients..."
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+      <button type="submit">Search</button>
+    </form>
+  );
+
   return (
     <div className="hp-page">
       <main id="top">
-        <section className="hp-hero">
-          <div className="hp-hero-content">
-            <p className="hp-kicker">Your online pharmacy</p>
-            <h1>Quality Medicines.<br /><span>Delivered to Your Door.</span></h1>
-            <p className="hp-hero-copy">Browse medicines and health products from the pharmacy catalogue. Search or explore categories below.</p>
-            <form className="hp-search-bar" onSubmit={submitSearch}>
-              <Search size={20} />
-              <input aria-label="Search medicines" placeholder="Search medicines and health products..." value={search} onChange={(event) => setSearch(event.target.value)} />
-              <button type="submit">Search</button>
-            </form>
-            <div className="hp-hero-benefits">
-              <div><Pill size={24} /><span><strong>Pharmacy Products</strong><small>Explore the pharmacy catalogue.</small></span></div>
-              <div><ShieldCheck size={24} /><span><strong>Prescription Services</strong><small>Submit a prescription for review.</small></span></div>
-              <div><Lock size={24} /><span><strong>Order Checkout</strong><small>Orders are verified by the pharmacy.</small></span></div>
-            </div>
-          </div>
-          <div className="hp-hero-image" role="img" aria-label="Pharmacist holding a tablet" />
-        </section>
+        <HeroBannerCarousel
+          banners={heroBanners}
+          autoPlayInterval={5000}
+          searchSlot={heroSearchBar}
+        />
 
         <section className="hp-services" id="services">
           <div><span className="hp-service-icon"><Pill size={24} /></span><span><strong>Pharmacy Products</strong><small>Explore products<br />in the pharmacy catalogue.</small></span></div>
@@ -169,23 +170,13 @@ export default function LoginPage({ staffMode = false }) {
           <div><span className="hp-service-icon"><HeartPulse size={24} /></span><span><strong>Prescription Support</strong><small>Prescription products<br />require pharmacy review.</small></span></div>
         </section>
 
-        <section className="hp-categories" id="categories">
-          <div className="hp-section-heading">
-            <h2>Shop by Category</h2>
-            <Link to="/shop">View all products <ArrowRight size={16} /></Link>
-          </div>
-          {catalogError && <div className="hp-catalog-error" role="alert">{catalogError} <button type="button" onClick={loadHomeCatalog}>Try again</button></div>}
-          <div className="hp-category-grid">
-            {categories.map((category) => (
-              <Link to={`/shop?category=${encodeURIComponent(category.slug)}`} className="hp-category-card" key={category.id}>
-                <img src={CATEGORY_IMAGES[category.slug] || CATEGORY_IMAGES.medicines} alt="" loading="lazy" />
-                <span>{category.name}<ChevronRight size={17} /></span>
-              </Link>
-            ))}
-            {!loadingProducts && !catalogError && categories.length === 0 && <p className="hp-empty-state">No product categories have been added yet.</p>}
-            {loadingProducts && <p className="hp-loading-state">Loading pharmacy categories…</p>}
-          </div>
-        </section>
+        <CategoryCarousel
+          categories={categories}
+          loading={loadingProducts}
+          error={catalogError}
+          onRetry={loadHomeCatalog}
+          autoPlayInterval={5000}
+        />
 
         <section className="hp-products">
           <div className="hp-section-heading">
