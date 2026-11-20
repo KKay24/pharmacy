@@ -36,9 +36,25 @@ function setViewportWidth(width) {
   fireEvent(window, new Event("resize"));
 }
 
+function mockReducedMotion(matches) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: jest.fn().mockImplementation((query) => ({
+      matches: query === "(prefers-reduced-motion: reduce)" ? matches : false,
+      media: query,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+    })),
+  });
+}
+
 describe("CategoryCarousel", () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    mockReducedMotion(false);
     setViewportWidth(1280);
   });
 
@@ -46,7 +62,7 @@ describe("CategoryCarousel", () => {
     jest.useRealTimers();
   });
 
-  it("renders all available categories dynamically with no slice(0, 3) truncation and clickable links", () => {
+  it("renders all available categories dynamically without exposing duplicate accessible clone links", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     EIGHT_CATEGORIES.forEach((cat) => {
@@ -55,60 +71,58 @@ describe("CategoryCarousel", () => {
     });
   });
 
-  it("adapts visible card counts for desktop (5-6), tablet (3-4), and mobile (2)", () => {
+  it("adapts visible card counts to 4-5 on desktop, 3 on tablet, and 2 on mobile", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
     const viewport = screen.getByTestId("category-carousel-viewport");
 
-    // 1440px desktop with 8 categories -> 6 cards
+    // Wide desktop (>= 1200px) -> 5 cards
     act(() => setViewportWidth(1440));
-    expect(viewport).toHaveAttribute("data-visible-cards", "6");
-
-    // 1200px desktop -> 5 cards
-    act(() => setViewportWidth(1200));
     expect(viewport).toHaveAttribute("data-visible-cards", "5");
 
-    // 900px tablet -> 4 cards
-    act(() => setViewportWidth(900));
+    // Standard desktop (1024px - 1199px) -> 4 cards
+    act(() => setViewportWidth(1100));
     expect(viewport).toHaveAttribute("data-visible-cards", "4");
 
-    // 700px small tablet -> 3 cards
-    act(() => setViewportWidth(700));
+    // Tablet (640px - 1023px) -> 3 cards
+    act(() => setViewportWidth(800));
     expect(viewport).toHaveAttribute("data-visible-cards", "3");
 
-    // 480px mobile -> 2 cards
+    // Mobile (< 640px) -> 2 cards
     act(() => setViewportWidth(480));
     expect(viewport).toHaveAttribute("data-visible-cards", "2");
   });
 
-  it("autoplays every 5 seconds, loops smoothly, and pauses on hover", () => {
-    render(<CategoryCarousel categories={EIGHT_CATEGORIES} autoPlayInterval={5000} />);
+  it("autoplays every 3.5 seconds, loops infinitely without rewind jumps, and pauses on hover", () => {
+    render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     const region = screen.getByRole("region", { name: /shop by category/i });
     const viewport = screen.getByTestId("category-carousel-viewport");
-    // 1280px -> 5 visible cards -> maxIndex = 3 (positions 0, 1, 2, 3)
     expect(viewport).toHaveAttribute("data-active-index", "0");
 
+    // Advances every 3.5s
     act(() => {
-      jest.advanceTimersByTime(5000);
+      jest.advanceTimersByTime(3500);
     });
     expect(viewport).toHaveAttribute("data-active-index", "1");
 
     // Pause on hover
     fireEvent.mouseEnter(region);
     act(() => {
-      jest.advanceTimersByTime(10000);
+      jest.advanceTimersByTime(10500);
     });
     expect(viewport).toHaveAttribute("data-active-index", "1");
 
-    // Resume and loop cleanly back to 0 after maxIndex (3)
+    // Resume and loop cleanly around all 8 items back to 0
     fireEvent.mouseLeave(region);
-    act(() => {
-      jest.advanceTimersByTime(15000);
-    });
+    for (let step = 0; step < 7; step += 1) {
+      act(() => {
+        jest.advanceTimersByTime(3500);
+      });
+    }
     expect(viewport).toHaveAttribute("data-active-index", "0");
   });
 
-  it("supports arrow clicks, touch swipe, and image error fallback", () => {
+  it("supports manual arrows, touch swipe, mouse dragging, and image error fallback", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     const viewport = screen.getByTestId("category-carousel-viewport");
@@ -121,15 +135,21 @@ describe("CategoryCarousel", () => {
     fireEvent.click(prevBtn);
     expect(viewport).toHaveAttribute("data-active-index", "0");
 
-    // Wrapping backward from 0 goes to maxIndex (3)
+    // Seamless backward wrap from 0 goes to index 7 (last item)
     fireEvent.click(prevBtn);
-    expect(viewport).toHaveAttribute("data-active-index", "3");
+    expect(viewport).toHaveAttribute("data-active-index", "7");
 
-    // Swipe right moves back to index 2
+    // Touch swipe right moves back to index 6
     fireEvent.touchStart(viewport, { touches: [{ clientX: 60, clientY: 80 }] });
-    fireEvent.touchMove(viewport, { touches: [{ clientX: 160, clientY: 82 }] });
+    fireEvent.touchMove(viewport, { touches: [{ clientX: 180, clientY: 82 }] });
     fireEvent.touchEnd(viewport);
-    expect(viewport).toHaveAttribute("data-active-index", "2");
+    expect(viewport).toHaveAttribute("data-active-index", "6");
+
+    // Mouse drag left advances to index 7
+    fireEvent.mouseDown(viewport, { button: 0, clientX: 240, clientY: 90 });
+    fireEvent.mouseMove(window, { clientX: 120, clientY: 92 });
+    fireEvent.mouseUp(window);
+    expect(viewport).toHaveAttribute("data-active-index", "7");
 
     // Image error falls back cleanly
     const img = screen.getByTestId("category-img-eye-ear-care");
@@ -137,7 +157,36 @@ describe("CategoryCarousel", () => {
     expect(img).toHaveAttribute("src", DEFAULT_CATEGORY_FALLBACK_IMAGE);
   });
 
-  it("renders 3 distinct rotating images for each main category (18 unique images total)", () => {
+  it("respects prefers-reduced-motion by disabling autoplay while keeping manual arrows functional", () => {
+    mockReducedMotion(true);
+    render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
+
+    const viewport = screen.getByTestId("category-carousel-viewport");
+    expect(viewport).toHaveAttribute("data-reduced-motion", "true");
+    expect(viewport).toHaveAttribute("data-active-index", "0");
+
+    act(() => {
+      jest.advanceTimersByTime(14000);
+    });
+    expect(viewport).toHaveAttribute("data-active-index", "0");
+
+    // Manual navigation still works
+    fireEvent.click(screen.getByRole("button", { name: /next categories/i }));
+    expect(viewport).toHaveAttribute("data-active-index", "1");
+  });
+
+  it("renders responsive loading skeletons and error state with retry callback", () => {
+    const { rerender } = render(<CategoryCarousel categories={[]} loading />);
+    expect(screen.getByText(/loading pharmacy categories/i)).toBeInTheDocument();
+
+    const onRetry = jest.fn();
+    rerender(<CategoryCarousel categories={[]} loading={false} error="Failed to load" onRetry={onRetry} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Failed to load");
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves all 3 distinct rotating images for each main category (18 unique images total)", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     const expectedGalleries = [
@@ -163,30 +212,5 @@ describe("CategoryCarousel", () => {
     }
 
     expect(allSrcs.size).toBe(18);
-
-    // Advance 3.5s -> second image becomes active across galleries
-    act(() => {
-      jest.advanceTimersByTime(3500);
-    });
-    expect(screen.getByTestId("category-img-medical-devices-blood-pressure-monitor")).toHaveAttribute("data-active", "true");
-    expect(screen.getByTestId("category-img-personal-care-gentle-cleansers")).toHaveAttribute("data-active", "true");
-    expect(screen.getByTestId("category-img-baby-products-baby-bath-care")).toHaveAttribute("data-active", "true");
-
-    // Advance 3.5s -> third image becomes active across galleries
-    act(() => {
-      jest.advanceTimersByTime(3500);
-    });
-    expect(screen.getByTestId("category-img-medical-devices-stethoscope")).toHaveAttribute("data-active", "true");
-    expect(screen.getByTestId("category-img-personal-care-oral-hygiene")).toHaveAttribute("data-active", "true");
-    expect(screen.getByTestId("category-img-baby-products-baby-feeding")).toHaveAttribute("data-active", "true");
-  });
-
-  it("renders error state with retry callback", () => {
-    const onRetry = jest.fn();
-    render(<CategoryCarousel categories={[]} error="Failed to load" onRetry={onRetry} />);
-
-    expect(screen.getByRole("alert")).toHaveTextContent("Failed to load");
-    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
-    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

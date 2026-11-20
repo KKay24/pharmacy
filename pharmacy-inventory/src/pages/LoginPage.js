@@ -175,7 +175,7 @@ export default function LoginPage({ staffMode = false, heroBanners = HERO_BANNER
           loading={loadingProducts}
           error={catalogError}
           onRetry={loadHomeCatalog}
-          autoPlayInterval={5000}
+          autoPlayInterval={3500}
         />
 
         <section className="hp-products">
