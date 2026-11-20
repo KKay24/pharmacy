@@ -26,14 +26,24 @@ export default function InventoryPage() {
     fetchInventory,
     userRole,
     riskInsights = {},
+    reorderInsights = {},
+    predictiveAnalytics = {},
   } = useContext(DataContext);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
   const [selectedMedicine, setSelectedMedicine] = useState(null);
   const requestedStockStatus = searchParams.get("stockStatus");
   const requestedExpiryStatus = searchParams.get("expiryStatus");
   const requestedRiskStatus = searchParams.get("riskStatus");
+  const validRiskStatuses = [
+    "stockout-risk",
+    "dead-stock",
+    "reorder-suggestions",
+    "demand-forecast",
+    "seasonal-trends",
+    "product-seasonality",
+  ];
   const [filters, setFilters] = useState(() => ({
     mainCategoryId: "",
     subcategoryId: "",
@@ -43,7 +53,7 @@ export default function InventoryPage() {
     supplier: "",
     stockStatus: ["in", "low", "out"].includes(requestedStockStatus) ? requestedStockStatus : "",
     expiryStatus: ["valid", "near-expiry", "expired"].includes(requestedExpiryStatus) ? requestedExpiryStatus : "",
-    riskStatus: ["stockout-risk", "dead-stock"].includes(requestedRiskStatus) ? requestedRiskStatus : "",
+    riskStatus: validRiskStatuses.includes(requestedRiskStatus) ? requestedRiskStatus : "",
   }));
   const LOW_STOCK_THRESHOLD = 10;
   const selectedCategory = inventoryCategories.find((category) =>
@@ -112,11 +122,23 @@ export default function InventoryPage() {
       }));
     }
     if (filters.riskStatus) {
-      const riskItems = filters.riskStatus === "stockout-risk"
-        ? riskInsights.stockoutRisk || []
-        : riskInsights.deadStock || [];
-      const riskMedicineIds = new Set(riskItems.map((item) => String(item.medicineId)));
-      result = result.filter((medicine) => riskMedicineIds.has(String(medicine.id)));
+      const predictions = predictiveAnalytics.predictions || [];
+      let insightItems = [];
+      if (filters.riskStatus === "stockout-risk") {
+        insightItems = riskInsights.stockoutRisk || [];
+      } else if (filters.riskStatus === "dead-stock") {
+        insightItems = riskInsights.deadStock || [];
+      } else if (filters.riskStatus === "reorder-suggestions") {
+        insightItems = reorderInsights.items || [];
+      } else if (filters.riskStatus === "demand-forecast") {
+        insightItems = predictions.filter((item) => Number(item.forecast?.forecastDemand || 0) > 0);
+      } else if (filters.riskStatus === "seasonal-trends" || filters.riskStatus === "product-seasonality") {
+        insightItems = predictions.filter(
+          (item) => item.sales?.last30Days > 0 && item.seasonality?.patternType !== "insufficient-data"
+        );
+      }
+      const insightMedicineIds = new Set(insightItems.map((item) => String(item.medicineId)));
+      result = result.filter((medicine) => insightMedicineIds.has(String(medicine.id)));
     }
 
     if (searchQuery) {
@@ -131,7 +153,7 @@ export default function InventoryPage() {
     }
 
     return result;
-  }, [inventory, filters, searchQuery, riskInsights]);
+  }, [inventory, filters, searchQuery, riskInsights, reorderInsights, predictiveAnalytics]);
 
   const addBatchToMedicine = async (medicineId, batch) => {
     try {
@@ -266,9 +288,13 @@ export default function InventoryPage() {
           <option value="expired">Expired</option>
         </select>
         <select className="asm-input" aria-label="Filter risk status" value={filters.riskStatus} onChange={e => setFilters(current => ({ ...current, riskStatus: e.target.value }))}>
-          <option value="">All risk statuses</option>
+          <option value="">All risk &amp; insight statuses</option>
           <option value="stockout-risk">Stockout risk</option>
           <option value="dead-stock">Dead stock</option>
+          <option value="reorder-suggestions">Reorder suggestions</option>
+          <option value="demand-forecast">Demand forecast</option>
+          <option value="seasonal-trends">Seasonal trends</option>
+          <option value="product-seasonality">Product seasonality</option>
         </select>
         <div className="inv-search-field">
           <Search size={18} aria-hidden="true" />

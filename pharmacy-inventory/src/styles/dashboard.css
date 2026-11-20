@@ -495,3 +495,234 @@
     align-items: flex-start;
   }
 }
+
+/* Clickable intelligence cards & full items list modal */
+.dash-card--clickable,
+.risk-panel--clickable {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.dash-card--clickable:hover,
+.risk-panel--clickable:hover {
+  transform: translateY(-2px);
+  border-color: #93c5fd;
+  box-shadow: 0 12px 24px -8px rgba(15, 41, 74, 0.14);
+}
+
+.dash-card--clickable:focus-visible,
+.risk-panel--clickable:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.dash-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.risk-panel__header-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.risk-panel__chevron {
+  color: #64748b;
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+
+.risk-panel--clickable:hover .risk-panel__chevron {
+  transform: translateX(2px);
+  color: #2563eb;
+}
+
+.dash-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.dash-modal {
+  width: min(920px, 100%);
+  max-height: 85vh;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.28);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dash-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.dash-modal__header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0f294a;
+}
+
+.dash-modal__header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.86rem;
+  color: #475569;
+}
+
+.dash-modal__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dash-modal__close:hover {
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.dash-modal__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.dash-modal__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 220px;
+  max-width: 380px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.dash-modal__search input {
+  width: 100%;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
+.dash-modal__count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.dash-modal__body {
+  overflow: auto;
+  flex: 1;
+  min-height: 160px;
+}
+
+.dash-modal__empty {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.dash-modal__item-link {
+  color: #0f294a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dash-modal__item-link:hover {
+  color: #039d83;
+  text-decoration: underline;
+}
+
+.dash-modal__action-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dash-modal__action-link:hover {
+  background: #dbeafe;
+}
+
+.dash-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  flex-wrap: wrap;
+}
+
+.dash-modal__inventory-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  background: #039d83;
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dash-modal__inventory-btn:hover {
+  background: #007d72;
+}
+
+.dash-modal__done-btn {
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dash-modal__done-btn:hover {
+  border-color: #94a3b8;
+}

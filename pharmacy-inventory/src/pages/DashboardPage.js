@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DataContext } from "../context/DataContext";
 import {
@@ -15,12 +15,16 @@ import {
 } from "recharts";
 import {
   CalendarDays,
+  ChevronRight,
   Clock3,
+  ExternalLink,
   Package,
   PackageSearch,
+  Search,
   ShieldAlert,
   TrendingDown,
   TrendingUp,
+  X,
 } from "lucide-react";
 import "../styles/dashboard.css";
 import { getInventoryStockValue } from "../utils/inventoryValuation";
@@ -122,7 +126,9 @@ export default function DashboardPage() {
     riskInsights = EMPTY_RISK_INSIGHTS,
   } = useContext(DataContext);
   const LOW_STOCK_THRESHOLD = 10;
-  const [inventoryBreakdownLevel, setInventoryBreakdownLevel] = React.useState("main");
+  const [inventoryBreakdownLevel, setInventoryBreakdownLevel] = useState("main");
+  const [activeListKey, setActiveListKey] = useState(null);
+  const [modalSearch, setModalSearch] = useState("");
   const predictions = predictiveAnalytics.predictions || [];
   const predictiveSummary = predictiveAnalytics.summary || {};
   const reorderSuggestions = reorderInsights.items || [];
@@ -130,6 +136,29 @@ export default function DashboardPage() {
   const expiryRisk = riskInsights.expiryRisk || [];
   const deadStock = riskInsights.deadStock || [];
   const forecastDays = predictiveAnalytics.parameters?.forecastDays || 14;
+
+  useEffect(() => {
+    if (!activeListKey) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setActiveListKey(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeListKey]);
+
+  const openItemsList = (key) => {
+    setModalSearch("");
+    setActiveListKey(key);
+  };
+
+  const handleCardKeyDown = (event, key) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openItemsList(key);
+    }
+  };
 
   const totalProducts = inventory.length;
 
@@ -233,18 +262,93 @@ export default function DashboardPage() {
   const seasonalitySignalCount =
     predictiveSummary.productsWithSeasonalitySignals ??
     predictions.filter((item) => ["high", "moderate"].includes(item.seasonality?.patternType)).length;
-  const topForecastProducts = [...predictions]
+  const allForecastProducts = [...predictions]
     .filter((item) => Number(item.forecast?.forecastDemand || 0) > 0)
     .sort(
       (left, right) =>
         Number(right.forecast?.seasonalityAdjustedForecastDemand || right.forecast?.forecastDemand || 0) -
         Number(left.forecast?.seasonalityAdjustedForecastDemand || left.forecast?.forecastDemand || 0)
-    )
-    .slice(0, 5);
-  const seasonalProducts = predictions
+    );
+  const topForecastProducts = allForecastProducts.slice(0, 5);
+  const allSeasonalProducts = predictions
     .filter((item) => item.sales?.last30Days > 0 && item.seasonality?.patternType !== "insufficient-data")
-    .sort((left, right) => Number(right.seasonality?.strength || 0) - Number(left.seasonality?.strength || 0))
-    .slice(0, 5);
+    .sort((left, right) => Number(right.seasonality?.strength || 0) - Number(left.seasonality?.strength || 0));
+  const seasonalProducts = allSeasonalProducts.slice(0, 5);
+
+  const listModalConfigs = {
+    "reorder-suggestions": {
+      title: "Reorder Suggestions",
+      subtitle: "Products currently at or below their dynamic reorder point.",
+      inventoryLink: "/inventory?riskStatus=reorder-suggestions",
+      emptyMessage: "No dynamic reorder suggestions right now.",
+      items: reorderSuggestions,
+      matchesQuery: (item, q) => String(item.name || "").toLowerCase().includes(q),
+    },
+    "demand-forecast": {
+      title: "Demand Forecast",
+      subtitle: `Projected unit demand across the next ${forecastDays} days based on recent sales velocity and seasonality.`,
+      inventoryLink: "/inventory?riskStatus=demand-forecast",
+      emptyMessage: "Forecasts will appear once products have recent sales history.",
+      items: allForecastProducts,
+      matchesQuery: (item, q) => String(item.name || "").toLowerCase().includes(q),
+    },
+    "seasonal-trends": {
+      title: "Seasonal Trends",
+      subtitle: "Products with measurable day-of-week or monthly demand patterns.",
+      inventoryLink: "/inventory?riskStatus=seasonal-trends",
+      emptyMessage: "Seasonal trends will appear as more product history builds up.",
+      items: allSeasonalProducts,
+      matchesQuery: (item, q) =>
+        String(item.name || "").toLowerCase().includes(q) ||
+        String(item.seasonality?.peakWeekday?.label || "").toLowerCase().includes(q) ||
+        String(item.seasonality?.peakMonth?.label || "").toLowerCase().includes(q),
+    },
+    "stockout-risk": {
+      title: "Stockout Risk",
+      subtitle: "Items projected to deplete before supplier replenishment arrives.",
+      inventoryLink: "/inventory?riskStatus=stockout-risk",
+      emptyMessage: "No immediate stockout risks.",
+      items: stockoutRisk,
+      matchesQuery: (item, q) => String(item.name || "").toLowerCase().includes(q),
+    },
+    "expiring-soon": {
+      title: "Expiring Soon",
+      subtitle: "Batches approaching expiry with units currently at risk.",
+      inventoryLink: "/inventory?expiryStatus=near-expiry",
+      emptyMessage: "No near-term expiry exposure found.",
+      items: expiryRisk,
+      matchesQuery: (item, q) =>
+        String(item.name || "").toLowerCase().includes(q) ||
+        String(item.batchNumber || "").toLowerCase().includes(q),
+    },
+    "dead-stock": {
+      title: "Dead Stock",
+      subtitle: "Items in stock with little or no sales movement over the monitoring window.",
+      inventoryLink: "/inventory?riskStatus=dead-stock",
+      emptyMessage: "No dead stock flags at the current threshold.",
+      items: deadStock,
+      matchesQuery: (item, q) => String(item.name || "").toLowerCase().includes(q),
+    },
+    "product-seasonality": {
+      title: "Product Seasonality",
+      subtitle: "Products showing weekday or seasonal demand peaks and spread signals.",
+      inventoryLink: "/inventory?riskStatus=product-seasonality",
+      emptyMessage: "No product seasonality signals yet.",
+      items: allSeasonalProducts,
+      matchesQuery: (item, q) =>
+        String(item.name || "").toLowerCase().includes(q) ||
+        String(item.seasonality?.description || "").toLowerCase().includes(q) ||
+        String(item.seasonality?.peakWeekday?.label || "").toLowerCase().includes(q),
+    },
+  };
+
+  const activeModal = activeListKey ? listModalConfigs[activeListKey] : null;
+  const filteredModalItems = activeModal
+    ? activeModal.items.filter((item) => {
+        const q = modalSearch.trim().toLowerCase();
+        return !q || activeModal.matchesQuery(item, q);
+      })
+    : [];
 
   const metricCards = [
     {
@@ -475,10 +579,19 @@ export default function DashboardPage() {
       </div>
 
       <div className="lists-row">
-        <div className="dash-card">
+        <div
+          className="dash-card dash-card--clickable"
+          role="button"
+          tabIndex={0}
+          aria-label={`Reorder Suggestions (${reorderSuggestions.length} active). Open full items list.`}
+          onClick={() => openItemsList("reorder-suggestions")}
+          onKeyDown={(event) => handleCardKeyDown(event, "reorder-suggestions")}
+        >
           <div className="dash-card-header">
             <h3>Reorder Suggestions</h3>
-            <span className="action-link">{reorderSuggestions.length} active</span>
+            <span className="action-link dash-card-cta">
+              {reorderSuggestions.length} active <ChevronRight size={15} aria-hidden="true" />
+            </span>
           </div>
           <div className="dash-card-body" style={{ padding: 0 }}>
             <table className="mini-table">
@@ -504,7 +617,7 @@ export default function DashboardPage() {
                       <td style={{ fontWeight: 700 }}>{item.currentStock}</td>
                       <td>{formatDecimal(item.reorderPoint)}</td>
                       <td>
-                        <button className="reorder-btn">{item.suggestedReorderQuantity} units</button>
+                        <span className="reorder-btn">{item.suggestedReorderQuantity} units</span>
                       </td>
                     </tr>
                   ))
@@ -514,10 +627,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="dash-card">
+        <div
+          className="dash-card dash-card--clickable"
+          role="button"
+          tabIndex={0}
+          aria-label={`Demand Forecast (Next ${forecastDays} days). Open full items list.`}
+          onClick={() => openItemsList("demand-forecast")}
+          onKeyDown={(event) => handleCardKeyDown(event, "demand-forecast")}
+        >
           <div className="dash-card-header">
             <h3>Demand Forecast</h3>
-            <span className="action-link">Next {forecastDays} days</span>
+            <span className="action-link dash-card-cta">
+              Next {forecastDays} days <ChevronRight size={15} aria-hidden="true" />
+            </span>
           </div>
           <div className="dash-card-body" style={{ padding: 0 }}>
             <table className="mini-table">
@@ -572,10 +694,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="dash-card">
+        <div
+          className="dash-card dash-card--clickable"
+          role="button"
+          tabIndex={0}
+          aria-label={`Seasonal Trends (${seasonalitySignalCount} active signals). Open full items list.`}
+          onClick={() => openItemsList("seasonal-trends")}
+          onKeyDown={(event) => handleCardKeyDown(event, "seasonal-trends")}
+        >
           <div className="dash-card-header">
             <h3>Seasonal Trends</h3>
-            <span className="action-link">{seasonalitySignalCount} active signals</span>
+            <span className="action-link dash-card-cta">
+              {seasonalitySignalCount} active signals <ChevronRight size={15} aria-hidden="true" />
+            </span>
           </div>
           <div className="dash-card-body" style={{ padding: 0 }}>
             <table className="mini-table">
@@ -620,13 +751,23 @@ export default function DashboardPage() {
       </div>
 
       <div className="predictive-panels-row">
-        <div className="risk-panel">
+        <div
+          className="risk-panel risk-panel--clickable"
+          role="button"
+          tabIndex={0}
+          aria-label={`Stockout Risk (${stockoutRiskCount} items). Open full items list.`}
+          onClick={() => openItemsList("stockout-risk")}
+          onKeyDown={(event) => handleCardKeyDown(event, "stockout-risk")}
+        >
           <div className="risk-panel__header">
             <div className="risk-panel__title">
               <ShieldAlert size={18} />
               <h3>Stockout Risk</h3>
             </div>
-            <span className="risk-panel__count">{stockoutRiskCount}</span>
+            <div className="risk-panel__header-meta">
+              <span className="risk-panel__count">{stockoutRiskCount}</span>
+              <ChevronRight size={16} className="risk-panel__chevron" aria-hidden="true" />
+            </div>
           </div>
           <div className="risk-list">
             {stockoutRisk.length === 0 ? (
@@ -648,13 +789,23 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="risk-panel">
+        <div
+          className="risk-panel risk-panel--clickable"
+          role="button"
+          tabIndex={0}
+          aria-label={`Expiring Soon (${expiringProductCount} items). Open full items list.`}
+          onClick={() => openItemsList("expiring-soon")}
+          onKeyDown={(event) => handleCardKeyDown(event, "expiring-soon")}
+        >
           <div className="risk-panel__header">
             <div className="risk-panel__title">
               <Clock3 size={18} />
               <h3>Expiring Soon</h3>
             </div>
-            <span className="risk-panel__count">{expiringProductCount}</span>
+            <div className="risk-panel__header-meta">
+              <span className="risk-panel__count">{expiringProductCount}</span>
+              <ChevronRight size={16} className="risk-panel__chevron" aria-hidden="true" />
+            </div>
           </div>
           <div className="risk-list">
             {expiryRisk.length === 0 ? (
@@ -676,13 +827,23 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="risk-panel">
+        <div
+          className="risk-panel risk-panel--clickable"
+          role="button"
+          tabIndex={0}
+          aria-label={`Dead Stock (${deadStockCount} items). Open full items list.`}
+          onClick={() => openItemsList("dead-stock")}
+          onKeyDown={(event) => handleCardKeyDown(event, "dead-stock")}
+        >
           <div className="risk-panel__header">
             <div className="risk-panel__title">
               <PackageSearch size={18} />
               <h3>Dead Stock</h3>
             </div>
-            <span className="risk-panel__count">{deadStockCount}</span>
+            <div className="risk-panel__header-meta">
+              <span className="risk-panel__count">{deadStockCount}</span>
+              <ChevronRight size={16} className="risk-panel__chevron" aria-hidden="true" />
+            </div>
           </div>
           <div className="risk-list">
             {deadStock.length === 0 ? (
@@ -704,13 +865,23 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="risk-panel">
+        <div
+          className="risk-panel risk-panel--clickable"
+          role="button"
+          tabIndex={0}
+          aria-label={`Product Seasonality (${seasonalitySignalCount} signals). Open full items list.`}
+          onClick={() => openItemsList("product-seasonality")}
+          onKeyDown={(event) => handleCardKeyDown(event, "product-seasonality")}
+        >
           <div className="risk-panel__header">
             <div className="risk-panel__title">
               <CalendarDays size={18} />
               <h3>Product Seasonality</h3>
             </div>
-            <span className="risk-panel__count">{seasonalitySignalCount}</span>
+            <div className="risk-panel__header-meta">
+              <span className="risk-panel__count">{seasonalitySignalCount}</span>
+              <ChevronRight size={16} className="risk-panel__chevron" aria-hidden="true" />
+            </div>
           </div>
           <div className="risk-list">
             {seasonalProducts.length === 0 ? (
@@ -734,6 +905,330 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {activeModal && (
+        <div
+          className="dash-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setActiveListKey(null);
+          }}
+        >
+          <div
+            className="dash-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dash-modal-title"
+          >
+            <div className="dash-modal__header">
+              <div>
+                <h2 id="dash-modal-title">{activeModal.title}</h2>
+                <p>{activeModal.subtitle}</p>
+              </div>
+              <button
+                type="button"
+                className="dash-modal__close"
+                aria-label={`Close ${activeModal.title} list`}
+                onClick={() => setActiveListKey(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="dash-modal__toolbar">
+              <label className="dash-modal__search">
+                <Search size={15} aria-hidden="true" />
+                <input
+                  type="search"
+                  placeholder={`Search ${activeModal.title.toLowerCase()}...`}
+                  aria-label={`Search ${activeModal.title}`}
+                  value={modalSearch}
+                  onChange={(event) => setModalSearch(event.target.value)}
+                />
+              </label>
+              <span className="dash-modal__count">
+                {filteredModalItems.length} of {activeModal.items.length} item{activeModal.items.length === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            <div className="dash-modal__body">
+              {filteredModalItems.length === 0 ? (
+                <div className="dash-modal__empty">
+                  {modalSearch.trim()
+                    ? `No items matched "${modalSearch.trim()}".`
+                    : activeModal.emptyMessage}
+                </div>
+              ) : (
+                <table className="mini-table dash-modal__table">
+                  {activeListKey === "reorder-suggestions" && (
+                    <>
+                      <thead>
+                        <tr>
+                          <th>Item Name</th>
+                          <th>Current Stock</th>
+                          <th>Reorder Point</th>
+                          <th>Suggested Qty</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModalItems.map((item) => (
+                          <tr key={item.medicineId}>
+                            <td>
+                              <Link
+                                to={`/inventory?search=${encodeURIComponent(item.name || "")}`}
+                                className="dash-modal__item-link"
+                              >
+                                {item.name}
+                              </Link>
+                            </td>
+                            <td style={{ fontWeight: 700 }}>{item.currentStock}</td>
+                            <td>{formatDecimal(item.reorderPoint)}</td>
+                            <td>
+                              <span className="reorder-btn">{item.suggestedReorderQuantity} units</span>
+                            </td>
+                            <td>
+                              <Link to="/add-stock" className="dash-modal__action-link">
+                                Restock
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  )}
+
+                  {activeListKey === "demand-forecast" && (
+                    <>
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>7d Avg/Day</th>
+                          <th>30d Avg/Day</th>
+                          <th>Base Forecast</th>
+                          <th>Adjusted Forecast &amp; Trend</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModalItems.map((item) => (
+                          <tr key={item.medicineId}>
+                            <td>
+                              <Link
+                                to={`/inventory?search=${encodeURIComponent(item.name || "")}`}
+                                className="dash-modal__item-link"
+                              >
+                                {item.name}
+                              </Link>
+                            </td>
+                            <td>{formatDecimal(item.sales?.avgDailySales7)}</td>
+                            <td>{formatDecimal(item.sales?.avgDailySales30)}</td>
+                            <td>{formatDecimal(item.forecast?.forecastDemand)}</td>
+                            <td>
+                              <div className="forecast-cell">
+                                <strong>
+                                  {formatDecimal(
+                                    item.forecast?.seasonalityAdjustedForecastDemand || item.forecast?.forecastDemand
+                                  )}
+                                </strong>
+                                <span className={`trend-chip ${item.sales?.trendDirection || "stable"}`}>
+                                  {formatTrendLabel(item.sales?.trendDirection, item.sales?.trendPercent)}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  )}
+
+                  {activeListKey === "seasonal-trends" && (
+                    <>
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Peak Day</th>
+                          <th>Peak Month</th>
+                          <th>Pattern</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModalItems.map((item) => (
+                          <tr key={item.medicineId}>
+                            <td>
+                              <Link
+                                to={`/inventory?search=${encodeURIComponent(item.name || "")}`}
+                                className="dash-modal__item-link"
+                              >
+                                {item.name}
+                              </Link>
+                            </td>
+                            <td>
+                              <div className="seasonality-cell">
+                                <strong>{item.seasonality?.peakWeekday?.label || "N/A"}</strong>
+                                <span>{formatDecimal(item.seasonality?.peakWeekday?.demandIndex || 0)}x avg</span>
+                              </div>
+                            </td>
+                            <td>{item.seasonality?.peakMonth?.label || "N/A"}</td>
+                            <td>
+                              <span className={`seasonality-chip ${item.seasonality?.patternType || "steady"}`}>
+                                {formatPatternLabel(item.seasonality?.patternType)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  )}
+
+                  {activeListKey === "stockout-risk" && (
+                    <>
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Current Stock</th>
+                          <th>Days Until Depletion</th>
+                          <th>Lead Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModalItems.map((item) => (
+                          <tr key={item.medicineId}>
+                            <td>
+                              <Link
+                                to={`/inventory?search=${encodeURIComponent(item.name || "")}`}
+                                className="dash-modal__item-link"
+                              >
+                                {item.name}
+                              </Link>
+                            </td>
+                            <td style={{ fontWeight: 700 }}>{item.currentStock} units</td>
+                            <td>{formatDaysLabel(item.daysUntilStockout)}</td>
+                            <td>
+                              <span className="risk-chip risk-chip--orange">Lead time {item.leadTimeDays}d</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  )}
+
+                  {activeListKey === "expiring-soon" && (
+                    <>
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Batch</th>
+                          <th>Time to Expiry</th>
+                          <th>Batch Qty</th>
+                          <th>At-Risk Units</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModalItems.map((item) => (
+                          <tr key={item.batchId || `${item.medicineId}-${item.batchNumber}`}>
+                            <td>
+                              <Link
+                                to={`/inventory?search=${encodeURIComponent(item.name || "")}`}
+                                className="dash-modal__item-link"
+                              >
+                                {item.name}
+                              </Link>
+                            </td>
+                            <td>{item.batchNumber || "—"}</td>
+                            <td>{formatDaysLabel(item.daysToExpiry)}</td>
+                            <td>{item.quantity} units</td>
+                            <td>
+                              <span className="risk-chip risk-chip--red">{item.atRiskUnits} at risk</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  )}
+
+                  {activeListKey === "dead-stock" && (
+                    <>
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Current Stock</th>
+                          <th>Sales in Window</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModalItems.map((item) => (
+                          <tr key={item.medicineId}>
+                            <td>
+                              <Link
+                                to={`/inventory?search=${encodeURIComponent(item.name || "")}`}
+                                className="dash-modal__item-link"
+                              >
+                                {item.name}
+                              </Link>
+                            </td>
+                            <td style={{ fontWeight: 700 }}>{item.currentStock} units</td>
+                            <td>{item.salesInWindow} sold in {item.deadStockWindowDays} days</td>
+                            <td>
+                              <span className="risk-chip risk-chip--slate">Low velocity</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  )}
+
+                  {activeListKey === "product-seasonality" && (
+                    <>
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Signal Summary</th>
+                          <th>Peak Weekday</th>
+                          <th>Spread</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModalItems.map((item) => (
+                          <tr key={item.medicineId}>
+                            <td>
+                              <Link
+                                to={`/inventory?search=${encodeURIComponent(item.name || "")}`}
+                                className="dash-modal__item-link"
+                              >
+                                {item.name}
+                              </Link>
+                            </td>
+                            <td>{item.seasonality?.description || "Seasonal signal unavailable"}</td>
+                            <td>{item.seasonality?.peakWeekday?.label || "N/A"}</td>
+                            <td>
+                              <span className="risk-chip risk-chip--blue">
+                                {formatDecimal(item.seasonality?.strength || 0)}x spread
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  )}
+                </table>
+              )}
+            </div>
+
+            <div className="dash-modal__footer">
+              <Link to={activeModal.inventoryLink} className="dash-modal__inventory-btn">
+                Open in Inventory Control <ExternalLink size={14} aria-hidden="true" />
+              </Link>
+              <button
+                type="button"
+                className="dash-modal__done-btn"
+                onClick={() => setActiveListKey(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
