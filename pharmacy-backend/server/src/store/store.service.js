@@ -24,6 +24,10 @@ const {
   sequelize,
 } = require('../../models');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
+const {
+  validateAndNormalizePhone,
+  validateAndNormalizeOptionalEmail,
+} = require('./contact-validation');
 const searchService = require('./search.service');
 
 function validatePrescriptionFile(fileData) {
@@ -960,15 +964,33 @@ class StoreService {
   }
 
   async createSupportInquiry(payload) {
-    if (!payload.name || !payload.phone || !payload.message) {
+    const name = typeof payload?.name === 'string' ? payload.name.trim() : '';
+    const message = typeof payload?.message === 'string' ? payload.message.trim() : '';
+    const inquiryType =
+      typeof payload?.inquiryType === 'string' && payload.inquiryType.trim()
+        ? payload.inquiryType.trim().slice(0, 100)
+        : 'Help finding product';
+
+    if (!name || !payload?.phone || !message) {
       throw new BadRequestException('Name, phone number, and message are required');
     }
+
+    const phoneResult = validateAndNormalizePhone(payload.phone, payload.countryCode);
+    if (!phoneResult.valid) {
+      throw new BadRequestException(phoneResult.error);
+    }
+
+    const emailResult = validateAndNormalizeOptionalEmail(payload.email);
+    if (!emailResult.valid) {
+      throw new BadRequestException(emailResult.error);
+    }
+
     const inquiry = await SupportInquiry.create({
-      inquiryType: payload.inquiryType || 'Help finding product',
-      name: payload.name,
-      phone: payload.phone,
-      email: payload.email || null,
-      message: payload.message,
+      inquiryType,
+      name: name.slice(0, 120),
+      phone: phoneResult.normalized,
+      email: emailResult.normalized,
+      message: message.slice(0, 2000),
       status: 'New',
     });
     return { success: true, inquiry };

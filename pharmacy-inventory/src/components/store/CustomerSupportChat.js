@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowRight,
+  CheckCircle2,
   ExternalLink,
   Headphones,
   Info,
@@ -14,6 +16,15 @@ import {
   X,
 } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
+import SupportPhoneInput from "./SupportPhoneInput";
+import {
+  DEFAULT_PHONE_COUNTRY,
+  SUPPORTED_PHONE_COUNTRIES,
+  validateSupportEmail,
+  validateSupportMessage,
+  validateSupportName,
+  validateSupportPhone,
+} from "../../utils/contactValidation";
 
 const SESSION_STORAGE_KEY = "mediquick_smart_assistant_session_v1";
 
@@ -77,6 +88,13 @@ export default function CustomerSupportChat() {
     name: storeUser?.name || storeUser?.username || "",
     email: storeUser?.email || "",
   }));
+  const [phoneCountry, setPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY);
+  const [touched, setTouched] = useState({
+    name: false,
+    phone: false,
+    email: false,
+    message: false,
+  });
   const [supportMessages, setSupportMessages] = useState([]);
   const [supportError, setSupportError] = useState("");
   const [supportSending, setSupportSending] = useState(false);
@@ -221,16 +239,46 @@ export default function CustomerSupportChat() {
     setActiveTab("support");
   };
 
+  const nameValidation = validateSupportName(form.name);
+  const phoneValidation = validateSupportPhone(form.phone, phoneCountry);
+  const emailValidation = validateSupportEmail(form.email);
+  const messageValidation = validateSupportMessage(form.message);
+  const isSupportFormValid =
+    nameValidation.valid &&
+    phoneValidation.valid &&
+    emailValidation.valid &&
+    messageValidation.valid;
+
+  const markSupportTouched = (field) => {
+    setTouched((current) => ({ ...current, [field]: true }));
+    if (field === "email") {
+      setForm((current) => ({ ...current, email: current.email.trim() }));
+    }
+  };
+
   const updateSupportField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+    if (field === "phone" && typeof value === "string" && value.trim().startsWith("+")) {
+      const detected = validateSupportPhone(value, phoneCountry).detectedCountry;
+      if (detected && SUPPORTED_PHONE_COUNTRIES.some((c) => c.code === detected)) {
+        setPhoneCountry(detected);
+      }
+    }
     if (supportError) setSupportError("");
   };
 
   const submitSupportMessage = async (event) => {
     event.preventDefault();
-    const message = form.message.trim();
-    if (!form.name.trim() || !form.phone.trim() || !message) {
-      setSupportError("Please enter your name, phone number, and message.");
+    setTouched({ name: true, phone: true, email: true, message: true });
+
+    if (!isSupportFormValid) {
+      setSupportError(
+        nameValidation.error ||
+          phoneValidation.error ||
+          emailValidation.error ||
+          messageValidation.error ||
+          "Please fix the highlighted fields before sending."
+      );
       return;
     }
 
@@ -241,22 +289,24 @@ export default function CustomerSupportChat() {
         method: "POST",
         body: JSON.stringify({
           ...form,
-          name: form.name.trim(),
-          phone: form.phone.trim(),
-          email: form.email.trim(),
-          message,
+          countryCode: phoneCountry,
+          name: nameValidation.normalized,
+          phone: phoneValidation.normalized,
+          email: emailValidation.normalized,
+          message: messageValidation.normalized,
         }),
       });
       setSupportMessages((current) => [
         ...current,
         {
           id: `${Date.now()}`,
-          message,
+          message: messageValidation.normalized,
           reply:
             "Your message has been sent to the pharmacy team. They will follow up using the contact details you provided.",
         },
       ]);
       setForm((current) => ({ ...current, message: "" }));
+      setTouched((current) => ({ ...current, message: false }));
       setTransferredNotice(false);
     } catch (requestError) {
       setSupportError(requestError.message || "Your message could not be sent. Please try again.");
@@ -606,41 +656,107 @@ export default function CustomerSupportChat() {
                 Please don’t include passwords, payment details, or private health information.
               </p>
 
-              <form className="customer-support-chat__form smart-assistant__support-form" onSubmit={submitSupportMessage}>
-                <div className="customer-support-chat__contact-fields">
-                  <label>
-                    Your name
+              <form className="customer-support-chat__form smart-assistant__support-form" onSubmit={submitSupportMessage} noValidate>
+                <div className="support-field support-field--compact">
+                  <div className="support-field__label-row">
+                    <label className="support-field__label" htmlFor="widget-support-name">
+                      Your name
+                    </label>
+                    <span className="support-field__req" aria-hidden="true">*</span>
+                  </div>
+                  <div
+                    className={`support-field__input-wrap${
+                      touched.name && !nameValidation.valid
+                        ? " is-invalid"
+                        : touched.name && nameValidation.valid
+                          ? " is-valid"
+                          : ""
+                    }`}
+                  >
                     <input
+                      id="widget-support-name"
                       autoComplete="name"
                       maxLength={100}
                       required
+                      placeholder="John Banda"
                       value={form.name}
+                      aria-invalid={touched.name && !nameValidation.valid ? "true" : "false"}
                       onChange={(event) => updateSupportField("name", event.target.value)}
+                      onBlur={() => markSupportTouched("name")}
                     />
-                  </label>
-                  <label>
-                    Phone number
-                    <input
-                      type="tel"
-                      autoComplete="tel"
-                      maxLength={40}
-                      required
-                      value={form.phone}
-                      onChange={(event) => updateSupportField("phone", event.target.value)}
-                    />
-                  </label>
+                    {touched.name && nameValidation.valid && (
+                      <span className="support-field__status-icon support-field__status-icon--valid" aria-label="Valid name">
+                        <CheckCircle2 size={15} aria-hidden="true" />
+                      </span>
+                    )}
+                    {touched.name && !nameValidation.valid && (
+                      <span className="support-field__status-icon support-field__status-icon--invalid" aria-hidden="true">
+                        <AlertCircle size={15} />
+                      </span>
+                    )}
+                  </div>
+                  {touched.name && !nameValidation.valid && (
+                    <span className="support-field__error" role="alert">{nameValidation.error}</span>
+                  )}
                 </div>
+
+                <SupportPhoneInput
+                  id="widget-support-phone"
+                  label="Phone number"
+                  countryCode={phoneCountry}
+                  onCountryChange={(code) => {
+                    setPhoneCountry(code);
+                    if (supportError) setSupportError("");
+                  }}
+                  value={form.phone}
+                  onChange={(value) => updateSupportField("phone", value)}
+                  onBlur={() => markSupportTouched("phone")}
+                  touched={touched.phone}
+                  validation={phoneValidation}
+                  compact
+                />
+
                 <div className="customer-support-chat__contact-fields">
-                  <label>
-                    Email <span>(optional)</span>
-                    <input
-                      type="email"
-                      autoComplete="email"
-                      maxLength={160}
-                      value={form.email}
-                      onChange={(event) => updateSupportField("email", event.target.value)}
-                    />
-                  </label>
+                  <div className="support-field support-field--compact">
+                    <label className="support-field__label" htmlFor="widget-support-email">
+                      <span>Email <span className="support-field__opt">(optional)</span></span>
+                    </label>
+                    <div
+                      className={`support-field__input-wrap${
+                        touched.email && !emailValidation.isEmpty && !emailValidation.valid
+                          ? " is-invalid"
+                          : touched.email && !emailValidation.isEmpty && emailValidation.valid
+                            ? " is-valid"
+                            : ""
+                      }`}
+                    >
+                      <input
+                        id="widget-support-email"
+                        type="email"
+                        autoComplete="email"
+                        maxLength={254}
+                        placeholder="name@example.com"
+                        value={form.email}
+                        aria-invalid={touched.email && !emailValidation.valid ? "true" : "false"}
+                        onChange={(event) => updateSupportField("email", event.target.value)}
+                        onBlur={() => markSupportTouched("email")}
+                      />
+                      {touched.email && !emailValidation.isEmpty && emailValidation.valid && (
+                        <span className="support-field__status-icon support-field__status-icon--valid" aria-label="Valid email">
+                          <CheckCircle2 size={15} aria-hidden="true" />
+                        </span>
+                      )}
+                      {touched.email && !emailValidation.valid && (
+                        <span className="support-field__status-icon support-field__status-icon--invalid" aria-hidden="true">
+                          <AlertCircle size={15} />
+                        </span>
+                      )}
+                    </div>
+                    {touched.email && !emailValidation.valid && (
+                      <span className="support-field__error" role="alert">{emailValidation.error}</span>
+                    )}
+                  </div>
+
                   <label>
                     What do you need help with?
                     <select
@@ -655,23 +771,47 @@ export default function CustomerSupportChat() {
                     </select>
                   </label>
                 </div>
-                <label>
-                  Message
+
+                <div className="support-field support-field--compact">
+                  <div className="support-field__label-row">
+                    <label className="support-field__label" htmlFor="widget-support-message">
+                      Message
+                    </label>
+                    <span className="support-field__req" aria-hidden="true">*</span>
+                  </div>
                   <textarea
+                    id="widget-support-message"
                     maxLength={2000}
                     required
                     rows={3}
+                    className={
+                      touched.message && !messageValidation.valid
+                        ? "support-field__textarea is-invalid"
+                        : touched.message && messageValidation.valid
+                          ? "support-field__textarea is-valid"
+                          : "support-field__textarea"
+                    }
                     value={form.message}
+                    aria-invalid={touched.message && !messageValidation.valid ? "true" : "false"}
                     onChange={(event) => updateSupportField("message", event.target.value)}
+                    onBlur={() => markSupportTouched("message")}
                     placeholder="How can we help?"
                   />
-                </label>
+                  {touched.message && !messageValidation.valid && (
+                    <span className="support-field__error" role="alert">{messageValidation.error}</span>
+                  )}
+                </div>
+
                 {supportError && (
                   <p className="customer-support-chat__error" role="alert">
                     {supportError}
                   </p>
                 )}
-                <button type="submit" className="customer-support-chat__send" disabled={supportSending}>
+                <button
+                  type="submit"
+                  className="customer-support-chat__send"
+                  disabled={supportSending || !isSupportFormValid}
+                >
                   <Send size={15} />
                   {supportSending ? "Sending..." : "Send message"}
                 </button>

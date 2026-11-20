@@ -165,10 +165,71 @@ describe("MediQuick Smart Assistant (CustomerSupportChat)", () => {
     );
     expect(JSON.parse(apiFetch.mock.calls[0][1].body)).toMatchObject({
       name: "Pat Customer",
-      phone: "+260 97 000 0000",
+      phone: "+260970000000",
       message: "Can you help me find a product?",
     });
     expect(await screen.findByText(/Your message has been sent to the pharmacy team/)).toBeInTheDocument();
+  });
+
+  test("validates Zambian phone and optional email on blur, disables invalid submission, and normalizes local ZM numbers", async () => {
+    apiFetch.mockResolvedValue({ success: true, inquiry: { id: 22 } });
+    render(<CustomerSupportChat />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open pharmacy support chat" }));
+    fireEvent.click(screen.getByRole("tab", { name: /pharmacy support/i }));
+
+    const sendButton = screen.getByRole("button", { name: "Send message" });
+    expect(sendButton).toBeDisabled();
+    expect(screen.getByLabelText("Country code")).toHaveValue("ZM");
+
+    const nameInput = screen.getByLabelText("Your name");
+    const phoneInput = screen.getByLabelText("Phone number");
+    const emailInput = screen.getByLabelText(/Email/i);
+    const messageInput = screen.getByLabelText("Message");
+
+    fireEvent.change(nameInput, { target: { value: "Chanda Mwale" } });
+    fireEvent.blur(nameInput);
+
+    // Invalid phone shows inline error on blur and keeps submit disabled
+    fireEvent.change(phoneInput, { target: { value: "09712" } });
+    fireEvent.blur(phoneInput);
+    expect(screen.getByText(/Enter a valid Zambian number/i)).toBeInTheDocument();
+    expect(sendButton).toBeDisabled();
+
+    // Local Zambian number becomes valid with green indicator & E.164 preview
+    fireEvent.change(phoneInput, { target: { value: "0977 123 456" } });
+    fireEvent.blur(phoneInput);
+    expect(screen.getByLabelText("Valid phone number")).toBeInTheDocument();
+    expect(screen.getByText(/Verified format: \+260977123456/i)).toBeInTheDocument();
+
+    // Malformed optional email disables submit and displays red error on blur
+    fireEvent.change(messageInput, { target: { value: "Do you stock Panadol?" } });
+    fireEvent.change(emailInput, { target: { value: "bad-email@nodomain" } });
+    fireEvent.blur(emailInput);
+    expect(screen.getByText(/Enter a valid email address/i)).toBeInTheDocument();
+    expect(sendButton).toBeDisabled();
+
+    // Valid email with whitespace trims on blur and enables submit
+    fireEvent.change(emailInput, { target: { value: "  chanda@example.com  " } });
+    fireEvent.blur(emailInput);
+    expect(emailInput).toHaveValue("chanda@example.com");
+    expect(screen.getByLabelText("Valid email")).toBeInTheDocument();
+    expect(sendButton).toBeEnabled();
+
+    fireEvent.click(sendButton);
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/api/support/inquiries",
+        expect.objectContaining({ method: "POST" })
+      )
+    );
+    expect(JSON.parse(apiFetch.mock.calls[0][1].body)).toMatchObject({
+      name: "Chanda Mwale",
+      phone: "+260977123456",
+      email: "chanda@example.com",
+      message: "Do you stock Panadol?",
+    });
   });
 
   test("keeps the support message available and reports API errors", async () => {

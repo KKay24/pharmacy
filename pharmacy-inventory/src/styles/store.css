@@ -2534,3 +2534,249 @@ ul { list-style: none; }
     grid-template-columns: 1fr;
   }
 }
+
+/* ─── Support Form Phone/Email Validation & Zambia Country Selector ─── */
+.store-contact-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 3rem;
+  max-width: 960px;
+  align-items: start;
+}
+
+.support-field {
+  display: grid;
+  gap: 0.32rem;
+}
+
+.support-field__label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.support-field__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f294a;
+}
+
+.support-field--compact .support-field__label {
+  font-size: 0.78rem;
+}
+
+.support-field__req {
+  color: #dc2626;
+}
+
+.support-field__opt {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.support-field__input-wrap,
+.support-phone__control {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  overflow: hidden;
+}
+
+.support-field__input-wrap:focus-within,
+.support-phone__control:focus-within {
+  border-color: #039d83;
+  box-shadow: 0 0 0 3px rgba(3, 157, 131, 0.14);
+}
+
+.support-field__input-wrap.is-valid,
+.support-phone__control.is-valid,
+.support-field__textarea.is-valid {
+  border-color: #059669;
+  background: #f0fdf4;
+}
+
+.support-field__input-wrap.is-invalid,
+.support-phone__control.is-invalid,
+.support-field__textarea.is-invalid {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.support-field__input-wrap input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0.62rem 0.75rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: #0f172a;
+  outline: none;
+}
+
+.support-field--compact .support-field__input-wrap input {
+  padding: 0.48rem 0.65rem;
+  font-size: 0.84rem;
+}
+
+.support-phone__country {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.45rem 0 0.65rem;
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+.support-phone__flag-svg {
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.1);
+  flex-shrink: 0;
+}
+
+.support-phone__iso-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #0f294a;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.support-phone__select {
+  border: none;
+  background: transparent;
+  color: #0f294a;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.5rem 0.2rem 0.5rem 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.support-field--compact .support-phone__select {
+  font-size: 0.78rem;
+  padding: 0.42rem 0.15rem 0.42rem 0;
+}
+
+.support-phone__input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0.62rem 0.7rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: #0f172a;
+  outline: none;
+}
+
+.support-field--compact .support-phone__input {
+  padding: 0.48rem 0.6rem;
+  font-size: 0.84rem;
+}
+
+.support-field__status-icon {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.6rem 0 0.2rem;
+  flex-shrink: 0;
+}
+
+.support-field__status-icon--valid {
+  color: #059669;
+}
+
+.support-field__status-icon--invalid {
+  color: #dc2626;
+}
+
+.support-field__textarea {
+  width: 100%;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-size: 0.88rem;
+  color: #0f172a;
+  background: #ffffff;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.support-field__textarea:focus {
+  border-color: #039d83;
+  box-shadow: 0 0 0 3px rgba(3, 157, 131, 0.14);
+}
+
+.support-field__hint {
+  font-size: 0.73rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.support-field__valid-hint {
+  font-size: 0.73rem;
+  color: #047857;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.support-field__error {
+  font-size: 0.75rem;
+  color: #dc2626;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.support-contact__submit {
+  width: 100%;
+  padding: 0.9rem;
+  background: var(--brand-blue, #039d83);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius, 10px);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.support-contact__submit:hover:not(:disabled) {
+  background: #007d72;
+}
+
+.support-contact__submit:disabled,
+.customer-support-chat__send:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+@media (max-width: 780px) {
+  .store-contact-layout {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+}
