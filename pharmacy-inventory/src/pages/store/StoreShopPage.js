@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useSearchParams, useOutletContext } from "react-router-dom";
+import { Link, useSearchParams, useOutletContext } from "react-router-dom";
 import { SlidersHorizontal, X, Sparkles } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import { ProductCard, ProductCardSkeleton } from "../../components/store/ProductCard";
-import ShopHeaderBanner from "../../components/store/ShopHeaderBanner";
+import PromotionalCarousel from "../../components/store/PromotionalCarousel";
+import { SHOP_PROMOTIONAL_SLIDES } from "../../data/promotionalSlides";
 
 export default function StoreShopPage() {
   const { openCart } = useOutletContext() || {};
@@ -79,9 +80,10 @@ export default function StoreShopPage() {
   useEffect(() => {
     const s = searchParams.get("search") || "";
     const c = searchParams.get("category") || "";
+    const sort = searchParams.get("sort") || "";
     setFilters((f) => {
-      if (f.search === s && f.category === c) return f;
-      return { ...f, search: s, category: c };
+      if (f.search === s && f.category === c && f.sort === sort) return f;
+      return { ...f, search: s, category: c, sort };
     });
     setPage(1);
   }, [searchParams]);
@@ -93,7 +95,7 @@ export default function StoreShopPage() {
       ...(key === "category" ? { subcategoryId: "", productFormId: "" } : {}),
       ...(key === "subcategoryId" ? { productFormId: "" } : {}),
     }));
-    if (key === "search" || key === "category") {
+    if (key === "search" || key === "category" || key === "sort") {
       const nextParams = new URLSearchParams(searchParams);
       if (value) nextParams.set(key, value);
       else nextParams.delete(key);
@@ -150,92 +152,125 @@ export default function StoreShopPage() {
   ].filter(Boolean).length;
 
   return (
-    <div className="store-section store-shop-section">
-      <div className="store-container">
-        <ShopHeaderBanner
-          heading={headerTitle}
-          total={total}
-          loading={loading}
-          searchQuery={filters.search}
-          categoryName={formattedCategoryTitle}
-        />
+    <div className="store-shop-page">
+      {/* Full-width, edge-to-edge promotional carousel */}
+      <PromotionalCarousel
+        slides={SHOP_PROMOTIONAL_SLIDES}
+        autoPlayInterval={5000}
+        ariaLabel="MediQuick Shop Promotions"
+      />
 
-        {/* Toolbar row below banner: active filter chips left, Filters & Sort right */}
-        <div className="store-shop-toolbar">
-          <div className="store-shop-toolbar__chips">
-            {filters.search && (
-              <span className="store-shop-chip">
-                Search: {filters.search}
-                <button
-                  type="button"
-                  aria-label="Clear search filter"
-                  onClick={() => setFilter("search", "")}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            )}
-            {filters.category && (
-              <span className="store-shop-chip">
-                Category: {formattedCategoryTitle || filters.category}
-                <button
-                  type="button"
-                  aria-label="Clear category filter"
-                  onClick={() => setFilter("category", "")}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            )}
-            {filters.prescriptionRequired === "false" && (
-              <span className="store-shop-chip store-shop-chip--otc">
-                OTC Only
-                <button
-                  type="button"
-                  aria-label="Clear OTC filter"
-                  onClick={() => setFilter("prescriptionRequired", "")}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            )}
-            {filters.prescriptionRequired === "true" && (
-              <span className="store-shop-chip store-shop-chip--rx">
-                Prescription Only
-                <button
-                  type="button"
-                  aria-label="Clear prescription filter"
-                  onClick={() => setFilter("prescriptionRequired", "")}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            )}
+      <div className="store-section store-shop-section">
+        <div className="store-container">
+          {/* Compact Shop identity + Filters & Sort toolbar */}
+          <div className="store-shop-heading-bar">
+            <div className="store-shop-heading-bar__identity">
+              <nav className="store-shop-banner__breadcrumb" aria-label="Breadcrumb">
+                <Link to="/">Home</Link>
+                <span className="store-shop-banner__sep" aria-hidden="true">›</span>
+                <span>Shop</span>
+                {formattedCategoryTitle && !filters.search && (
+                  <>
+                    <span className="store-shop-banner__sep" aria-hidden="true">›</span>
+                    <span>{formattedCategoryTitle}</span>
+                  </>
+                )}
+                {filters.search && (
+                  <>
+                    <span className="store-shop-banner__sep" aria-hidden="true">›</span>
+                    <span>&ldquo;{filters.search}&rdquo;</span>
+                  </>
+                )}
+              </nav>
+              <div className="store-shop-heading-bar__title-row">
+                <h1 className="store-shop-banner__title">{headerTitle}</h1>
+                <p className="store-shop-banner__count" data-testid="shop-product-count">
+                  {loading
+                    ? "Loading products…"
+                    : `${total} product${total !== 1 ? "s" : ""} found`}
+                </p>
+              </div>
+            </div>
+
+            <div className="store-shop-toolbar__controls">
+              <button
+                type="button"
+                className={`store-shop-toolbar__filter-btn${filtersOpen ? " is-open" : ""}`}
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen(!filtersOpen)}
+              >
+                <SlidersHorizontal size={15} aria-hidden="true" />
+                <span>Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="store-shop-toolbar__filter-badge">{activeFilterCount}</span>
+                )}
+              </button>
+              <select
+                aria-label="Sort products"
+                className="store-shop-toolbar__sort-select"
+                value={filters.sort}
+                onChange={e => setFilter("sort", e.target.value)}
+              >
+                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
           </div>
 
-          <div className="store-shop-toolbar__controls">
-            <button
-              type="button"
-              className={`store-shop-toolbar__filter-btn${filtersOpen ? " is-open" : ""}`}
-              aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen(!filtersOpen)}
-            >
-              <SlidersHorizontal size={15} aria-hidden="true" />
-              <span>Filters</span>
-              {activeFilterCount > 0 && (
-                <span className="store-shop-toolbar__filter-badge">{activeFilterCount}</span>
-              )}
-            </button>
-            <select
-              aria-label="Sort products"
-              className="store-shop-toolbar__sort-select"
-              value={filters.sort}
-              onChange={e => setFilter("sort", e.target.value)}
-            >
-              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-        </div>
+          {/* Active filter chips */}
+          {(filters.search || filters.category || filters.prescriptionRequired) && (
+            <div className="store-shop-toolbar store-shop-toolbar--chips-only">
+              <div className="store-shop-toolbar__chips">
+                {filters.search && (
+                  <span className="store-shop-chip">
+                    Search: {filters.search}
+                    <button
+                      type="button"
+                      aria-label="Clear search filter"
+                      onClick={() => setFilter("search", "")}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {filters.category && (
+                  <span className="store-shop-chip">
+                    Category: {formattedCategoryTitle || filters.category}
+                    <button
+                      type="button"
+                      aria-label="Clear category filter"
+                      onClick={() => setFilter("category", "")}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {filters.prescriptionRequired === "false" && (
+                  <span className="store-shop-chip store-shop-chip--otc">
+                    OTC Only
+                    <button
+                      type="button"
+                      aria-label="Clear OTC filter"
+                      onClick={() => setFilter("prescriptionRequired", "")}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {filters.prescriptionRequired === "true" && (
+                  <span className="store-shop-chip store-shop-chip--rx">
+                    Prescription Only
+                    <button
+                      type="button"
+                      aria-label="Clear prescription filter"
+                      onClick={() => setFilter("prescriptionRequired", "")}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
         {/* Spelling suggestion banner ("Did you mean?") */}
         {filters.search && searchMeta?.spellingSuggestion && (
@@ -472,6 +507,7 @@ export default function StoreShopPage() {
             <button className="store-page-btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

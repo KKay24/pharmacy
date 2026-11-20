@@ -49,7 +49,7 @@ const MOCK_PRODUCTS = [
   },
 ];
 
-describe("StoreShopPage redesigned header banner and toolbar", () => {
+describe("StoreShopPage promotional carousel, heading bar, and toolbar", () => {
   const apiFetch = jest.fn();
   const addToCart = jest.fn();
 
@@ -74,28 +74,28 @@ describe("StoreShopPage redesigned header banner and toolbar", () => {
     });
   });
 
-  it("renders the three-section header banner with dynamic product count, prescription links, and trust indicators", async () => {
+  it("renders the full-width 6-slide promotional carousel, preserves Prescription Upload, and displays dynamic product count", async () => {
     render(<StoreShopPage />);
 
     await waitFor(() => {
       expect(screen.getByTestId("shop-product-count")).toHaveTextContent("399 products found");
     });
 
-    const banner = screen.getByRole("region", { name: /shop header and prescription services/i });
+    // Edge-to-edge promotional carousel with 6 slides & Prescription Upload workflow preserved
+    const carousel = screen.getByTestId("promotional-carousel");
+    expect(carousel).toHaveAttribute("data-slide-count", "6");
+    expect(within(carousel).getByRole("link", { name: /upload prescription/i })).toHaveAttribute(
+      "href",
+      "/prescription-upload"
+    );
+    expect(within(carousel).getByRole("link", { name: /ask a pharmacist/i })).toHaveAttribute(
+      "href",
+      "/contact"
+    );
 
-    // Section 1: Breadcrumb & Heading
-    expect(within(banner).getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
-    expect(within(banner).getByRole("heading", { level: 1, name: "All Products" })).toBeInTheDocument();
-
-    // Section 2: Prescription CTA & Ask a Pharmacist connected to existing workflows
-    expect(within(banner).getByRole("heading", { level: 2, name: /have a prescription\?/i })).toBeInTheDocument();
-    expect(within(banner).getByRole("link", { name: /upload prescription/i })).toHaveAttribute("href", "/prescription-upload");
-    expect(within(banner).getByRole("link", { name: /ask a pharmacist/i })).toHaveAttribute("href", "/contact");
-
-    // Section 3: Trust indicators
-    expect(within(banner).getByText("Express Delivery")).toBeInTheDocument();
-    expect(within(banner).getByText("100% Genuine Medicines")).toBeInTheDocument();
-    expect(within(banner).getByText("Discreet Packaging")).toBeInTheDocument();
+    // Breadcrumb & Heading below carousel
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("heading", { level: 1, name: "All Products" })).toBeInTheDocument();
 
     // Product cards & cart workflow remain intact
     expect(screen.getByText("Paracetamol 500mg Tablets")).toBeInTheDocument();
