@@ -1,63 +1,43 @@
 import React from "react";
 import "@testing-library/jest-dom";
-import { act, render, screen } from "@testing-library/react";
-import LiveBpMonitorMedia from "./LiveBpMonitorMedia";
+import { render, screen } from "@testing-library/react";
+import LiveBpMonitorMedia, { DEFAULT_BP_MONITOR_VIDEO_SRC } from "./LiveBpMonitorMedia";
 
 describe("LiveBpMonitorMedia", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      writable: true,
+      value: jest.fn(() => Promise.resolve()),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+      configurable: true,
+      writable: true,
+      value: jest.fn(),
+    });
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  it("animates live blood pressure measurement from inflating to measuring to complete reading", () => {
+  it("renders a muted infinitely looping blood pressure monitor video when active", () => {
     render(<LiveBpMonitorMedia isActive />);
 
-    const svg = screen.getByTestId("live-bp-monitor");
-    expect(svg).toHaveAttribute("data-phase", "inflating");
-    expect(svg).toHaveAttribute("data-sys", "18");
-    expect(svg).toHaveAttribute("data-dia", "--");
-    expect(svg).toHaveAttribute("data-pulse", "--");
-
-    // Advance one inflation step (150ms) -> pressure climbs
-    act(() => {
-      jest.advanceTimersByTime(150);
-    });
-    expect(svg).toHaveAttribute("data-phase", "inflating");
-    expect(svg).toHaveAttribute("data-sys", "42");
-
-    // Advance through remaining 8 inflation steps -> enters measuring phase
-    for (let i = 0; i < 8; i += 1) {
-      act(() => {
-        jest.advanceTimersByTime(150);
-      });
-    }
-    expect(svg).toHaveAttribute("data-phase", "measuring");
-    expect(svg).toHaveAttribute("data-sys", "164");
-
-    // Advance through 9 deflation/measuring steps (200ms each) -> settles on complete reading
-    for (let i = 0; i < 9; i += 1) {
-      act(() => {
-        jest.advanceTimersByTime(200);
-      });
-    }
-    expect(svg).toHaveAttribute("data-phase", "complete");
-    expect(svg).toHaveAttribute("data-sys", "120");
-    expect(svg).toHaveAttribute("data-dia", "80");
-    expect(svg).toHaveAttribute("data-pulse", "72");
+    const video = screen.getByTestId("live-bp-monitor");
+    expect(video.tagName).toBe("VIDEO");
+    expect(video).toHaveAttribute("src", DEFAULT_BP_MONITOR_VIDEO_SRC);
+    expect(video).toHaveAttribute("autoplay");
+    expect(video).toHaveAttribute("loop");
+    expect(video).toHaveAttribute("playsinline");
+    expect(video).toHaveAttribute("data-playing", "true");
+    expect(video).toHaveClass("is-playing");
+    expect(video.muted).toBe(true);
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
   });
 
-  it("pauses timer when inactive", () => {
+  it("pauses video playback when inactive", () => {
     render(<LiveBpMonitorMedia isActive={false} />);
 
-    const svg = screen.getByTestId("live-bp-monitor");
-    expect(svg).toHaveAttribute("data-sys", "18");
-
-    act(() => {
-      jest.advanceTimersByTime(5000);
-    });
-    expect(svg).toHaveAttribute("data-sys", "18");
+    const video = screen.getByTestId("live-bp-monitor");
+    expect(video).toHaveAttribute("data-playing", "false");
+    expect(video).toHaveClass("is-paused");
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
   });
 });

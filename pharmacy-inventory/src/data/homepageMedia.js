@@ -3,6 +3,8 @@ export const DEFAULT_HERO_FALLBACK_IMAGE = "/logo512.png";
 export const DEFAULT_CATEGORY_FALLBACK_IMAGE = "/images/medicines/tablets-blister.jpg";
 
 export const PRESCRIPTION_CAPSULES_VIDEO = "/videos/prescription-capsules.mp4";
+export const BLOOD_PRESSURE_MONITOR_VIDEO = "/videos/blood-pressure-monitor.mp4";
+export const BLOOD_PRESSURE_MONITOR_POSTER = "/images/medical-devices/blood-pressure-monitor.jpg";
 
 /**
  * Three distinct studio images for Medical Devices:
@@ -18,7 +20,7 @@ export const MEDICAL_DEVICE_IMAGES = [
   {
     id: "blood-pressure-monitor",
     label: "Blood Pressure Monitors",
-    src: "/images/medical-devices/blood-pressure-monitor.jpg",
+    src: BLOOD_PRESSURE_MONITOR_VIDEO,
     alt: "Automatic digital blood pressure monitor",
     mediaType: "live-bp-monitor",
   },
@@ -239,8 +241,8 @@ export const CATEGORY_IMAGES = {
   "medical-devices": MEDICAL_DEVICE_IMAGES[0].src,
   "digital-thermometers": MEDICAL_DEVICE_IMAGES[0].src,
   thermometer: MEDICAL_DEVICE_IMAGES[0].src,
-  "blood-pressure-monitors": MEDICAL_DEVICE_IMAGES[1].src,
-  "bp-machine": MEDICAL_DEVICE_IMAGES[1].src,
+  "blood-pressure-monitors": BLOOD_PRESSURE_MONITOR_POSTER,
+  "bp-machine": BLOOD_PRESSURE_MONITOR_POSTER,
   stethoscopes: MEDICAL_DEVICE_IMAGES[2].src,
   stethoscope: MEDICAL_DEVICE_IMAGES[2].src,
 };
@@ -266,7 +268,7 @@ export function getCategoryImage(category) {
 
   const name = String(category.name || "").toLowerCase();
   if (name.includes("thermometer")) return MEDICAL_DEVICE_IMAGES[0].src;
-  if (name.includes("blood pressure") || name.includes("bp")) return MEDICAL_DEVICE_IMAGES[1].src;
+  if (name.includes("blood pressure") || name.includes("bp")) return BLOOD_PRESSURE_MONITOR_POSTER;
   if (name.includes("stethoscope")) return MEDICAL_DEVICE_IMAGES[2].src;
   if (name.includes("vitamin") || name.includes("supplement")) {
     return CATEGORY_IMAGES["vitamins-supplements"];

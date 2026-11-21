@@ -199,6 +199,7 @@ export default function HeroBannerCarousel({
                       className="hp-hero-media__img"
                       isActive={isActive}
                       testId={`hero-live-bp-${slideKey}`}
+                      onError={() => handleImageError(slideKey, banner.fallbackImageUrl)}
                     />
                   ) : banner.mediaType === "live-capsules" && !failedImages[slideKey] ? (
                     <LiveCapsulesMedia

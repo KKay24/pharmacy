@@ -88,6 +88,7 @@ function CategoryCardMedia({
               isActive={isActive}
               className={`hp-category-card__slide-img${isActive ? " is-active" : ""}`}
               testId={isClone ? undefined : `category-img-${slug}-${item.id}`}
+              onError={() => onImgError(imgKey)}
             />
           );
         }
