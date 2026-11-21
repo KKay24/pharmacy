@@ -39,7 +39,7 @@ function usePrefersReducedMotion() {
 
 export default function PromotionalCarousel({
   slides = SHOP_PROMOTIONAL_SLIDES,
-  autoPlayInterval = 5000,
+  autoPlayInterval = 16000,
   ariaLabel = "Shop promotions",
 }) {
   const activeSlides = useMemo(() => getActivePromotionalSlides(slides), [slides]);

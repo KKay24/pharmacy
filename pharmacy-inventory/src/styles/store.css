@@ -5663,12 +5663,12 @@ ul {
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2.25rem 4rem 3rem;
+  padding: 1.15rem 3.75rem 2.15rem;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
   align-items: center;
-  gap: 2.25rem;
-  min-height: 300px;
+  gap: 1.75rem;
+  min-height: 205px;
   box-sizing: border-box;
 }
 
@@ -5676,19 +5676,19 @@ ul {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.45rem;
   min-width: 0;
 }
 
 .promo-carousel__badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.3rem 0.78rem;
+  padding: 0.22rem 0.65rem;
   border-radius: 999px;
   background: rgba(230, 250, 247, 0.16);
   border: 1px solid rgba(230, 250, 247, 0.34);
   color: #e6faf7;
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -5697,42 +5697,42 @@ ul {
 .promo-carousel__heading {
   margin: 0;
   font-family: "Outfit", "DM Sans", sans-serif;
-  font-size: clamp(1.55rem, 2.8vw, 2.35rem);
+  font-size: clamp(1.3rem, 2.2vw, 1.8rem);
   font-weight: 800;
-  line-height: 1.14;
+  line-height: 1.15;
   letter-spacing: -0.025em;
   color: #ffffff;
-  max-width: 24ch;
+  max-width: 28ch;
 }
 
 .promo-carousel__description {
   margin: 0;
-  font-size: clamp(0.9rem, 1.1vw, 1rem);
-  line-height: 1.55;
+  font-size: clamp(0.84rem, 1vw, 0.92rem);
+  line-height: 1.45;
   color: rgba(236, 249, 251, 0.9);
-  max-width: 54ch;
+  max-width: 58ch;
 }
 
 .promo-carousel__actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 0.35rem;
+  gap: 0.65rem;
+  margin-top: 0.2rem;
 }
 
 .promo-carousel__cta {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.72rem 1.35rem;
+  gap: 0.45rem;
+  padding: 0.56rem 1.15rem;
   border-radius: 999px;
   background: #ffffff;
   color: #0f294a;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 800;
   text-decoration: none;
-  box-shadow: 0 8px 20px rgba(8, 28, 52, 0.22);
+  box-shadow: 0 6px 16px rgba(8, 28, 52, 0.22);
   transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -5745,12 +5745,12 @@ ul {
 .promo-carousel__secondary-cta {
   display: inline-flex;
   align-items: center;
-  padding: 0.68rem 1.15rem;
+  padding: 0.52rem 1rem;
   border-radius: 999px;
   border: 1.5px solid rgba(255, 255, 255, 0.55);
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
-  font-size: 0.88rem;
+  font-size: 0.83rem;
   font-weight: 700;
   text-decoration: none;
   transition: background-color 0.2s ease, border-color 0.2s ease;
@@ -5769,13 +5769,13 @@ ul {
 
 .promo-carousel__media-frame {
   width: 100%;
-  max-width: 460px;
-  aspect-ratio: 16 / 10;
-  border-radius: 16px;
+  max-width: 340px;
+  height: 158px;
+  border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 18px 38px rgba(7, 25, 48, 0.3);
+  box-shadow: 0 14px 30px rgba(7, 25, 48, 0.28);
 }
 
 .promo-carousel__media-frame img {
@@ -5791,8 +5791,8 @@ ul {
   top: 50%;
   transform: translateY(-50%);
   z-index: 4;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.34);
   background: rgba(15, 41, 74, 0.52);
@@ -5826,13 +5826,13 @@ ul {
 .promo-carousel__dots {
   position: absolute;
   left: 50%;
-  bottom: 14px;
+  bottom: 10px;
   transform: translateX(-50%);
   z-index: 4;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 10px;
+  padding: 4px 9px;
   border-radius: 999px;
   background: rgba(9, 29, 56, 0.38);
   backdrop-filter: blur(6px);
@@ -5897,21 +5897,22 @@ ul {
 
 @media (max-width: 1024px) {
   .promo-carousel__inner {
-    padding: 2rem 3.5rem 2.85rem;
-    gap: 1.5rem;
-    min-height: 270px;
+    padding: 1rem 3.25rem 2rem;
+    gap: 1.25rem;
+    min-height: 185px;
   }
 
   .promo-carousel__media-frame {
-    max-width: 380px;
+    max-width: 280px;
+    height: 140px;
   }
 }
 
 @media (max-width: 768px) {
   .promo-carousel__inner {
     grid-template-columns: 1fr;
-    padding: 1.5rem 1.25rem 3rem;
-    gap: 1.15rem;
+    padding: 0.95rem 1rem 2.25rem;
+    gap: 0.75rem;
     min-height: auto;
   }
 
@@ -5922,14 +5923,13 @@ ul {
 
   .promo-carousel__media-frame {
     max-width: 100%;
-    aspect-ratio: 16 / 9;
-    max-height: 210px;
+    height: 132px;
   }
 
   .promo-carousel__arrow {
-    width: 34px;
-    height: 34px;
-    top: 112px;
+    width: 32px;
+    height: 32px;
+    top: 66px;
     transform: none;
   }
 

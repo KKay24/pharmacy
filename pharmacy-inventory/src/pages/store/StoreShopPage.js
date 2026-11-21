@@ -156,7 +156,7 @@ export default function StoreShopPage() {
       {/* Full-width, edge-to-edge promotional carousel */}
       <PromotionalCarousel
         slides={SHOP_PROMOTIONAL_SLIDES}
-        autoPlayInterval={5000}
+        autoPlayInterval={16000}
         ariaLabel="MediQuick Shop Promotions"
       />
 
