@@ -80,11 +80,11 @@ export default function ContactScreen() {
   };
 
   const handleDial = () => {
-    Linking.openURL('tel:+260977000000');
+    Linking.openURL('tel:+260974392925');
   };
 
   const handleEmail = () => {
-    Linking.openURL('mailto:pharmacy@mediquick.co.zm');
+    Linking.openURL('mailto:mediquick85@gmail.com');
   };
 
   const handleDirections = () => {
@@ -115,7 +115,7 @@ export default function ContactScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.channelTitle, { color: colors.text }]}>Phone & WhatsApp</Text>
-                  <Text style={[styles.channelValue, { color: colors.primary }]}>+260 97 700 0000</Text>
+                  <Text style={[styles.channelValue, { color: colors.primary }]}>+260974392925</Text>
                   <Text style={[styles.channelHours, { color: colors.textMuted }]}>Mon–Sat, 8 AM – 8 PM</Text>
                 </View>
               </TouchableOpacity>
@@ -128,7 +128,7 @@ export default function ContactScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.channelTitle, { color: colors.text }]}>Pharmacy Email</Text>
-                  <Text style={[styles.channelValue, { color: colors.primary }]}>pharmacy@mediquick.co.zm</Text>
+                  <Text style={[styles.channelValue, { color: colors.primary }]}>mediquick85@gmail.com</Text>
                   <Text style={[styles.channelHours, { color: colors.textMuted }]}>Replies within 2–4 hours</Text>
                 </View>
               </TouchableOpacity>

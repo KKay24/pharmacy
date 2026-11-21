@@ -22,25 +22,31 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .pl-filters-group {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1.25rem;
 }
 
-.pl-filter-item {
+.pl-actions-group {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.pl-filter-item label {
+.pl-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
   font-size: 0.875rem;
-  font-weight: 500;
-  color: #64748b;
+  font-weight: 600;
+  color: #475569;
   white-space: nowrap;
 }
 
@@ -55,10 +61,69 @@
   cursor: pointer;
 }
 
+.pl-date-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.42rem 0.75rem;
+  background: #f8fafc;
+  color: #475569;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+.pl-date-picker:hover,
+.pl-date-picker:focus-within {
+  border-color: var(--primary, #039d83);
+  background: #ffffff;
+}
+
+.pl-date-picker.active {
+  border-color: var(--primary, #039d83);
+  background: #ffffff;
+  color: var(--primary, #039d83);
+  box-shadow: 0 0 0 2px rgba(3, 157, 131, 0.14);
+}
+
+.pl-date-input {
+  border: none;
+  background: transparent;
+  color: #1e293b;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.pl-date-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.pl-date-clear:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
 .btn-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   background: var(--primary);
   color: white;
-  padding: 0.6rem 1.5rem;
+  padding: 0.6rem 1.25rem;
   border-radius: 8px;
   font-weight: 600;
   font-size: 0.9rem;

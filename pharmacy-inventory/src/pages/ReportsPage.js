@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { BarChart3, Download, History, RefreshCw, Table } from 'lucide-react';
+import { BarChart3, Calendar, Download, History, RefreshCw, Table, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { apiFetch, getApiErrorMessage } from '../utils/api';
 import { DataContext } from '../context/DataContext';
@@ -16,7 +16,7 @@ function csvValue(value) { return `"${String(value ?? '').replace(/"/g, '""')}"`
 export default function ReportsPage() {
   const { userRole } = useContext(DataContext);
   const [tab, setTab] = useState('ledger');
-  const { period, periods, range, setPeriod } = useReportingPeriod();
+  const { period, periods, range, setPeriod, selectedDate, selectDate, today } = useReportingPeriod();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -165,6 +165,30 @@ export default function ReportsPage() {
       </div>
       <div className="ri-period-selector">
         {periods.map(({ id, label }) => <button key={id} type="button" className={`ri-period-btn ${period === id ? 'active' : ''}`} onClick={() => setPeriod(id)}>{label}</button>)}
+        <label className={`ri-date-picker ${period === 'day' ? 'active' : ''}`} title="Select a specific calendar day">
+          <Calendar size={14} aria-hidden="true" />
+          <input
+            type="date"
+            aria-label="Select specific day"
+            className="ri-date-input"
+            max={today}
+            value={period === 'day' ? selectedDate : ''}
+            onChange={(event) => selectDate(event.target.value)}
+          />
+          {period === 'day' && (
+            <button
+              type="button"
+              className="ri-date-clear"
+              aria-label="Clear selected day"
+              onClick={(event) => {
+                event.preventDefault();
+                selectDate('');
+              }}
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          )}
+        </label>
         <button type="button" className="ri-period-btn" onClick={loadReport} disabled={loading}><RefreshCw size={15} /> Refresh</button>
       </div>
     </div>

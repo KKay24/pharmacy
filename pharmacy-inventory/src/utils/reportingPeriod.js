@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export const REPORTING_PERIODS = Object.freeze([
   { id: 'week', label: 'Week' },
@@ -22,6 +22,12 @@ export function lusakaDateKey(now = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+export function isValidDateKey(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 export function addCalendarDays(dateKey, days) {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
@@ -41,10 +47,21 @@ function previousMonthStart(dateKey) {
 
 // Every range is a Lusaka calendar interval [start, end), including the
 // ongoing day but never the following day. The values are API-ready date keys.
-export function reportingPeriodRange(period, now = new Date()) {
+export function reportingPeriodRange(period, now = new Date(), selectedDate = null) {
   const today = lusakaDateKey(now);
   const currentMonthStart = monthStart(today);
   switch (period) {
+    case 'day': {
+      const dayKey = isValidDateKey(selectedDate) ? selectedDate : today;
+      return {
+        period: 'day',
+        label: dayKey,
+        start: dayKey,
+        end: addCalendarDays(dayKey, 1),
+        granularity: 'day',
+        selectedDate: dayKey,
+      };
+    }
     case 'week':
       return { period, label: 'Week', start: addCalendarDays(today, 1 - weekday(today)), end: addCalendarDays(today, 1), granularity: 'day' };
     case 'previous-month':
@@ -58,8 +75,39 @@ export function reportingPeriodRange(period, now = new Date()) {
 }
 
 export function useReportingPeriod(initialPeriod = 'current-month') {
-  const [period, setPeriod] = useState(initialPeriod);
-  const range = useMemo(() => reportingPeriodRange(period), [period]);
-  return { period, setPeriod, range, periods: REPORTING_PERIODS };
-}
+  const [period, setPeriodState] = useState(initialPeriod);
+  const [selectedDate, setSelectedDate] = useState('');
+  const today = lusakaDateKey();
 
+  const setPeriod = useCallback((nextPeriod) => {
+    setPeriodState(nextPeriod);
+    if (nextPeriod !== 'day') {
+      setSelectedDate('');
+    }
+  }, []);
+
+  const selectDate = useCallback((dateKey) => {
+    if (isValidDateKey(dateKey)) {
+      setSelectedDate(dateKey);
+      setPeriodState('day');
+    } else {
+      setSelectedDate('');
+      setPeriodState((current) => (current === 'day' ? initialPeriod : current));
+    }
+  }, [initialPeriod]);
+
+  const range = useMemo(
+    () => reportingPeriodRange(period, new Date(), selectedDate),
+    [period, selectedDate]
+  );
+
+  return {
+    period,
+    setPeriod,
+    selectedDate,
+    selectDate,
+    today,
+    range,
+    periods: REPORTING_PERIODS,
+  };
+}

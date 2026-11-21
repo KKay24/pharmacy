@@ -97,7 +97,7 @@ export default function AboutScreen() {
   };
 
   const handleCall = () => {
-    Linking.openURL('tel:+260977000000');
+    Linking.openURL('tel:+260974392925');
   };
 
   return (
@@ -213,7 +213,7 @@ export default function AboutScreen() {
           <View style={styles.locationRow}>
             <Phone size={18} color={colors.textMuted} />
             <Text style={[styles.locationDetail, { color: colors.text }]}>
-              +260 97 700 0000 (Consultations & Enquiries)
+              +260974392925 (Consultations & Enquiries)
             </Text>
           </View>
 

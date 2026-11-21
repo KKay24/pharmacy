@@ -116,6 +116,56 @@ describe('ReportsPage item sales history', () => {
     expect(salesRange.get('to')).toBe(`${financialRange.get('end')}T00:00:00+02:00`);
   });
 
+  it('filters financial report, reconciliations, and item history to a specific calendar day', async () => {
+    apiFetch.mockImplementation((url) => {
+      if (url.startsWith('/api/analytics/financial-report?')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            daily: [{ date: '2026-10-10', revenue: 210, operatingExpenses: 40, cashRefunds: 0, receiptCount: 2, payments: [] }],
+            totals: { revenue: 210, cogs: 90, grossProfit: 120, operatingExpenses: 40, cashRefunds: 0, cogsKnown: true, receiptCount: 2, unknownCogsSaleCount: 0 },
+          }),
+        });
+      }
+      if (url.startsWith('/api/cash-reconciliations?')) {
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          data: [{ id: 9, date: '2026-10-10T10:00:00.000Z', name: 'Amoxicillin', quantity: 1, totalPrice: 210 }],
+          pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+        }),
+      });
+    });
+
+    render(
+      <DataContext.Provider value={{ sales: [], expenses: [] }}>
+        <ReportsPage />
+      </DataContext.Provider>
+    );
+
+    const dateInput = screen.getByLabelText(/select specific day/i);
+    fireEvent.change(dateInput, { target: { value: '2026-10-10' } });
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith('/api/analytics/financial-report?start=2026-10-10&end=2026-10-11')
+    );
+    expect(apiFetch).toHaveBeenCalledWith('/api/cash-reconciliations?start=2026-10-10&end=2026-10-11');
+
+    fireEvent.click(screen.getByRole('button', { name: /item history/i }));
+    expect(await screen.findByText('Amoxicillin')).toBeTruthy();
+
+    const salesCalls = apiFetch.mock.calls.map(([url]) => url).filter((url) => url.startsWith('/api/sales?'));
+    const latestSalesParams = new URLSearchParams(salesCalls[salesCalls.length - 1].split('?')[1]);
+    expect(latestSalesParams.get('from')).toBe('2026-10-10T00:00:00+02:00');
+    expect(latestSalesParams.get('to')).toBe('2026-10-11T00:00:00+02:00');
+
+    // Clearing the selected day resets back out of single-day mode
+    fireEvent.click(screen.getByRole('button', { name: /clear selected day/i }));
+    expect(dateInput.value).toBe('');
+  });
+
   it('lets an admin preview and confirm a completed receipt reversal', async () => {
     apiFetch.mockImplementation((url, options) => {
       if (url === '/api/sales/17/reversal-preview') {
