@@ -2,7 +2,11 @@ import React from "react";
 import "@testing-library/jest-dom";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import CategoryCarousel from "./CategoryCarousel";
-import { DEFAULT_CATEGORY_FALLBACK_IMAGE } from "../../data/homepageMedia";
+import {
+  BLOOD_PRESSURE_MONITOR_VIDEO,
+  DEFAULT_CATEGORY_FALLBACK_IMAGE,
+  PRESCRIPTION_CAPSULES_VIDEO,
+} from "../../data/homepageMedia";
 
 jest.mock(
   "react-router-dom",
@@ -53,13 +57,18 @@ function mockReducedMotion(matches) {
 
 describe("CategoryCarousel", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
     mockReducedMotion(false);
     setViewportWidth(1280);
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      writable: true,
+      value: jest.fn(() => Promise.resolve()),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+      configurable: true,
+      writable: true,
+      value: jest.fn(),
+    });
   });
 
   it("renders all available categories dynamically without duplicate accessible clone links, dots, or arrows", () => {
@@ -81,24 +90,20 @@ describe("CategoryCarousel", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
     const viewport = screen.getByTestId("category-carousel-viewport");
 
-    // Wide desktop (>= 1200px) -> 5 cards
     act(() => setViewportWidth(1440));
     expect(viewport).toHaveAttribute("data-visible-cards", "5");
 
-    // Standard desktop (1024px - 1199px) -> 4 cards
     act(() => setViewportWidth(1100));
     expect(viewport).toHaveAttribute("data-visible-cards", "4");
 
-    // Tablet (640px - 1023px) -> 3 cards
     act(() => setViewportWidth(800));
     expect(viewport).toHaveAttribute("data-visible-cards", "3");
 
-    // Mobile (< 640px) -> 2 cards
     act(() => setViewportWidth(480));
     expect(viewport).toHaveAttribute("data-visible-cards", "2");
   });
 
-  it("runs a seamless two-group CSS marquee with synced card galleries, pauses on hover, and handles image fallback", () => {
+  it("runs a seamless two-group CSS marquee, pauses on hover, and handles media error fallback", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     const region = screen.getByRole("region", { name: /shop by category/i });
@@ -118,29 +123,11 @@ describe("CategoryCarousel", () => {
     expect(cloneGroup).toHaveAttribute("aria-hidden", "true");
     expect(cloneGroup).toHaveAttribute("data-clone", "true");
 
-    // Real and cloned card galleries stay synchronized on the same active image index
-    const realGallery = screen.getByTestId("category-gallery-medicines");
-    const cloneGallery = screen.getByTestId("category-gallery-clone-medicines");
-    expect(realGallery).toHaveAttribute("data-active-image", "0");
-    expect(cloneGallery).toHaveAttribute("data-active-image", "0");
-
-    act(() => {
-      jest.advanceTimersByTime(3500);
-    });
-    expect(realGallery).toHaveAttribute("data-active-image", "1");
-    expect(cloneGallery).toHaveAttribute("data-active-image", "1");
-
-    // Pause on hover freezes both marquee animation and gallery rotation
+    // Pause on hover & resume on mouse leave
     fireEvent.mouseEnter(region);
     expect(viewport).toHaveAttribute("data-paused", "true");
     expect(track.style.animationPlayState).toBe("paused");
-    act(() => {
-      jest.advanceTimersByTime(7000);
-    });
-    expect(realGallery).toHaveAttribute("data-active-image", "1");
-    expect(cloneGallery).toHaveAttribute("data-active-image", "1");
 
-    // Resume on mouse leave
     fireEvent.mouseLeave(region);
     expect(viewport).toHaveAttribute("data-paused", "false");
     expect(track.style.animationPlayState).toBe("running");
@@ -149,6 +136,41 @@ describe("CategoryCarousel", () => {
     const img = screen.getByTestId("category-img-eye-ear-care");
     fireEvent.error(img);
     expect(img).toHaveAttribute("src", DEFAULT_CATEGORY_FALLBACK_IMAGE);
+  });
+
+  it("shows looping videos only on Medicines and Medical Devices and a single static image on all other categories (no per-card slideshow)", () => {
+    render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
+
+    // Medicines & Medical Devices play infinitely looping videos
+    const medicinesVideo = screen.getByTestId("category-img-medicines");
+    expect(medicinesVideo.tagName).toBe("VIDEO");
+    expect(medicinesVideo).toHaveAttribute("src", PRESCRIPTION_CAPSULES_VIDEO);
+    expect(medicinesVideo).toHaveAttribute("loop");
+    expect(medicinesVideo).toHaveAttribute("autoplay");
+    expect(medicinesVideo).toHaveAttribute("playsinline");
+
+    const devicesVideo = screen.getByTestId("category-img-medical-devices");
+    expect(devicesVideo.tagName).toBe("VIDEO");
+    expect(devicesVideo).toHaveAttribute("src", BLOOD_PRESSURE_MONITOR_VIDEO);
+    expect(devicesVideo).toHaveAttribute("loop");
+    expect(devicesVideo).toHaveAttribute("autoplay");
+    expect(devicesVideo).toHaveAttribute("playsinline");
+
+    // All other categories render a single static photo without a rotating gallery slideshow
+    for (const slug of [
+      "medical-supplies",
+      "personal-care",
+      "baby-products",
+      "vitamins-supplements",
+      "first-aid",
+      "eye-ear-care",
+    ]) {
+      const media = screen.getByTestId(`category-img-${slug}`);
+      expect(media.tagName).toBe("IMG");
+      expect(screen.queryByTestId(`category-gallery-${slug}`)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("category-gallery-medicines")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("category-gallery-medical-devices")).not.toBeInTheDocument();
   });
 
   it("respects prefers-reduced-motion by disabling marquee animation and clone duplication", () => {
@@ -173,33 +195,5 @@ describe("CategoryCarousel", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Failed to load");
     fireEvent.click(screen.getByRole("button", { name: /try again/i }));
     expect(onRetry).toHaveBeenCalledTimes(1);
-  });
-
-  it("preserves all 3 distinct rotating images for each main category (18 unique images total)", () => {
-    render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
-
-    const expectedGalleries = [
-      ["medicines", ["tablets-blister", "capsules-vial", "dispensary-medicines"]],
-      ["medical-supplies", ["first-aid-supplies", "protective-gloves-syringes", "clinical-care-supplies"]],
-      ["personal-care", ["skincare-lotion", "gentle-cleansers", "oral-hygiene"]],
-      ["baby-products", ["baby-diapers", "baby-bath-care", "baby-feeding"]],
-      ["vitamins-supplements", ["daily-vitamins", "supplement-bottles", "wellness-minerals"]],
-      ["medical-devices", ["digital-thermometer", "blood-pressure-monitor", "stethoscope"]],
-    ];
-
-    const allSrcs = new Set();
-    for (const [slug, imageIds] of expectedGalleries) {
-      const categorySrcs = new Set();
-      imageIds.forEach((id, idx) => {
-        const img = screen.getByTestId(`category-img-${slug}-${id}`);
-        const src = img.getAttribute("src") || img.getAttribute("data-src");
-        categorySrcs.add(src);
-        allSrcs.add(src);
-        expect(img).toHaveAttribute("data-active", idx === 0 ? "true" : "false");
-      });
-      expect(categorySrcs.size).toBe(3);
-    }
-
-    expect(allSrcs.size).toBe(18);
   });
 });

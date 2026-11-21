@@ -8,8 +8,6 @@ import {
 import LiveBpMonitorMedia from "./LiveBpMonitorMedia";
 import LiveCapsulesMedia from "./LiveCapsulesMedia";
 
-const CARD_GALLERY_INTERVAL_MS = 3500;
-
 function usePrefersReducedMotion() {
   const [prefersReduced, setPrefersReduced] = useState(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
@@ -43,83 +41,47 @@ function CategoryCardMedia({
   category,
   categoryKey,
   isClone = false,
-  galleryTick = 0,
   failedSrcMap = {},
   onImgError,
 }) {
   const images = getCategoryImages(category);
-  const hasGallery = images.length > 1;
-  const activeImgIndex = hasGallery ? galleryTick % images.length : 0;
+  const primary =
+    images.find(
+      (item) => item.mediaType === "live-capsules" || item.mediaType === "live-bp-monitor"
+    ) || images[0];
   const slug = category.slug || categoryKey;
+  const mediaKey = `${categoryKey}-${primary.id}`;
+  const testId = isClone ? undefined : `category-img-${slug}`;
 
-  if (!hasGallery) {
-    const single = images[0];
-    const singleKey = `${categoryKey}-${single.id}`;
-    return (
-      <div className="hp-category-card__media">
+  return (
+    <div className="hp-category-card__media">
+      {primary.mediaType === "live-bp-monitor" && !failedSrcMap[mediaKey] ? (
+        <LiveBpMonitorMedia
+          src={primary.src}
+          decorative
+          isActive
+          testId={testId}
+          onError={() => onImgError(mediaKey)}
+        />
+      ) : primary.mediaType === "live-capsules" && !failedSrcMap[mediaKey] ? (
+        <LiveCapsulesMedia
+          src={primary.src}
+          decorative
+          isActive
+          testId={testId}
+          onError={() => onImgError(mediaKey)}
+        />
+      ) : (
         <img
-          src={failedSrcMap[singleKey] || single.src}
+          src={failedSrcMap[mediaKey] || primary.src}
           alt=""
           loading="eager"
           decoding="async"
           draggable={false}
-          data-testid={isClone ? undefined : `category-img-${slug}`}
-          onError={() => onImgError(singleKey)}
+          data-testid={testId}
+          onError={() => onImgError(mediaKey)}
         />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="hp-category-card__media hp-category-card__media--gallery"
-      data-testid={isClone ? `category-gallery-clone-${slug}` : `category-gallery-${slug}`}
-      data-active-image={activeImgIndex}
-    >
-      {images.map((item, idx) => {
-        const imgKey = `${categoryKey}-${item.id}`;
-        const isActive = idx === activeImgIndex;
-        if (item.mediaType === "live-bp-monitor" && !failedSrcMap[imgKey]) {
-          return (
-            <LiveBpMonitorMedia
-              key={item.id}
-              src={item.src}
-              decorative
-              isActive={isActive}
-              className={`hp-category-card__slide-img${isActive ? " is-active" : ""}`}
-              testId={isClone ? undefined : `category-img-${slug}-${item.id}`}
-              onError={() => onImgError(imgKey)}
-            />
-          );
-        }
-        if (item.mediaType === "live-capsules" && !failedSrcMap[imgKey]) {
-          return (
-            <LiveCapsulesMedia
-              key={item.id}
-              src={item.src}
-              decorative
-              isActive={isActive}
-              className={`hp-category-card__slide-img${isActive ? " is-active" : ""}`}
-              testId={isClone ? undefined : `category-img-${slug}-${item.id}`}
-              onError={() => onImgError(imgKey)}
-            />
-          );
-        }
-        return (
-          <img
-            key={item.id}
-            src={failedSrcMap[imgKey] || item.src}
-            alt=""
-            loading="eager"
-            decoding="async"
-            draggable={false}
-            className={`hp-category-card__slide-img${isActive ? " is-active" : ""}`}
-            data-testid={isClone ? undefined : `category-img-${slug}-${item.id}`}
-            data-active={isActive ? "true" : "false"}
-            onError={() => onImgError(imgKey)}
-          />
-        );
-      })}
+      )}
     </div>
   );
 }
@@ -158,7 +120,6 @@ export default function CategoryCarousel({
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isTabHidden, setIsTabHidden] = useState(false);
-  const [galleryTick, setGalleryTick] = useState(0);
   const [failedSrcMap, setFailedSrcMap] = useState({});
 
   useEffect(() => {
@@ -181,17 +142,6 @@ export default function CategoryCarousel({
   const canScroll = !loading && totalItems > visibleCards;
   const canAnimate = canScroll && !prefersReducedMotion && autoPlayInterval > 0;
   const isPaused = isHovered || isFocused || isTabHidden;
-
-  // Shared gallery tick keeps real cards and cloned seam cards 100% image-synced
-  useEffect(() => {
-    if (loading || totalItems === 0 || isPaused || prefersReducedMotion) {
-      return undefined;
-    }
-    const timer = window.setInterval(() => {
-      setGalleryTick((prev) => prev + 1);
-    }, CARD_GALLERY_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [loading, totalItems, isPaused, prefersReducedMotion]);
 
   const handleImgError = (imgKey) => {
     setFailedSrcMap((prev) => {
@@ -234,7 +184,6 @@ export default function CategoryCarousel({
             category={category}
             categoryKey={baseKey}
             isClone={isClone}
-            galleryTick={galleryTick}
             failedSrcMap={failedSrcMap}
             onImgError={handleImgError}
           />
