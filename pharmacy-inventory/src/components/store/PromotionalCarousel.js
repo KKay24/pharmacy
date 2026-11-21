@@ -6,6 +6,7 @@ import {
   SHOP_PROMOTIONAL_SLIDES,
   getActivePromotionalSlides,
 } from "../../data/promotionalSlides";
+import LiveCapsulesMedia from "./LiveCapsulesMedia";
 
 function usePrefersReducedMotion() {
   const [prefersReduced, setPrefersReduced] = useState(() => {
@@ -127,15 +128,26 @@ export default function PromotionalCarousel({
 
           <div className="promo-carousel__media">
             <div className="promo-carousel__media-frame">
-              <img
-                src={imgSrc}
-                alt={isClone ? "" : slide.imageAlt || slide.heading}
-                loading="eager"
-                decoding="async"
-                draggable={false}
-                data-testid={isClone ? undefined : `promo-img-${slide.id}`}
-                onError={() => handleImageError(slide.id, slide.fallbackImageUrl)}
-              />
+              {slide.mediaType === "live-capsules" && !failedImages[slide.id] ? (
+                <LiveCapsulesMedia
+                  src={imgSrc}
+                  alt={isClone ? "" : slide.imageAlt || slide.heading}
+                  decorative={isClone}
+                  isActive
+                  testId={isClone ? undefined : `promo-img-${slide.id}`}
+                  onError={() => handleImageError(slide.id, slide.fallbackImageUrl)}
+                />
+              ) : (
+                <img
+                  src={imgSrc}
+                  alt={isClone ? "" : slide.imageAlt || slide.heading}
+                  loading="eager"
+                  decoding="async"
+                  draggable={false}
+                  data-testid={isClone ? undefined : `promo-img-${slide.id}`}
+                  onError={() => handleImageError(slide.id, slide.fallbackImageUrl)}
+                />
+              )}
             </div>
           </div>
         </div>

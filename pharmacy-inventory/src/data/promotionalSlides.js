@@ -31,6 +31,7 @@ export const SHOP_PROMOTIONAL_SLIDES = [
     imageUrl: HERO_BANNERS[1].imageUrl,
     fallbackImageUrl: DEFAULT_CATEGORY_FALLBACK_IMAGE,
     imageAlt: "Verified prescription medicines prepared by a MediQuick pharmacist",
+    mediaType: HERO_BANNERS[1].mediaType,
     theme: "navy-teal",
   },
   {

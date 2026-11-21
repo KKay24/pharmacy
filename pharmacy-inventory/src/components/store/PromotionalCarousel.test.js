@@ -90,10 +90,15 @@ describe("PromotionalCarousel", () => {
     expect(carousel).toHaveAttribute("data-paused", "false");
     expect(track.style.animationPlayState).toBe("running");
 
-    // Image error fallback updates cleanly
-    const firstImg = screen.getByTestId("promo-img-prescription-upload");
-    fireEvent.error(firstImg);
-    expect(firstImg).toHaveAttribute("src", DEFAULT_CATEGORY_FALLBACK_IMAGE);
+    // Media error fallback updates cleanly from video to fallback image
+    const firstMedia = screen.getByTestId("promo-img-prescription-upload");
+    expect(firstMedia.tagName).toBe("VIDEO");
+    expect(firstMedia).toHaveAttribute("loop");
+    fireEvent.error(firstMedia);
+    expect(screen.getByTestId("promo-img-prescription-upload")).toHaveAttribute(
+      "src",
+      DEFAULT_CATEGORY_FALLBACK_IMAGE
+    );
   });
 
   it("supports configurable add, remove, reorder, and deactivate slide data", () => {

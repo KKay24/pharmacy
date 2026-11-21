@@ -2,6 +2,8 @@ export const DEFAULT_HERO_FALLBACK_IMAGE = "/logo512.png";
 
 export const DEFAULT_CATEGORY_FALLBACK_IMAGE = "/images/medicines/tablets-blister.jpg";
 
+export const PRESCRIPTION_CAPSULES_VIDEO = "/videos/prescription-capsules.mp4";
+
 /**
  * Three distinct studio images for Medical Devices:
  * digital thermometers, blood pressure monitors, and stethoscopes.
@@ -98,7 +100,7 @@ export const MEDICINES_IMAGES = [
   {
     id: "dispensary-medicines",
     label: "Prescription Medicines",
-    src: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=700&q=80",
+    src: PRESCRIPTION_CAPSULES_VIDEO,
     alt: "Assorted pharmacy medications",
     mediaType: "live-capsules",
   },
@@ -186,8 +188,7 @@ export const HERO_BANNERS = [
     ctaTo: "/prescription-upload",
     secondaryCtaLabel: "Track Order",
     secondaryCtaTo: "/track-order",
-    imageUrl:
-      "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: PRESCRIPTION_CAPSULES_VIDEO,
     fallbackImageUrl: DEFAULT_CATEGORY_FALLBACK_IMAGE,
     imageAlt: "Pharmacist organizing verified prescription medications",
     mediaType: "live-capsules",
