@@ -7,6 +7,8 @@ export const BLOOD_PRESSURE_MONITOR_VIDEO = "/videos/blood-pressure-monitor.mp4"
 export const BLOOD_PRESSURE_MONITOR_POSTER = "/images/medical-devices/blood-pressure-monitor.jpg";
 export const BABY_PRODUCTS_VIDEO = "/videos/baby-products.mp4";
 export const BABY_PRODUCTS_POSTER = "/images/baby-products/baby-diapers.jpg";
+export const PERSONAL_CARE_VIDEO = "/videos/personal-care.mp4";
+export const PERSONAL_CARE_POSTER = "/images/personal-care/skincare-lotion.jpg";
 
 /**
  * Three distinct studio images for Medical Devices:
@@ -42,7 +44,7 @@ export const PERSONAL_CARE_IMAGES = [
   {
     id: "skincare-lotion",
     label: "Skincare & Lotions",
-    src: "/images/personal-care/skincare-lotion.jpg",
+    src: PERSONAL_CARE_POSTER,
     alt: "Moisturizing skincare lotion bottle and facial cream jar",
   },
   {
@@ -56,6 +58,14 @@ export const PERSONAL_CARE_IMAGES = [
     label: "Oral Hygiene",
     src: "/images/personal-care/oral-hygiene.jpg",
     alt: "Toothbrushes, toothpaste, and dental floss essentials",
+  },
+  {
+    id: "personal-care-video",
+    label: "Personal Care Essentials",
+    src: PERSONAL_CARE_VIDEO,
+    poster: PERSONAL_CARE_POSTER,
+    alt: "Skincare, cleansers, and daily personal care essentials",
+    mediaType: "live-video",
   },
 ];
 
