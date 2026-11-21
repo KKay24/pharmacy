@@ -88,16 +88,19 @@ describe("Homepage (LoginPage) Carousels & Store Functionality", () => {
     expect(heroTabs.length).toBeGreaterThan(3);
 
     const catViewport = screen.getByTestId("category-carousel-viewport");
-    expect(catViewport).toHaveAttribute("data-active-index", "0");
+    const catTrack = screen.getByTestId("category-carousel-track");
+    expect(catViewport).toHaveAttribute("data-infinite-scroll", "active");
+    expect(catTrack.style.animationPlayState).toBe("running");
 
-    // Hovering the hero pauses ONLY the hero carousel; the category carousel still advances!
+    // Hovering the hero pauses ONLY the hero carousel; the category carousel keeps running!
     fireEvent.mouseEnter(heroRegion);
     act(() => {
       jest.advanceTimersByTime(5000);
     });
 
     expect(heroTabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(catViewport).toHaveAttribute("data-active-index", "1");
+    expect(catViewport).toHaveAttribute("data-paused", "false");
+    expect(catTrack.style.animationPlayState).toBe("running");
 
     // Homepage search bar still navigates to /shop?search=...
     const searchInput = screen.getByLabelText(/search medicines/i);

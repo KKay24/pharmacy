@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import {
   DEFAULT_CATEGORY_FALLBACK_IMAGE,
   getCategoryImages,
 } from "../../data/homepageMedia";
-import useInfiniteScrollTrack from "../../hooks/useInfiniteScrollTrack";
 import LiveBpMonitorMedia from "./LiveBpMonitorMedia";
 import LiveCapsulesMedia from "./LiveCapsulesMedia";
 
@@ -40,28 +39,17 @@ function usePrefersReducedMotion() {
   return prefersReduced;
 }
 
-function CategoryCardMedia({ category, categoryKey, isClone = false, prefersReducedMotion = false }) {
+function CategoryCardMedia({
+  category,
+  categoryKey,
+  isClone = false,
+  galleryTick = 0,
+  failedSrcMap = {},
+  onImgError,
+}) {
   const images = getCategoryImages(category);
   const hasGallery = images.length > 1;
-  const [activeImgIndex, setActiveImgIndex] = useState(0);
-  const [isCardHovered, setIsCardHovered] = useState(false);
-  const [failedSrcMap, setFailedSrcMap] = useState({});
-
-  useEffect(() => {
-    if (!hasGallery || isCardHovered || prefersReducedMotion) return undefined;
-    const timer = window.setInterval(() => {
-      setActiveImgIndex((prev) => (prev + 1) % images.length);
-    }, CARD_GALLERY_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [hasGallery, isCardHovered, prefersReducedMotion, images.length]);
-
-  const handleImgError = (imgKey) => {
-    setFailedSrcMap((prev) => {
-      if (prev[imgKey] === DEFAULT_CATEGORY_FALLBACK_IMAGE) return prev;
-      return { ...prev, [imgKey]: DEFAULT_CATEGORY_FALLBACK_IMAGE };
-    });
-  };
-
+  const activeImgIndex = hasGallery ? galleryTick % images.length : 0;
   const slug = category.slug || categoryKey;
 
   if (!hasGallery) {
@@ -72,11 +60,11 @@ function CategoryCardMedia({ category, categoryKey, isClone = false, prefersRedu
         <img
           src={failedSrcMap[singleKey] || single.src}
           alt=""
-          loading="lazy"
+          loading="eager"
           decoding="async"
           draggable={false}
           data-testid={isClone ? undefined : `category-img-${slug}`}
-          onError={() => handleImgError(singleKey)}
+          onError={() => onImgError(singleKey)}
         />
       </div>
     );
@@ -85,9 +73,7 @@ function CategoryCardMedia({ category, categoryKey, isClone = false, prefersRedu
   return (
     <div
       className="hp-category-card__media hp-category-card__media--gallery"
-      onMouseEnter={() => setIsCardHovered(true)}
-      onMouseLeave={() => setIsCardHovered(false)}
-      data-testid={isClone ? undefined : `category-gallery-${slug}`}
+      data-testid={isClone ? `category-gallery-clone-${slug}` : `category-gallery-${slug}`}
       data-active-image={activeImgIndex}
     >
       {images.map((item, idx) => {
@@ -122,13 +108,13 @@ function CategoryCardMedia({ category, categoryKey, isClone = false, prefersRedu
             key={item.id}
             src={failedSrcMap[imgKey] || item.src}
             alt=""
-            loading="lazy"
+            loading="eager"
             decoding="async"
             draggable={false}
             className={`hp-category-card__slide-img${isActive ? " is-active" : ""}`}
             data-testid={isClone ? undefined : `category-img-${slug}-${item.id}`}
             data-active={isActive ? "true" : "false"}
-            onError={() => handleImgError(imgKey)}
+            onError={() => onImgError(imgKey)}
           />
         );
       })}
@@ -170,6 +156,8 @@ export default function CategoryCarousel({
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isTabHidden, setIsTabHidden] = useState(false);
+  const [galleryTick, setGalleryTick] = useState(0);
+  const [failedSrcMap, setFailedSrcMap] = useState({});
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -189,51 +177,79 @@ export default function CategoryCarousel({
 
   const visibleCards = getVisibleCardsForWidth(viewportWidth);
   const canScroll = !loading && totalItems > visibleCards;
-  const secondsPerItem = autoPlayInterval > 0 ? autoPlayInterval / 1000 : 0;
+  const canAnimate = canScroll && !prefersReducedMotion && autoPlayInterval > 0;
   const isPaused = isHovered || isFocused || isTabHidden;
 
-  const {
-    viewportRef,
-    trackRef,
-    activeIndex,
-    isDragging,
-    stepNext,
-    stepPrev,
-    goToIndex,
-    dragHandlers,
-  } = useInfiniteScrollTrack({
-    itemCount: totalItems,
-    visibleItems: visibleCards,
-    secondsPerItem,
-    canScroll,
-    paused: isPaused,
-    prefersReducedMotion,
-  });
+  // Shared gallery tick keeps real cards and cloned seam cards 100% image-synced
+  useEffect(() => {
+    if (loading || totalItems === 0 || isPaused || prefersReducedMotion) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      setGalleryTick((prev) => prev + 1);
+    }, CARD_GALLERY_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [loading, totalItems, isPaused, prefersReducedMotion]);
 
-  // Duplicate full set once for seamless 0 -> totalItems continuous infinite scroll
-  const renderedSlides = useMemo(() => {
-    const realSlides = safeCategories.map((category, idx) => ({
-      category,
-      key: `real-${category.id ?? category.slug ?? idx}`,
-      categoryKey: category.id ?? category.slug ?? idx,
-      isClone: false,
-    }));
+  const handleImgError = (imgKey) => {
+    setFailedSrcMap((prev) => {
+      if (prev[imgKey] === DEFAULT_CATEGORY_FALLBACK_IMAGE) return prev;
+      return { ...prev, [imgKey]: DEFAULT_CATEGORY_FALLBACK_IMAGE };
+    });
+  };
 
-    if (!canScroll) return realSlides;
+  const totalDurationSec = canAnimate ? (totalItems * autoPlayInterval) / 1000 : 0;
 
-    const cloneSlides = safeCategories.map((category, idx) => ({
-      category,
-      key: `clone-${idx}-${category.id ?? category.slug ?? idx}`,
-      categoryKey: `clone-${category.id ?? category.slug ?? idx}`,
-      isClone: true,
-    }));
+  const trackStyle = canAnimate
+    ? {
+        "--hp-cat-visible": visibleCards,
+        "--hp-cat-count": totalItems,
+        "--hp-cat-duration": `${totalDurationSec}s`,
+        animationPlayState: isPaused ? "paused" : "running",
+      }
+    : {
+        "--hp-cat-visible": visibleCards,
+      };
 
-    return [...realSlides, ...cloneSlides];
-  }, [safeCategories, canScroll]);
+  const renderCategoryItem = (category, idx, isClone) => {
+    const baseKey = category.id ?? category.slug ?? idx;
+    const slugParam = encodeURIComponent(category.slug || category.name || "");
+
+    return (
+      <div
+        key={isClone ? `clone-${idx}-${baseKey}` : `real-${baseKey}`}
+        className="hp-category-carousel__item"
+        aria-hidden={isClone ? "true" : undefined}
+        data-clone={isClone ? "true" : undefined}
+      >
+        <Link
+          to={`/shop?category=${slugParam}`}
+          className="hp-category-card"
+          tabIndex={isClone ? -1 : undefined}
+          draggable={false}
+        >
+          <CategoryCardMedia
+            category={category}
+            categoryKey={baseKey}
+            isClone={isClone}
+            galleryTick={galleryTick}
+            failedSrcMap={failedSrcMap}
+            onImgError={handleImgError}
+          />
+          <span className="hp-category-card__footer">
+            <span className="hp-category-card__name">{category.name}</span>
+            <span className="hp-category-card__arrow" aria-hidden="true">
+              <ChevronRight size={15} />
+            </span>
+          </span>
+        </Link>
+      </div>
+    );
+  };
 
   return (
     <section
-      className="hp-categories hp-categories--lenco"
+      className={`hp-categories hp-categories--lenco${isPaused ? " is-paused" : ""}`}
       id="categories"
       aria-roledescription="carousel"
       aria-label="Shop by Category"
@@ -256,26 +272,6 @@ export default function CategoryCarousel({
           )}
         </div>
         <div className="hp-category-carousel__controls">
-          {!loading && canScroll && (
-            <div className="hp-category-carousel__arrows">
-              <button
-                type="button"
-                className="hp-carousel-arrow hp-carousel-arrow--inline"
-                aria-label="Previous categories"
-                onClick={stepPrev}
-              >
-                <ChevronLeft size={18} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="hp-carousel-arrow hp-carousel-arrow--inline"
-                aria-label="Next categories"
-                onClick={stepNext}
-              >
-                <ChevronRight size={18} aria-hidden="true" />
-              </button>
-            </div>
-          )}
           <Link to="/shop" className="hp-category-carousel__all-link">
             View all products <ArrowRight size={16} />
           </Link>
@@ -310,102 +306,35 @@ export default function CategoryCarousel({
       ) : !error && totalItems === 0 ? (
         <p className="hp-empty-state">No product categories have been added yet.</p>
       ) : totalItems > 0 ? (
-        <div
-          className={`hp-category-carousel__shell${canScroll ? " is-scrollable" : ""}`}
-          onWheel={dragHandlers.onWheel}
-        >
-          {canScroll && (
-            <button
-              type="button"
-              className="hp-carousel-arrow hp-carousel-arrow--prev hp-category-carousel__edge-arrow"
-              aria-label="Scroll categories left"
-              onClick={stepPrev}
-            >
-              <ChevronLeft size={18} aria-hidden="true" />
-            </button>
-          )}
-
+        <div className={`hp-category-carousel__shell${canAnimate ? " is-scrollable" : ""}`}>
           <div
-            ref={viewportRef}
-            className={`hp-category-carousel__viewport${isDragging ? " is-dragging" : ""}`}
+            className="hp-category-carousel__viewport"
             data-testid="category-carousel-viewport"
-            data-active-index={activeIndex}
             data-visible-cards={visibleCards}
             data-reduced-motion={prefersReducedMotion ? "true" : "false"}
-            data-infinite-scroll={canScroll && !prefersReducedMotion ? "active" : "paused"}
-            onMouseDown={dragHandlers.onMouseDown}
-            onTouchStart={dragHandlers.onTouchStart}
-            onTouchMove={dragHandlers.onTouchMove}
-            onTouchEnd={dragHandlers.onTouchEnd}
-            onClickCapture={dragHandlers.onClickCapture}
+            data-infinite-scroll={canAnimate ? "active" : "paused"}
+            data-paused={isPaused ? "true" : "false"}
           >
             <div
-              ref={trackRef}
-              className="hp-category-carousel__track hp-category-carousel__track--continuous"
+              className={`hp-category-carousel__track${canAnimate ? " hp-category-carousel__track--marquee" : ""}`}
               data-testid="category-carousel-track"
-              style={{ "--hp-cat-visible": visibleCards }}
+              style={trackStyle}
             >
-              {renderedSlides.map(({ category, key, categoryKey, isClone }) => {
-                const slugParam = encodeURIComponent(category.slug || category.name || "");
-
-                return (
-                  <div
-                    key={key}
-                    className="hp-category-carousel__item"
-                    aria-hidden={isClone ? "true" : undefined}
-                    data-clone={isClone ? "true" : undefined}
-                  >
-                    <Link
-                      to={`/shop?category=${slugParam}`}
-                      className="hp-category-card"
-                      tabIndex={isClone ? -1 : undefined}
-                      draggable={false}
-                    >
-                      <CategoryCardMedia
-                        category={category}
-                        categoryKey={categoryKey}
-                        isClone={isClone}
-                        prefersReducedMotion={prefersReducedMotion}
-                      />
-                      <span className="hp-category-card__footer">
-                        <span className="hp-category-card__name">{category.name}</span>
-                        <span className="hp-category-card__arrow" aria-hidden="true">
-                          <ChevronRight size={15} />
-                        </span>
-                      </span>
-                    </Link>
-                  </div>
-                );
-              })}
+              <div className="hp-category-carousel__group" data-testid="category-carousel-group-primary">
+                {safeCategories.map((category, idx) => renderCategoryItem(category, idx, false))}
+              </div>
+              {canAnimate && (
+                <div
+                  className="hp-category-carousel__group"
+                  aria-hidden="true"
+                  data-clone="true"
+                  data-testid="category-carousel-group-clone"
+                >
+                  {safeCategories.map((category, idx) => renderCategoryItem(category, idx, true))}
+                </div>
+              )}
             </div>
           </div>
-
-          {canScroll && (
-            <button
-              type="button"
-              className="hp-carousel-arrow hp-carousel-arrow--next hp-category-carousel__edge-arrow"
-              aria-label="Scroll categories right"
-              onClick={stepNext}
-            >
-              <ChevronRight size={18} aria-hidden="true" />
-            </button>
-          )}
-
-          {canScroll && totalItems > 1 && (
-            <div className="hp-category-carousel__dots" role="tablist" aria-label="Category carousel position">
-              {safeCategories.map((category, idx) => (
-                <button
-                  key={category.id ?? category.slug ?? idx}
-                  type="button"
-                  role="tab"
-                  aria-selected={idx === activeIndex}
-                  aria-label={`Show ${category.name} category first`}
-                  className={`hp-category-carousel__dot${idx === activeIndex ? " is-active" : ""}`}
-                  onClick={() => goToIndex(idx)}
-                />
-              ))}
-            </div>
-          )}
         </div>
       ) : null}
     </section>

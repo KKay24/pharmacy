@@ -1,6 +1,6 @@
 import React from "react";
 import "@testing-library/jest-dom";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import PromotionalCarousel from "./PromotionalCarousel";
 import {
   SHOP_PROMOTIONAL_SLIDES,
@@ -37,25 +37,21 @@ function mockReducedMotion(matches) {
 
 describe("PromotionalCarousel", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
     mockReducedMotion(false);
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  it("renders all 6 initial slides with valid destinations, preserves Prescription Upload, and avoids fabricated discounts", () => {
+  it("renders all 6 initial slides with valid destinations, preserves Prescription Upload, omits dots and arrows, and avoids fabricated discounts", () => {
     render(<PromotionalCarousel slides={SHOP_PROMOTIONAL_SLIDES} />);
 
     const carousel = screen.getByTestId("promotional-carousel");
     expect(carousel).toHaveAttribute("data-slide-count", "6");
-    expect(carousel).toHaveAttribute("data-active-index", "0");
 
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(6);
+    // No pagination dots or navigation arrow buttons
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /previous promotion/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /next promotion/i })).not.toBeInTheDocument();
 
-    // Prescription Upload slide is active first with preserved upload route
+    // Prescription Upload slide is preserved with upload & pharmacist routes
     const uploadLink = screen.getByRole("link", { name: /upload prescription/i });
     expect(uploadLink).toHaveAttribute("href", "/prescription-upload");
     expect(screen.getByRole("link", { name: /ask a pharmacist/i })).toHaveAttribute("href", "/contact");
@@ -66,83 +62,35 @@ describe("PromotionalCarousel", () => {
     }
   });
 
-  it("continuously infinite-scrolls right-to-left, loops seamlessly, and pauses on hover", () => {
-    render(<PromotionalCarousel slides={SHOP_PROMOTIONAL_SLIDES} autoPlayInterval={5000} />);
+  it("runs a seamless two-group CSS marquee without repeat jumps and pauses cleanly on hover and focus", () => {
+    render(<PromotionalCarousel slides={SHOP_PROMOTIONAL_SLIDES} autoPlayInterval={16000} />);
 
     const carousel = screen.getByTestId("promotional-carousel");
     const track = screen.getByTestId("promotional-carousel-track");
-    expect(carousel).toHaveAttribute("data-active-index", "0");
     expect(carousel).toHaveAttribute("data-infinite-scroll", "active");
-    expect(track).toHaveStyle({ transform: "translate3d(-0%, 0, 0)" });
+    expect(carousel).toHaveAttribute("data-paused", "false");
+    expect(track).toHaveClass("promo-carousel__track--marquee");
+    expect(track.style.getPropertyValue("--promo-count")).toBe("6");
+    expect(track.style.getPropertyValue("--promo-duration")).toBe("96s");
+    expect(track.style.animationPlayState).toBe("running");
 
-    // Halfway through first slide -> track is actively scrolling continuously mid-slide (~-50%)
-    act(() => {
-      jest.advanceTimersByTime(2500);
-    });
-    expect(track.style.transform).not.toBe("translate3d(-0%, 0, 0)");
+    // Exactly two equal groups (1 accessible real group + 1 aria-hidden clone group) for seamless -50% loop
+    const primaryGroup = screen.getByTestId("promotional-carousel-group-primary");
+    const cloneGroup = screen.getByTestId("promotional-carousel-group-clone");
+    expect(primaryGroup).not.toHaveAttribute("aria-hidden");
+    expect(cloneGroup).toHaveAttribute("aria-hidden", "true");
+    expect(cloneGroup).toHaveAttribute("data-clone", "true");
 
-    // Full 5 seconds (+ 1 animation frame margin) -> reaches slide 1
-    act(() => {
-      jest.advanceTimersByTime(2550);
-    });
-    expect(carousel).toHaveAttribute("data-active-index", "1");
-
-    // Pause on hover freezes scroll in place
+    // Pause on hover & resume on mouse leave
     fireEvent.mouseEnter(carousel);
-    const frozenTransform = track.style.transform;
-    act(() => {
-      jest.advanceTimersByTime(15000);
-    });
-    expect(carousel).toHaveAttribute("data-active-index", "1");
-    expect(track.style.transform).toBe(frozenTransform);
+    expect(carousel).toHaveAttribute("data-paused", "true");
+    expect(track.style.animationPlayState).toBe("paused");
 
-    // Resume and infinitely wrap past slide 5 seamlessly back to slide 0
     fireEvent.mouseLeave(carousel);
-    act(() => {
-      jest.advanceTimersByTime(25100);
-    });
-    expect(carousel).toHaveAttribute("data-active-index", "0");
-  });
+    expect(carousel).toHaveAttribute("data-paused", "false");
+    expect(track.style.animationPlayState).toBe("running");
 
-  it("supports manual arrows, clickable pagination dots, touch swipe, keyboard navigation, and image fallbacks", () => {
-    render(<PromotionalCarousel slides={SHOP_PROMOTIONAL_SLIDES} />);
-
-    const carousel = screen.getByTestId("promotional-carousel");
-
-    // Arrow navigation
-    fireEvent.click(screen.getByRole("button", { name: /next promotion/i }));
-    expect(carousel).toHaveAttribute("data-active-index", "1");
-
-    fireEvent.click(screen.getByRole("button", { name: /previous promotion/i }));
-    expect(carousel).toHaveAttribute("data-active-index", "0");
-
-    // Backward infinite wrap from 0 -> 5
-    fireEvent.click(screen.getByRole("button", { name: /previous promotion/i }));
-    expect(carousel).toHaveAttribute("data-active-index", "5");
-
-    // Pagination dot jump
-    const tabs = screen.getAllByRole("tab");
-    fireEvent.click(tabs[2]);
-    expect(carousel).toHaveAttribute("data-active-index", "2");
-    expect(tabs[2]).toHaveAttribute("aria-selected", "true");
-
-    // Touch swipe left -> slide 3
-    fireEvent.touchStart(carousel, { touches: [{ clientX: 220, clientY: 100 }] });
-    fireEvent.touchMove(carousel, { touches: [{ clientX: 110, clientY: 102 }] });
-    fireEvent.touchEnd(carousel);
-    expect(carousel).toHaveAttribute("data-active-index", "3");
-
-    // Keyboard ArrowRight / ArrowLeft / Home / End
-    fireEvent.keyDown(carousel, { key: "ArrowRight" });
-    expect(carousel).toHaveAttribute("data-active-index", "4");
-    fireEvent.keyDown(carousel, { key: "ArrowLeft" });
-    expect(carousel).toHaveAttribute("data-active-index", "3");
-    fireEvent.keyDown(carousel, { key: "End" });
-    expect(carousel).toHaveAttribute("data-active-index", "5");
-    fireEvent.keyDown(carousel, { key: "Home" });
-    expect(carousel).toHaveAttribute("data-active-index", "0");
-
-    // Image error fallback
+    // Image error fallback updates cleanly
     const firstImg = screen.getByTestId("promo-img-prescription-upload");
     fireEvent.error(firstImg);
     expect(firstImg).toHaveAttribute("src", DEFAULT_CATEGORY_FALLBACK_IMAGE);
@@ -165,19 +113,16 @@ describe("PromotionalCarousel", () => {
     expect(screen.queryByText("Hidden Slide")).not.toBeInTheDocument();
   });
 
-  it("respects prefers-reduced-motion by pausing autoplay while keeping manual navigation active", () => {
+  it("respects prefers-reduced-motion by disabling marquee animation and clone duplication", () => {
     mockReducedMotion(true);
     render(<PromotionalCarousel slides={SHOP_PROMOTIONAL_SLIDES} />);
 
     const carousel = screen.getByTestId("promotional-carousel");
+    const track = screen.getByTestId("promotional-carousel-track");
     expect(carousel).toHaveAttribute("data-reduced-motion", "true");
-
-    act(() => {
-      jest.advanceTimersByTime(20000);
-    });
-    expect(carousel).toHaveAttribute("data-active-index", "0");
-
-    fireEvent.click(screen.getByRole("button", { name: /next promotion/i }));
-    expect(carousel).toHaveAttribute("data-active-index", "1");
+    expect(carousel).toHaveAttribute("data-infinite-scroll", "paused");
+    expect(track).not.toHaveClass("promo-carousel__track--marquee");
+    expect(screen.getByTestId("promotional-carousel-group-primary")).toBeInTheDocument();
+    expect(screen.queryByTestId("promotional-carousel-group-clone")).not.toBeInTheDocument();
   });
 });

@@ -62,13 +62,19 @@ describe("CategoryCarousel", () => {
     jest.useRealTimers();
   });
 
-  it("renders all available categories dynamically without exposing duplicate accessible clone links", () => {
+  it("renders all available categories dynamically without duplicate accessible clone links, dots, or arrows", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     EIGHT_CATEGORIES.forEach((cat) => {
       const link = screen.getByRole("link", { name: cat.name });
       expect(link).toHaveAttribute("href", `/shop?category=${encodeURIComponent(cat.slug)}`);
     });
+
+    // Dots and prev/next arrows are removed
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /previous categories/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /next categories/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /scroll categories/i })).not.toBeInTheDocument();
   });
 
   it("adapts visible card counts to 4-5 on desktop, 3 on tablet, and 2 on mobile", () => {
@@ -92,72 +98,52 @@ describe("CategoryCarousel", () => {
     expect(viewport).toHaveAttribute("data-visible-cards", "2");
   });
 
-  it("continuously infinite-scrolls right-to-left, loops seamlessly, and pauses on hover", () => {
+  it("runs a seamless two-group CSS marquee with synced card galleries, pauses on hover, and handles image fallback", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     const region = screen.getByRole("region", { name: /shop by category/i });
     const viewport = screen.getByTestId("category-carousel-viewport");
     const track = screen.getByTestId("category-carousel-track");
-    expect(viewport).toHaveAttribute("data-active-index", "0");
     expect(viewport).toHaveAttribute("data-infinite-scroll", "active");
+    expect(viewport).toHaveAttribute("data-paused", "false");
+    expect(track).toHaveClass("hp-category-carousel__track--marquee");
+    expect(track.style.getPropertyValue("--hp-cat-count")).toBe("8");
+    expect(track.style.getPropertyValue("--hp-cat-duration")).toBe("28s");
+    expect(track.style.animationPlayState).toBe("running");
 
-    // Continuously scrolls mid-card after 1.75s
+    // Exactly two equal groups (real + aria-hidden clone) so -50% repeats with zero jump
+    const primaryGroup = screen.getByTestId("category-carousel-group-primary");
+    const cloneGroup = screen.getByTestId("category-carousel-group-clone");
+    expect(primaryGroup).not.toHaveAttribute("aria-hidden");
+    expect(cloneGroup).toHaveAttribute("aria-hidden", "true");
+    expect(cloneGroup).toHaveAttribute("data-clone", "true");
+
+    // Real and cloned card galleries stay synchronized on the same active image index
+    const realGallery = screen.getByTestId("category-gallery-medicines");
+    const cloneGallery = screen.getByTestId("category-gallery-clone-medicines");
+    expect(realGallery).toHaveAttribute("data-active-image", "0");
+    expect(cloneGallery).toHaveAttribute("data-active-image", "0");
+
     act(() => {
-      jest.advanceTimersByTime(1750);
+      jest.advanceTimersByTime(3500);
     });
-    expect(track.style.transform).not.toBe("translate3d(-0%, 0, 0)");
+    expect(realGallery).toHaveAttribute("data-active-image", "1");
+    expect(cloneGallery).toHaveAttribute("data-active-image", "1");
 
-    // Completes first full card after 3.5s (+ 1 animation frame margin)
-    act(() => {
-      jest.advanceTimersByTime(1800);
-    });
-    expect(viewport).toHaveAttribute("data-active-index", "1");
-
-    // Pause on hover freezes scroll in place
+    // Pause on hover freezes both marquee animation and gallery rotation
     fireEvent.mouseEnter(region);
-    const frozenTransform = track.style.transform;
+    expect(viewport).toHaveAttribute("data-paused", "true");
+    expect(track.style.animationPlayState).toBe("paused");
     act(() => {
-      jest.advanceTimersByTime(10500);
+      jest.advanceTimersByTime(7000);
     });
-    expect(viewport).toHaveAttribute("data-active-index", "1");
-    expect(track.style.transform).toBe(frozenTransform);
+    expect(realGallery).toHaveAttribute("data-active-image", "1");
+    expect(cloneGallery).toHaveAttribute("data-active-image", "1");
 
-    // Resume and loop cleanly around all 8 items back to 0
+    // Resume on mouse leave
     fireEvent.mouseLeave(region);
-    act(() => {
-      jest.advanceTimersByTime(24600);
-    });
-    expect(viewport).toHaveAttribute("data-active-index", "0");
-  });
-
-  it("supports manual arrows, touch swipe, mouse dragging, and image error fallback", () => {
-    render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
-
-    const viewport = screen.getByTestId("category-carousel-viewport");
-    const nextBtn = screen.getByRole("button", { name: /next categories/i });
-    const prevBtn = screen.getByRole("button", { name: /previous categories/i });
-
-    fireEvent.click(nextBtn);
-    expect(viewport).toHaveAttribute("data-active-index", "1");
-
-    fireEvent.click(prevBtn);
-    expect(viewport).toHaveAttribute("data-active-index", "0");
-
-    // Seamless backward wrap from 0 goes to index 7 (last item)
-    fireEvent.click(prevBtn);
-    expect(viewport).toHaveAttribute("data-active-index", "7");
-
-    // Touch swipe right moves back to index 6
-    fireEvent.touchStart(viewport, { touches: [{ clientX: 60, clientY: 80 }] });
-    fireEvent.touchMove(viewport, { touches: [{ clientX: 180, clientY: 82 }] });
-    fireEvent.touchEnd(viewport);
-    expect(viewport).toHaveAttribute("data-active-index", "6");
-
-    // Mouse drag left advances to index 7
-    fireEvent.mouseDown(viewport, { button: 0, clientX: 240, clientY: 90 });
-    fireEvent.mouseMove(window, { clientX: 120, clientY: 92 });
-    fireEvent.mouseUp(window);
-    expect(viewport).toHaveAttribute("data-active-index", "7");
+    expect(viewport).toHaveAttribute("data-paused", "false");
+    expect(track.style.animationPlayState).toBe("running");
 
     // Image error falls back cleanly
     const img = screen.getByTestId("category-img-eye-ear-care");
@@ -165,22 +151,17 @@ describe("CategoryCarousel", () => {
     expect(img).toHaveAttribute("src", DEFAULT_CATEGORY_FALLBACK_IMAGE);
   });
 
-  it("respects prefers-reduced-motion by disabling autoplay while keeping manual arrows functional", () => {
+  it("respects prefers-reduced-motion by disabling marquee animation and clone duplication", () => {
     mockReducedMotion(true);
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     const viewport = screen.getByTestId("category-carousel-viewport");
+    const track = screen.getByTestId("category-carousel-track");
     expect(viewport).toHaveAttribute("data-reduced-motion", "true");
-    expect(viewport).toHaveAttribute("data-active-index", "0");
-
-    act(() => {
-      jest.advanceTimersByTime(14000);
-    });
-    expect(viewport).toHaveAttribute("data-active-index", "0");
-
-    // Manual navigation still works
-    fireEvent.click(screen.getByRole("button", { name: /next categories/i }));
-    expect(viewport).toHaveAttribute("data-active-index", "1");
+    expect(viewport).toHaveAttribute("data-infinite-scroll", "paused");
+    expect(track).not.toHaveClass("hp-category-carousel__track--marquee");
+    expect(screen.getByTestId("category-carousel-group-primary")).toBeInTheDocument();
+    expect(screen.queryByTestId("category-carousel-group-clone")).not.toBeInTheDocument();
   });
 
   it("renders responsive loading skeletons and error state with retry callback", () => {

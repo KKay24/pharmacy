@@ -366,29 +366,6 @@
   color: #11699a;
 }
 
-.hp-category-carousel__arrows {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.hp-carousel-arrow--inline {
-  width: 34px;
-  height: 34px;
-  border: 1px solid #d7e5f0;
-  color: #0b3156;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(11, 49, 86, 0.08);
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
-}
-
-.hp-carousel-arrow--inline:hover {
-  background: #0b3156;
-  border-color: #0b3156;
-  color: #ffffff;
-  transform: translateY(-1px);
-}
-
 .hp-category-carousel__shell {
   position: relative;
 }
@@ -398,43 +375,74 @@
   content: "";
   position: absolute;
   top: 0;
-  bottom: 28px;
+  bottom: 0;
   width: 34px;
   z-index: 2;
   pointer-events: none;
 }
 
 .hp-category-carousel__shell.is-scrollable::before {
-  left: -4px;
+  left: 0;
   background: linear-gradient(90deg, rgba(251, 253, 254, 0.92) 0%, rgba(251, 253, 254, 0) 100%);
 }
 
 .hp-category-carousel__shell.is-scrollable::after {
-  right: -4px;
+  right: 0;
   background: linear-gradient(270deg, rgba(251, 253, 254, 0.92) 0%, rgba(251, 253, 254, 0) 100%);
 }
 
 .hp-category-carousel__viewport {
   overflow: hidden;
   width: 100%;
-  margin: 0 -8px;
   padding: 6px 0 12px;
-  cursor: grab;
-  touch-action: pan-y;
 }
 
-.hp-category-carousel__viewport.is-dragging {
-  cursor: grabbing;
-  user-select: none;
+.hp-category-carousel__viewport[data-reduced-motion="true"] {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .hp-category-carousel__track {
   display: flex;
-  will-change: transform;
+  width: 100%;
 }
 
-.hp-category-carousel__track--continuous {
-  transition: none;
+.hp-category-carousel__group {
+  display: flex;
+  flex: 0 0 100%;
+  width: 100%;
+}
+
+.hp-category-carousel__track--marquee {
+  width: calc((var(--hp-cat-count, 6) * 200%) / var(--hp-cat-visible, 5));
+  will-change: transform;
+  animation: hpCategoryMarquee var(--hp-cat-duration, 28s) linear infinite;
+}
+
+.hp-category-carousel__track--marquee .hp-category-carousel__group {
+  flex: 0 0 50%;
+  width: 50%;
+}
+
+.hp-category-carousel__track--marquee .hp-category-carousel__item {
+  flex: 1 0 0;
+  max-width: none;
+  min-width: 0;
+}
+
+.hp-categories--lenco:hover .hp-category-carousel__track--marquee,
+.hp-categories--lenco:focus-within .hp-category-carousel__track--marquee,
+.hp-categories--lenco.is-paused .hp-category-carousel__track--marquee {
+  animation-play-state: paused;
+}
+
+@keyframes hpCategoryMarquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
 }
 
 .hp-category-carousel__item {
@@ -550,61 +558,6 @@
   transform: translateX(2px);
 }
 
-.hp-category-carousel__edge-arrow {
-  position: absolute;
-  top: calc(50% - 14px);
-  transform: translateY(-50%);
-  z-index: 4;
-  width: 38px;
-  height: 38px;
-  border: 1px solid #d7e5f0;
-  background: rgba(255, 255, 255, 0.96);
-  color: #0b3156;
-  box-shadow: 0 6px 18px rgba(11, 49, 86, 0.14);
-}
-
-.hp-category-carousel__edge-arrow:hover {
-  background: #0b3156;
-  border-color: #0b3156;
-  color: #ffffff;
-}
-
-.hp-category-carousel__edge-arrow.hp-carousel-arrow--prev {
-  left: -16px;
-}
-
-.hp-category-carousel__edge-arrow.hp-carousel-arrow--next {
-  right: -16px;
-}
-
-.hp-category-carousel__dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.hp-category-carousel__dot {
-  width: 7px;
-  height: 7px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: #c7d9e8;
-  cursor: pointer;
-  transition: width 0.24s ease, background 0.2s ease;
-}
-
-.hp-category-carousel__dot:hover {
-  background: #7ca8c9;
-}
-
-.hp-category-carousel__dot.is-active {
-  width: 24px;
-  background: linear-gradient(90deg, #0b3156 0%, #11699a 100%);
-}
-
 .hp-category-carousel__skeletons {
   display: grid;
   grid-template-columns: repeat(var(--hp-cat-visible, 5), minmax(0, 1fr));
@@ -676,7 +629,6 @@
     top: 120px;
   }
 
-  .hp-category-carousel__edge-arrow,
   .hp-category-carousel__shell.is-scrollable::before,
   .hp-category-carousel__shell.is-scrollable::after {
     display: none;
@@ -702,10 +654,6 @@
     top: 105px;
   }
 
-  .hp-category-carousel__viewport {
-    margin: 0 -5px;
-  }
-
   .hp-category-carousel__item {
     padding: 0 5px;
   }
@@ -723,6 +671,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hp-category-carousel__track--marquee {
+    animation: none;
+  }
+
   .hp-hero-carousel__track,
   .hp-category-carousel__track,
   .hp-category-card__media img,

@@ -5595,22 +5595,54 @@ ul {
 .promo-carousel__viewport {
   width: 100%;
   overflow: hidden;
-  cursor: grab;
 }
 
-.promo-carousel__viewport.is-dragging {
-  cursor: grabbing;
-  user-select: none;
+.promo-carousel[data-reduced-motion="true"] .promo-carousel__viewport {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
 }
 
 .promo-carousel__track {
   display: flex;
   width: 100%;
-  will-change: transform;
 }
 
-.promo-carousel__track--continuous {
-  transition: none;
+.promo-carousel__group {
+  display: flex;
+  flex: 0 0 100%;
+  width: 100%;
+}
+
+.promo-carousel__track--marquee {
+  width: calc(var(--promo-count, 6) * 200%);
+  will-change: transform;
+  animation: promoCarouselMarquee var(--promo-duration, 96s) linear infinite;
+}
+
+.promo-carousel__track--marquee .promo-carousel__group {
+  flex: 0 0 50%;
+  width: 50%;
+}
+
+.promo-carousel__track--marquee .promo-carousel__slide {
+  flex: 1 0 0;
+  width: auto;
+  min-width: 0;
+}
+
+.promo-carousel:hover .promo-carousel__track--marquee,
+.promo-carousel:focus-within .promo-carousel__track--marquee,
+.promo-carousel.is-paused .promo-carousel__track--marquee {
+  animation-play-state: paused;
+}
+
+@keyframes promoCarouselMarquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
 }
 
 .promo-carousel__slide {
@@ -5620,6 +5652,7 @@ ul {
   position: relative;
   overflow: hidden;
   color: #ffffff;
+  scroll-snap-align: start;
 }
 
 /* MediQuick navy & teal subtle gradient themes */
@@ -5663,12 +5696,12 @@ ul {
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 1.15rem 3.75rem 2.15rem;
+  padding: 1.1rem 1.75rem;
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
   align-items: center;
   gap: 1.75rem;
-  min-height: 205px;
+  min-height: 188px;
   box-sizing: border-box;
 }
 
@@ -5786,83 +5819,6 @@ ul {
   object-position: center;
 }
 
-.promo-carousel__arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 4;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  background: rgba(15, 41, 74, 0.52);
-  color: #ffffff;
-  backdrop-filter: blur(6px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-}
-
-.promo-carousel__arrow:hover {
-  background: #009f91;
-  border-color: #009f91;
-}
-
-.promo-carousel__arrow:focus-visible {
-  outline: 3px solid #e6faf7;
-  outline-offset: 2px;
-}
-
-.promo-carousel__arrow--prev {
-  left: clamp(10px, 1.5vw, 24px);
-}
-
-.promo-carousel__arrow--next {
-  right: clamp(10px, 1.5vw, 24px);
-}
-
-.promo-carousel__dots {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: rgba(9, 29, 56, 0.38);
-  backdrop-filter: blur(6px);
-}
-
-.promo-carousel__dot {
-  width: 8px;
-  height: 8px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.45);
-  cursor: pointer;
-  transition: width 0.25s ease, background-color 0.2s ease;
-}
-
-.promo-carousel__dot:hover {
-  background: rgba(255, 255, 255, 0.8);
-}
-
-.promo-carousel__dot.is-active {
-  width: 26px;
-  background: #e6faf7;
-}
-
-.promo-carousel__dot:focus-visible {
-  outline: 2px solid #ffffff;
-  outline-offset: 2px;
-}
-
 /* Compact Shop identity + Filters/Sort heading bar below carousel */
 .store-shop-heading-bar {
   display: flex;
@@ -5897,9 +5853,9 @@ ul {
 
 @media (max-width: 1024px) {
   .promo-carousel__inner {
-    padding: 1rem 3.25rem 2rem;
+    padding: 0.95rem 1.4rem;
     gap: 1.25rem;
-    min-height: 185px;
+    min-height: 172px;
   }
 
   .promo-carousel__media-frame {
@@ -5911,7 +5867,7 @@ ul {
 @media (max-width: 768px) {
   .promo-carousel__inner {
     grid-template-columns: 1fr;
-    padding: 0.95rem 1rem 2.25rem;
+    padding: 0.9rem 1rem;
     gap: 0.75rem;
     min-height: auto;
   }
@@ -5926,13 +5882,6 @@ ul {
     height: 132px;
   }
 
-  .promo-carousel__arrow {
-    width: 32px;
-    height: 32px;
-    top: 66px;
-    transform: none;
-  }
-
   .store-shop-heading-bar {
     align-items: stretch;
   }
@@ -5943,12 +5892,13 @@ ul {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .promo-carousel__track--marquee {
+    animation: none;
+  }
 
   .promo-carousel__track,
   .promo-carousel__cta,
-  .promo-carousel__secondary-cta,
-  .promo-carousel__arrow,
-  .promo-carousel__dot {
+  .promo-carousel__secondary-cta {
     transition: none;
   }
 }
