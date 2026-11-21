@@ -261,78 +261,6 @@
   width: 100%;
 }
 
-.hp-carousel-arrow {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  border: 1px solid rgba(11, 49, 86, 0.12);
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--hp-ink);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(11, 49, 86, 0.12);
-  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
-}
-
-.hp-carousel-arrow:hover {
-  background: var(--hp-teal);
-  border-color: var(--hp-teal);
-  color: #fff;
-}
-
-.hp-carousel-arrow:focus-visible {
-  outline: 2px solid var(--hp-teal-dark);
-  outline-offset: 2px;
-}
-
-.hp-hero-carousel__arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 4;
-}
-
-.hp-hero-carousel__arrow.hp-carousel-arrow--prev {
-  left: 12px;
-}
-
-.hp-hero-carousel__arrow.hp-carousel-arrow--next {
-  right: 12px;
-}
-
-.hp-hero-carousel__dots {
-  position: absolute;
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(4px);
-}
-
-.hp-hero-carousel__dot {
-  width: 8px;
-  height: 8px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: #b5cdd4;
-  cursor: pointer;
-  transition: width 0.25s ease, background 0.2s ease;
-}
-
-.hp-hero-carousel__dot.is-active {
-  width: 24px;
-  background: var(--hp-teal);
-}
-
 /* ─── Shop by Category Carousel (Lenco-inspired MediQuick) ─── */
 .hp-categories--lenco {
   background: linear-gradient(180deg, #ffffff 0%, #f7fbfd 100%);
@@ -620,13 +548,9 @@
   .hp-hero-search-wrap {
     position: static;
     width: 100%;
-    padding: 0 24px 44px;
+    padding: 0 24px 26px;
     box-sizing: border-box;
     background: var(--hp-mist);
-  }
-
-  .hp-hero-carousel__arrow {
-    top: 120px;
   }
 
   .hp-category-carousel__shell.is-scrollable::before,
@@ -645,13 +569,7 @@
   }
 
   .hp-hero-search-wrap {
-    padding: 0 18px 42px;
-  }
-
-  .hp-hero-carousel__arrow {
-    width: 32px;
-    height: 32px;
-    top: 105px;
+    padding: 0 18px 24px;
   }
 
   .hp-category-carousel__item {

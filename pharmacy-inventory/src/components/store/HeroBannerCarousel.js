@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { DEFAULT_HERO_FALLBACK_IMAGE, HERO_BANNERS } from "../../data/homepageMedia";
 import LiveBpMonitorMedia from "./LiveBpMonitorMedia";
 import LiveCapsulesMedia from "./LiveCapsulesMedia";
@@ -31,15 +31,6 @@ export default function HeroBannerCarousel({
       setActiveIndex(0);
     }
   }, [totalSlides, activeIndex]);
-
-  const goToSlide = useCallback(
-    (index) => {
-      if (totalSlides <= 1) return;
-      const wrapped = ((index % totalSlides) + totalSlides) % totalSlides;
-      setActiveIndex(wrapped);
-    },
-    [totalSlides]
-  );
 
   const goNext = useCallback(() => {
     setActiveIndex((prev) => (totalSlides <= 1 ? 0 : (prev + 1) % totalSlides));
@@ -125,6 +116,8 @@ export default function HeroBannerCarousel({
       className="hp-hero-carousel"
       aria-roledescription="carousel"
       aria-label="Featured Pharmacy Promotions"
+      data-active-index={activeIndex}
+      data-slide-count={totalSlides}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onFocusCapture={() => setIsFocused(true)}
@@ -234,45 +227,6 @@ export default function HeroBannerCarousel({
 
         {/* Persistent search bar overlay anchored cleanly below hero copy on desktop/mobile */}
         {searchSlot && <div className="hp-hero-search-wrap">{searchSlot}</div>}
-
-        {/* Previous / Next Navigation Arrows */}
-        {totalSlides > 1 && (
-          <>
-            <button
-              type="button"
-              className="hp-carousel-arrow hp-carousel-arrow--prev hp-hero-carousel__arrow"
-              aria-label="Previous promotional banner"
-              onClick={goPrev}
-            >
-              <ChevronLeft size={20} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="hp-carousel-arrow hp-carousel-arrow--next hp-hero-carousel__arrow"
-              aria-label="Next promotional banner"
-              onClick={goNext}
-            >
-              <ChevronRight size={20} aria-hidden="true" />
-            </button>
-          </>
-        )}
-
-        {/* Pagination Dots */}
-        {totalSlides > 1 && (
-          <div className="hp-hero-carousel__dots" role="tablist" aria-label="Hero banner slides">
-            {safeBanners.map((banner, index) => (
-              <button
-                key={banner.id || index}
-                type="button"
-                role="tab"
-                aria-selected={index === activeIndex}
-                aria-label={`Go to banner ${index + 1}: ${banner.title || ""}`}
-                className={`hp-hero-carousel__dot${index === activeIndex ? " is-active" : ""}`}
-                onClick={() => goToSlide(index)}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </section>
   );

@@ -82,10 +82,11 @@ describe("Homepage (LoginPage) Carousels & Store Functionality", () => {
     });
     expect(screen.getByRole("link", { name: "Dental Care" })).toBeInTheDocument();
 
-    // Verify >3 hero banners and all 7 dynamic categories are mounted
+    // Verify >3 hero banners (without dots/arrows) and all 7 dynamic categories are mounted
     const heroRegion = screen.getByRole("region", { name: /featured pharmacy promotions/i });
-    const heroTabs = within(heroRegion).getAllByRole("tab");
-    expect(heroTabs.length).toBeGreaterThan(3);
+    expect(Number(heroRegion.getAttribute("data-slide-count"))).toBeGreaterThan(3);
+    expect(heroRegion).toHaveAttribute("data-active-index", "0");
+    expect(within(heroRegion).queryAllByRole("tab")).toHaveLength(0);
 
     const catViewport = screen.getByTestId("category-carousel-viewport");
     const catTrack = screen.getByTestId("category-carousel-track");
@@ -98,7 +99,7 @@ describe("Homepage (LoginPage) Carousels & Store Functionality", () => {
       jest.advanceTimersByTime(5000);
     });
 
-    expect(heroTabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(heroRegion).toHaveAttribute("data-active-index", "0");
     expect(catViewport).toHaveAttribute("data-paused", "false");
     expect(catTrack.style.animationPlayState).toBe("running");
 

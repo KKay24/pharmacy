@@ -178,8 +178,8 @@ export default function StoreAboutPage() {
       <section className="about-visit" aria-labelledby="about-visit-title">
         <div className="about-visit__image">
           <img
-            src="https://images.unsplash.com/photo-1632833239869-a37e3a5806d2?auto=format&fit=crop&w=1100&q=85"
-            alt="Pharmacy shelves with health and personal care products"
+            src="/images/about/mediquick-storefront.jpg"
+            alt="MediQuick Pharmacy storefront at 25147 Nationalist Road, Lusaka"
             loading="lazy"
           />
         </div>

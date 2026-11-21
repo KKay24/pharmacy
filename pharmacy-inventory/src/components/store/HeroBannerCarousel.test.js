@@ -84,12 +84,17 @@ describe("HeroBannerCarousel", () => {
     jest.useRealTimers();
   });
 
-  it("renders all configured banners (>3) with titles, descriptions, CTAs, and optimized lazy loading", () => {
+  it("renders all configured banners (>3) with titles, descriptions, CTAs, lazy loading, and without dots or arrows", () => {
     render(<HeroBannerCarousel banners={FIVE_BANNERS} />);
 
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(5);
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    const carousel = screen.getByRole("region", { name: /featured pharmacy promotions/i });
+    expect(carousel).toHaveAttribute("data-slide-count", "5");
+    expect(carousel).toHaveAttribute("data-active-index", "0");
+
+    // Prev/next arrows and pagination dots are removed
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /previous promotional banner/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /next promotional banner/i })).not.toBeInTheDocument();
 
     expect(screen.getByText("Description one")).toBeInTheDocument();
     expect(screen.getByText("Description five")).toBeInTheDocument();
@@ -104,57 +109,52 @@ describe("HeroBannerCarousel", () => {
     render(<HeroBannerCarousel banners={FIVE_BANNERS} autoPlayInterval={5000} />);
 
     const carousel = screen.getByRole("region", { name: /featured pharmacy promotions/i });
-    const tabs = screen.getAllByRole("tab");
-
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(carousel).toHaveAttribute("data-active-index", "0");
 
     act(() => {
       jest.advanceTimersByTime(5000);
     });
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+    expect(carousel).toHaveAttribute("data-active-index", "1");
 
     // Hover pauses autoplay
     fireEvent.mouseEnter(carousel);
     act(() => {
       jest.advanceTimersByTime(10000);
     });
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+    expect(carousel).toHaveAttribute("data-active-index", "1");
 
     // Leaving resumes autoplay and loops cleanly past banner 5 back to banner 1
     fireEvent.mouseLeave(carousel);
     act(() => {
       jest.advanceTimersByTime(20000);
     });
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(carousel).toHaveAttribute("data-active-index", "0");
   });
 
-  it("supports arrow buttons, pagination dots, and mobile swipe gestures", () => {
+  it("supports mobile swipe gestures and keyboard arrow navigation", () => {
     render(<HeroBannerCarousel banners={FIVE_BANNERS} />);
 
     const carousel = screen.getByRole("region", { name: /featured pharmacy promotions/i });
-    const tabs = screen.getAllByRole("tab");
+    expect(carousel).toHaveAttribute("data-active-index", "0");
 
-    fireEvent.click(screen.getByRole("button", { name: /next promotional banner/i }));
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+    // Keyboard navigation
+    fireEvent.keyDown(carousel, { key: "ArrowRight" });
+    expect(carousel).toHaveAttribute("data-active-index", "1");
 
-    fireEvent.click(screen.getByRole("button", { name: /previous promotional banner/i }));
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(carousel, { key: "ArrowLeft" });
+    expect(carousel).toHaveAttribute("data-active-index", "0");
 
-    // Clicking dot 4 (0-indexed 3)
-    fireEvent.click(tabs[3]);
-    expect(tabs[3]).toHaveAttribute("aria-selected", "true");
-
-    // Swipe left -> next slide (index 4)
+    // Swipe left -> next slide (index 1)
     fireEvent.touchStart(carousel, { touches: [{ clientX: 220, clientY: 100 }] });
     fireEvent.touchMove(carousel, { touches: [{ clientX: 120, clientY: 102 }] });
     fireEvent.touchEnd(carousel);
-    expect(tabs[4]).toHaveAttribute("aria-selected", "true");
+    expect(carousel).toHaveAttribute("data-active-index", "1");
 
-    // Swipe right -> previous slide (index 3)
+    // Swipe right -> previous slide (index 0)
     fireEvent.touchStart(carousel, { touches: [{ clientX: 100, clientY: 100 }] });
     fireEvent.touchMove(carousel, { touches: [{ clientX: 190, clientY: 100 }] });
     fireEvent.touchEnd(carousel);
-    expect(tabs[3]).toHaveAttribute("aria-selected", "true");
+    expect(carousel).toHaveAttribute("data-active-index", "0");
   });
 
   it("falls back cleanly when a banner image fails to load", () => {
