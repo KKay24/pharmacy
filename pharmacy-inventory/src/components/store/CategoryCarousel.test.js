@@ -3,6 +3,7 @@ import "@testing-library/jest-dom";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import CategoryCarousel from "./CategoryCarousel";
 import {
+  BABY_PRODUCTS_VIDEO,
   BLOOD_PRESSURE_MONITOR_VIDEO,
   DEFAULT_CATEGORY_FALLBACK_IMAGE,
   PRESCRIPTION_CAPSULES_VIDEO,
@@ -138,10 +139,10 @@ describe("CategoryCarousel", () => {
     expect(img).toHaveAttribute("src", DEFAULT_CATEGORY_FALLBACK_IMAGE);
   });
 
-  it("shows looping videos only on Medicines and Medical Devices and a single static image on all other categories (no per-card slideshow)", () => {
+  it("shows looping videos on Medicines, Medical Devices, and Baby Products and a single static image on all other categories (no per-card slideshow)", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
-    // Medicines & Medical Devices play infinitely looping videos
+    // Medicines, Medical Devices, and Baby Products play infinitely looping videos
     const medicinesVideo = screen.getByTestId("category-img-medicines");
     expect(medicinesVideo.tagName).toBe("VIDEO");
     expect(medicinesVideo).toHaveAttribute("src", PRESCRIPTION_CAPSULES_VIDEO);
@@ -156,11 +157,17 @@ describe("CategoryCarousel", () => {
     expect(devicesVideo).toHaveAttribute("autoplay");
     expect(devicesVideo).toHaveAttribute("playsinline");
 
+    const babyVideo = screen.getByTestId("category-img-baby-products");
+    expect(babyVideo.tagName).toBe("VIDEO");
+    expect(babyVideo).toHaveAttribute("src", BABY_PRODUCTS_VIDEO);
+    expect(babyVideo).toHaveAttribute("loop");
+    expect(babyVideo).toHaveAttribute("autoplay");
+    expect(babyVideo).toHaveAttribute("playsinline");
+
     // All other categories render a single static photo without a rotating gallery slideshow
     for (const slug of [
       "medical-supplies",
       "personal-care",
-      "baby-products",
       "vitamins-supplements",
       "first-aid",
       "eye-ear-care",
@@ -171,6 +178,7 @@ describe("CategoryCarousel", () => {
     }
     expect(screen.queryByTestId("category-gallery-medicines")).not.toBeInTheDocument();
     expect(screen.queryByTestId("category-gallery-medical-devices")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("category-gallery-baby-products")).not.toBeInTheDocument();
   });
 
   it("respects prefers-reduced-motion by disabling marquee animation and clone duplication", () => {

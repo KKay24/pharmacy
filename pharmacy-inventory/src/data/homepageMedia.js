@@ -5,6 +5,8 @@ export const DEFAULT_CATEGORY_FALLBACK_IMAGE = "/images/medicines/tablets-bliste
 export const PRESCRIPTION_CAPSULES_VIDEO = "/videos/prescription-capsules.mp4";
 export const BLOOD_PRESSURE_MONITOR_VIDEO = "/videos/blood-pressure-monitor.mp4";
 export const BLOOD_PRESSURE_MONITOR_POSTER = "/images/medical-devices/blood-pressure-monitor.jpg";
+export const BABY_PRODUCTS_VIDEO = "/videos/baby-products.mp4";
+export const BABY_PRODUCTS_POSTER = "/images/baby-products/baby-diapers.jpg";
 
 /**
  * Three distinct studio images for Medical Devices:
@@ -65,7 +67,7 @@ export const BABY_PRODUCTS_IMAGES = [
   {
     id: "baby-diapers",
     label: "Diapers & Wipes",
-    src: "/images/baby-products/baby-diapers.jpg",
+    src: BABY_PRODUCTS_POSTER,
     alt: "Soft baby diapers and gentle baby wipes",
   },
   {
@@ -79,6 +81,14 @@ export const BABY_PRODUCTS_IMAGES = [
     label: "Baby Feeding",
     src: "/images/baby-products/baby-feeding.jpg",
     alt: "Baby feeding bottle and silicone pacifier",
+  },
+  {
+    id: "baby-products-video",
+    label: "Baby Care Essentials",
+    src: BABY_PRODUCTS_VIDEO,
+    poster: BABY_PRODUCTS_POSTER,
+    alt: "Baby products and gentle family care essentials",
+    mediaType: "live-video",
   },
 ];
 

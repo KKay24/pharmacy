@@ -7,6 +7,7 @@ import {
 } from "../../data/homepageMedia";
 import LiveBpMonitorMedia from "./LiveBpMonitorMedia";
 import LiveCapsulesMedia from "./LiveCapsulesMedia";
+import LiveVideoMedia from "./LiveVideoMedia";
 
 function usePrefersReducedMotion() {
   const [prefersReduced, setPrefersReduced] = useState(() => {
@@ -47,7 +48,10 @@ function CategoryCardMedia({
   const images = getCategoryImages(category);
   const primary =
     images.find(
-      (item) => item.mediaType === "live-capsules" || item.mediaType === "live-bp-monitor"
+      (item) =>
+        item.mediaType === "live-capsules" ||
+        item.mediaType === "live-bp-monitor" ||
+        item.mediaType === "live-video"
     ) || images[0];
   const slug = category.slug || categoryKey;
   const mediaKey = `${categoryKey}-${primary.id}`;
@@ -66,6 +70,15 @@ function CategoryCardMedia({
       ) : primary.mediaType === "live-capsules" && !failedSrcMap[mediaKey] ? (
         <LiveCapsulesMedia
           src={primary.src}
+          decorative
+          isActive
+          testId={testId}
+          onError={() => onImgError(mediaKey)}
+        />
+      ) : primary.mediaType === "live-video" && !failedSrcMap[mediaKey] ? (
+        <LiveVideoMedia
+          src={primary.src}
+          poster={primary.poster}
           decorative
           isActive
           testId={testId}
