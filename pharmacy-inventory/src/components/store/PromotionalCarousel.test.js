@@ -66,35 +66,41 @@ describe("PromotionalCarousel", () => {
     }
   });
 
-  it("autoplays every 5 seconds right-to-left, loops infinitely, and pauses on hover", () => {
+  it("continuously infinite-scrolls right-to-left, loops seamlessly, and pauses on hover", () => {
     render(<PromotionalCarousel slides={SHOP_PROMOTIONAL_SLIDES} autoPlayInterval={5000} />);
 
     const carousel = screen.getByTestId("promotional-carousel");
     const track = screen.getByTestId("promotional-carousel-track");
     expect(carousel).toHaveAttribute("data-active-index", "0");
-    expect(track).toHaveStyle({ transform: "translate3d(-100%, 0, 0)" });
+    expect(carousel).toHaveAttribute("data-infinite-scroll", "active");
+    expect(track).toHaveStyle({ transform: "translate3d(-0%, 0, 0)" });
 
-    // 5 seconds -> advances right-to-left to slide 1
+    // Halfway through first slide -> track is actively scrolling continuously mid-slide (~-50%)
     act(() => {
-      jest.advanceTimersByTime(5000);
+      jest.advanceTimersByTime(2500);
+    });
+    expect(track.style.transform).not.toBe("translate3d(-0%, 0, 0)");
+
+    // Full 5 seconds (+ 1 animation frame margin) -> reaches slide 1
+    act(() => {
+      jest.advanceTimersByTime(2550);
     });
     expect(carousel).toHaveAttribute("data-active-index", "1");
-    expect(track).toHaveStyle({ transform: "translate3d(-200%, 0, 0)" });
 
-    // Pause on hover
+    // Pause on hover freezes scroll in place
     fireEvent.mouseEnter(carousel);
+    const frozenTransform = track.style.transform;
     act(() => {
       jest.advanceTimersByTime(15000);
     });
     expect(carousel).toHaveAttribute("data-active-index", "1");
+    expect(track.style.transform).toBe(frozenTransform);
 
-    // Resume and infinitely wrap past slide 5 back to slide 0
+    // Resume and infinitely wrap past slide 5 seamlessly back to slide 0
     fireEvent.mouseLeave(carousel);
-    for (let i = 0; i < 5; i += 1) {
-      act(() => {
-        jest.advanceTimersByTime(5000);
-      });
-    }
+    act(() => {
+      jest.advanceTimersByTime(25100);
+    });
     expect(carousel).toHaveAttribute("data-active-index", "0");
   });
 

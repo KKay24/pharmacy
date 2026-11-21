@@ -430,12 +430,11 @@
 
 .hp-category-carousel__track {
   display: flex;
-  transition: transform 0.56s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
-.hp-category-carousel__track.is-instant {
-  transition: none !important;
+.hp-category-carousel__track--continuous {
+  transition: none;
 }
 
 .hp-category-carousel__item {

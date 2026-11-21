@@ -92,33 +92,41 @@ describe("CategoryCarousel", () => {
     expect(viewport).toHaveAttribute("data-visible-cards", "2");
   });
 
-  it("autoplays every 3.5 seconds, loops infinitely without rewind jumps, and pauses on hover", () => {
+  it("continuously infinite-scrolls right-to-left, loops seamlessly, and pauses on hover", () => {
     render(<CategoryCarousel categories={EIGHT_CATEGORIES} />);
 
     const region = screen.getByRole("region", { name: /shop by category/i });
     const viewport = screen.getByTestId("category-carousel-viewport");
+    const track = screen.getByTestId("category-carousel-track");
     expect(viewport).toHaveAttribute("data-active-index", "0");
+    expect(viewport).toHaveAttribute("data-infinite-scroll", "active");
 
-    // Advances every 3.5s
+    // Continuously scrolls mid-card after 1.75s
     act(() => {
-      jest.advanceTimersByTime(3500);
+      jest.advanceTimersByTime(1750);
+    });
+    expect(track.style.transform).not.toBe("translate3d(-0%, 0, 0)");
+
+    // Completes first full card after 3.5s (+ 1 animation frame margin)
+    act(() => {
+      jest.advanceTimersByTime(1800);
     });
     expect(viewport).toHaveAttribute("data-active-index", "1");
 
-    // Pause on hover
+    // Pause on hover freezes scroll in place
     fireEvent.mouseEnter(region);
+    const frozenTransform = track.style.transform;
     act(() => {
       jest.advanceTimersByTime(10500);
     });
     expect(viewport).toHaveAttribute("data-active-index", "1");
+    expect(track.style.transform).toBe(frozenTransform);
 
     // Resume and loop cleanly around all 8 items back to 0
     fireEvent.mouseLeave(region);
-    for (let step = 0; step < 7; step += 1) {
-      act(() => {
-        jest.advanceTimersByTime(3500);
-      });
-    }
+    act(() => {
+      jest.advanceTimersByTime(24600);
+    });
     expect(viewport).toHaveAttribute("data-active-index", "0");
   });
 
