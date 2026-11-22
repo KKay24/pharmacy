@@ -26,10 +26,16 @@ const API_BASE_URL = resolveApiBaseUrl();
 
 export const apiUrl = (path) => {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (normalizedPath === '/api/health') {
+    return normalizedPath;
+  }
   return `${API_BASE_URL}${normalizedPath}`;
 };
 
-export const apiHealthPath = (baseUrl = API_BASE_URL) => (baseUrl ? '/health' : '/api/health');
+export const apiHealthPath = (
+  baseUrl = API_BASE_URL,
+  isLocalDevelopment = typeof window !== 'undefined' && LOCALHOST_NAMES.has(window.location.hostname)
+) => (baseUrl && isLocalDevelopment ? '/health' : '/api/health');
 
 export const apiFetch = async (path, options = {}) => {
   const token = getAccessToken();
