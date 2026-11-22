@@ -125,12 +125,20 @@ export function StoreProvider({ children }) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(
+      const httpError = new Error(
         getHttpErrorMessage(res.status, extractPayloadMessage(data), {
           context,
           fallback: `Request failed (${res.status})`,
         })
       );
+      httpError.status = res.status;
+      if (data && typeof data === "object") {
+        if (typeof data.code === "string") httpError.code = data.code;
+        if (typeof data.retryAfterSeconds === "number") {
+          httpError.retryAfterSeconds = data.retryAfterSeconds;
+        }
+      }
+      throw httpError;
     }
     return data;
   }, [storeToken, storeLogout]);

@@ -41,6 +41,12 @@ Configure these values through the deployment provider's environment/secret mana
 | `FRONTEND_URLS` | Optional comma-separated additional allowed origins. |
 | `ALLOW_VERCEL_PREVIEWS` | Set intentionally; when enabled, HTTPS `*.vercel.app` origins can be accepted. |
 | `ENABLE_DEMO_SEEDING` | Keep disabled in production. |
+| `AI_PROVIDER` | Medical AI provider (`openai`, `gemini`, `anthropic`, or `openai-compatible`). Defaults to `openai` in Render blueprints. |
+| `OPENAI_API_KEY` | Provider secret for OpenAI (`<OPENAI_API_KEY>`). Alternatively set `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, or `AI_API_KEY` matching `AI_PROVIDER`. Required for `POST /api/ai/chat`. |
+| `AI_MODEL` | Optional model override (defaults: `gpt-4o-mini` for OpenAI, `gemini-2.5-flash` for Gemini, `claude-3-5-haiku-latest` for Anthropic). |
+| `AI_TIMEOUT_MS` | Optional upstream AI timeout in milliseconds (`2000`–`45000`, default `15000`). |
+| `AI_RATE_LIMIT_MAX` | Optional max AI chat messages per client per window (default `15`). |
+| `AI_RATE_LIMIT_WINDOW_MS` | Optional AI rate-limit window in milliseconds (default `60000`). |
 
 `POSTGRES_URL` is recognized by the Sequelize connection setup as a fallback, but production startup explicitly requires `DATABASE_URL`; configure the latter. Do not set `SQLITE_STORAGE_PATH` or a SQLite URL in production; the backend rejects SQLite production configuration.
 

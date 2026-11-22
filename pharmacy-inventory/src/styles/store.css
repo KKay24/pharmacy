@@ -4916,6 +4916,17 @@ ul {
   border-bottom-right-radius: 4px;
 }
 
+.smart-assistant__bubble--failed {
+  opacity: 0.88;
+  border: 1px dashed #fca5a5;
+}
+
+.smart-assistant__msg-status {
+  font-size: 11px;
+  color: #b91c1c;
+  margin-top: 2px;
+}
+
 .smart-assistant__bubble--ai {
   background: #ffffff;
   color: #0b3156;
@@ -5138,6 +5149,36 @@ ul {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.smart-assistant__error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.smart-assistant__error-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.smart-assistant__error-retry:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.smart-assistant__error-retry:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .smart-assistant__error-action {

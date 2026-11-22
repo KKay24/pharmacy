@@ -34,6 +34,18 @@ services:
         sync: false
       - key: FRONTEND_URLS
         sync: false
+      - key: AI_PROVIDER
+        value: "openai"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: "gpt-4o-mini"
+      - key: AI_TIMEOUT_MS
+        value: "15000"
+      - key: AI_RATE_LIMIT_MAX
+        value: "15"
+      - key: AI_RATE_LIMIT_WINDOW_MS
+        value: "60000"
 
 databases:
   - name: pharmacy-db

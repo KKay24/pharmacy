@@ -48,9 +48,14 @@ function loadSavedAiState() {
     const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) return { sessionId: "", messages: [] };
     const parsed = JSON.parse(raw);
+    const messages = Array.isArray(parsed?.messages)
+      ? parsed.messages.slice(-20).map((entry) =>
+          entry && entry.status === "pending" ? { ...entry, status: "failed" } : entry
+        )
+      : [];
     return {
       sessionId: typeof parsed?.sessionId === "string" ? parsed.sessionId : "",
-      messages: Array.isArray(parsed?.messages) ? parsed.messages.slice(-20) : [],
+      messages,
     };
   } catch (error) {
     return { sessionId: "", messages: [] };
@@ -74,11 +79,18 @@ export default function CustomerSupportChat() {
   const [activeTab, setActiveTab] = useState("ai"); // "ai" | "support"
 
   // Medical AI state
-  const [aiSessionId, setAiSessionId] = useState(() => loadSavedAiState().sessionId);
-  const [aiMessages, setAiMessages] = useState(() => loadSavedAiState().messages);
+  const [initialAiState] = useState(loadSavedAiState);
+  const [aiSessionId, setAiSessionId] = useState(initialAiState.sessionId);
+  const [aiMessages, setAiMessages] = useState(initialAiState.messages);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [failedAiMessage, setFailedAiMessage] = useState(() => {
+    const last = initialAiState.messages[initialAiState.messages.length - 1];
+    return last && last.role === "user" && last.status === "failed"
+      ? { id: last.id, content: last.content }
+      : null;
+  });
   const [showEscalationPrompt, setShowEscalationPrompt] = useState(false);
   const [consentShareContext, setConsentShareContext] = useState(false);
 
@@ -101,6 +113,8 @@ export default function CustomerSupportChat() {
   const [transferredNotice, setTransferredNotice] = useState(false);
 
   const aiScrollRef = useRef(null);
+  const aiInFlightRef = useRef(false);
+  const aiMsgSeqRef = useRef(0);
 
   // Sync user info gently if user signs in while form is empty
   useEffect(() => {
@@ -132,21 +146,37 @@ export default function CustomerSupportChat() {
     if (open && activeTab === "ai" && aiScrollRef.current) {
       aiScrollRef.current.scrollTop = aiScrollRef.current.scrollHeight;
     }
-  }, [open, activeTab, aiMessages, aiLoading, showEscalationPrompt]);
+  }, [open, activeTab, aiMessages, aiLoading, aiError, showEscalationPrompt]);
 
-  const sendAiMessage = async (rawText) => {
+  const sendAiMessage = async (rawText, { retryMessageId = null } = {}) => {
     const text = String(rawText !== undefined ? rawText : aiInput).trim();
-    if (!text || aiLoading) return;
+    if (!text || aiInFlightRef.current || aiLoading) return;
 
-    const userMsg = {
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: text,
-    };
+    aiInFlightRef.current = true;
+    const isRetry = Boolean(retryMessageId);
+    const targetMessageId = isRetry
+      ? retryMessageId
+      : `user-${Date.now()}-${(aiMsgSeqRef.current += 1)}`;
 
-    setAiMessages((current) => [...current, userMsg]);
-    setAiInput("");
+    if (isRetry) {
+      setAiMessages((current) =>
+        current.map((entry) =>
+          entry.id === targetMessageId ? { ...entry, status: "pending" } : entry
+        )
+      );
+    } else {
+      const userMsg = {
+        id: targetMessageId,
+        role: "user",
+        content: text,
+        status: "pending",
+      };
+      setAiMessages((current) => [...current, userMsg]);
+      setAiInput("");
+    }
+
     setAiError("");
+    setFailedAiMessage(null);
     setShowEscalationPrompt(false);
     setAiLoading(true);
 
@@ -164,7 +194,7 @@ export default function CustomerSupportChat() {
       }
 
       const assistantMsg = {
-        id: `assistant-${Date.now()}`,
+        id: `assistant-${Date.now()}-${(aiMsgSeqRef.current += 1)}`,
         role: "assistant",
         content: data?.reply || "I could not generate a response. Please contact our Pharmacy Support team.",
         emergency: Boolean(data?.emergency),
@@ -174,15 +204,33 @@ export default function CustomerSupportChat() {
         sources: Array.isArray(data?.sources) ? data.sources : [],
       };
 
-      setAiMessages((current) => [...current, assistantMsg]);
+      setAiMessages((current) => [
+        ...current.map((entry) =>
+          entry.id === targetMessageId ? { ...entry, status: "sent" } : entry
+        ),
+        assistantMsg,
+      ]);
+      setFailedAiMessage(null);
     } catch (requestError) {
+      setAiMessages((current) =>
+        current.map((entry) =>
+          entry.id === targetMessageId ? { ...entry, status: "failed" } : entry
+        )
+      );
+      setFailedAiMessage({ id: targetMessageId, content: text });
       setAiError(
         requestError?.message ||
-          "Medical AI is temporarily unavailable. You can switch to Pharmacy Support to message a pharmacist."
+          "We're temporarily unable to connect. Please try again."
       );
     } finally {
+      aiInFlightRef.current = false;
       setAiLoading(false);
     }
+  };
+
+  const handleRetryAiMessage = () => {
+    if (!failedAiMessage || aiInFlightRef.current || aiLoading) return;
+    sendAiMessage(failedAiMessage.content, { retryMessageId: failedAiMessage.id });
   };
 
   const handleAiSubmit = (event) => {
@@ -191,10 +239,12 @@ export default function CustomerSupportChat() {
   };
 
   const handleClearAiChat = () => {
+    if (aiInFlightRef.current || aiLoading) return;
     const oldSessionId = aiSessionId;
     setAiMessages([]);
     setAiSessionId("");
     setAiError("");
+    setFailedAiMessage(null);
     setShowEscalationPrompt(false);
     setConsentShareContext(false);
     try {
@@ -342,6 +392,7 @@ export default function CustomerSupportChat() {
                 className="smart-assistant__header-btn"
                 aria-label="Start new AI conversation"
                 title="New chat"
+                disabled={aiLoading}
                 onClick={handleClearAiChat}
               >
                 <RotateCcw size={16} />
@@ -400,7 +451,7 @@ export default function CustomerSupportChat() {
                 </span>
               </div>
 
-              <div className="smart-assistant__messages" ref={aiScrollRef}>
+              <div className="smart-assistant__messages" ref={aiScrollRef} aria-busy={aiLoading ? "true" : "false"}>
                 {aiMessages.length === 0 && (
                   <div className="smart-assistant__welcome">
                     <div className="smart-assistant__bubble smart-assistant__bubble--ai">
@@ -439,10 +490,16 @@ export default function CustomerSupportChat() {
                       <div
                         className={`smart-assistant__bubble smart-assistant__bubble--${
                           msg.role === "user" ? "user" : "ai"
-                        }`}
+                        }${msg.status === "failed" ? " smart-assistant__bubble--failed" : ""}`}
                       >
                         <p className="smart-assistant__bubble-text">{msg.content}</p>
                       </div>
+                    )}
+
+                    {msg.role === "user" && msg.status === "failed" && (
+                      <span className="smart-assistant__msg-status">
+                        Not delivered — your message is preserved
+                      </span>
                     )}
 
                     {/* Verified MediQuick Catalogue Products */}
@@ -544,13 +601,26 @@ export default function CustomerSupportChat() {
                 {aiError && (
                   <div className="smart-assistant__error-card" role="alert">
                     <p>{aiError}</p>
-                    <button
-                      type="button"
-                      className="smart-assistant__error-action"
-                      onClick={() => setActiveTab("support")}
-                    >
-                      Message Pharmacy Support <ArrowRight size={13} aria-hidden="true" />
-                    </button>
+                    <div className="smart-assistant__error-actions">
+                      {failedAiMessage && (
+                        <button
+                          type="button"
+                          className="smart-assistant__error-retry"
+                          disabled={aiLoading}
+                          onClick={handleRetryAiMessage}
+                        >
+                          <RotateCcw size={13} aria-hidden="true" />
+                          <span>Retry</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="smart-assistant__error-action"
+                        onClick={() => setActiveTab("support")}
+                      >
+                        Message Pharmacy Support <ArrowRight size={13} aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
                 )}
 

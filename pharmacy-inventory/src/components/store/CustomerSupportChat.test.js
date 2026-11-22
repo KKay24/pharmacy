@@ -141,8 +141,96 @@ describe("MediQuick Smart Assistant (CustomerSupportChat)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send AI message" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("AI assistant is temporarily unavailable");
+    expect(screen.getByText("Do you stock ibuprofen?")).toBeInTheDocument();
+    expect(screen.getByText(/Not delivered/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Message Pharmacy Support/i }));
     expect(screen.getByRole("tab", { name: /pharmacy support/i })).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("preserves failed AI messages, supports one-click Retry without duplicating user bubbles, and prevents duplicate submissions", async () => {
+    let resolveSecondCall;
+    apiFetch
+      .mockRejectedValueOnce(new Error("We're temporarily unable to connect. Please try again."))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecondCall = resolve;
+          })
+      );
+
+    render(<CustomerSupportChat />);
+    fireEvent.click(screen.getByRole("button", { name: "Open pharmacy support chat" }));
+
+    fireEvent.change(screen.getByLabelText("Ask Medical AI"), {
+      target: { value: "Do you have Amoxicillin?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send AI message" }));
+
+    // Failed message is preserved with Retry action
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We're temporarily unable to connect. Please try again."
+    );
+    expect(screen.getAllByText("Do you have Amoxicillin?")).toHaveLength(1);
+    const retryBtn = screen.getByRole("button", { name: /Retry/i });
+
+    // Trigger Retry and simulate rapid duplicate click while request is in-flight
+    fireEvent.click(retryBtn);
+    expect(screen.getByText(/MediQuick AI is typing/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Ask Medical AI")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send AI message" })).toBeDisabled();
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+
+    // Resolve retry cleanly
+    resolveSecondCall({
+      sessionId: "sess-retry-1",
+      reply: "Amoxicillin is a prescription-only medicine. Please upload a valid prescription.",
+      emergency: false,
+      recommendPharmacist: true,
+      products: [],
+      verifiedAlternatives: [],
+    });
+
+    expect(
+      await screen.findByText(/Amoxicillin is a prescription-only medicine/i)
+    ).toBeInTheDocument();
+    // User bubble was NOT duplicated on retry, and error/not-delivered notice cleared
+    expect(screen.getAllByText("Do you have Amoxicillin?")).toHaveLength(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not delivered/i)).not.toBeInTheDocument();
+  });
+
+  test("prevents duplicate submissions when the user double-submits a Medical AI question", async () => {
+    let resolveCall;
+    apiFetch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCall = resolve;
+        })
+    );
+
+    render(<CustomerSupportChat />);
+    fireEvent.click(screen.getByRole("button", { name: "Open pharmacy support chat" }));
+
+    const input = screen.getByLabelText("Ask Medical AI");
+    fireEvent.change(input, { target: { value: "What helps with hydration?" } });
+
+    // Fire two rapid submit events before state settles
+    fireEvent.submit(input);
+    fireEvent.submit(input);
+
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+
+    resolveCall({
+      sessionId: "sess-dedupe-1",
+      reply: "Oral rehydration salts and clean water help maintain hydration.",
+      emergency: false,
+      recommendPharmacist: false,
+      products: [],
+      verifiedAlternatives: [],
+    });
+
+    expect(await screen.findByText(/Oral rehydration salts/i)).toBeInTheDocument();
+    expect(screen.getAllByText("What helps with hydration?")).toHaveLength(1);
   });
 
   test("submits a support message through the existing inquiry API on the Pharmacy Support tab", async () => {

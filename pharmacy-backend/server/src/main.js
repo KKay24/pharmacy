@@ -11,6 +11,7 @@ const {
   mountLegacyApi,
 } = require('./app.module');
 const { resolveTrustProxySetting } = require('./security/request-context');
+const { getAiProviderDiagnostics } = require('./ai/ai-provider.service');
 
 async function createApplication() {
   const app = await NestFactory.create(AppModule, {
@@ -58,6 +59,16 @@ async function bootstrap() {
   const app = await createApplication();
   await app.listen(Number(process.env.PORT || 5001));
   console.log(`NestJS server running on http://localhost:${process.env.PORT || 5001}`);
+  const aiDiagnostics = getAiProviderDiagnostics();
+  const aiLog = JSON.stringify({
+    event: 'ai_provider_startup',
+    ...aiDiagnostics,
+  });
+  if (aiDiagnostics.configured) {
+    console.info(aiLog);
+  } else {
+    console.warn(aiLog);
+  }
   return app;
 }
 

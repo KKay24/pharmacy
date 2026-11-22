@@ -18,6 +18,7 @@ let Medicine;
 let Batch;
 let AiService;
 let resolveAiProviderConfig;
+let getAiProviderDiagnostics;
 let generateAiCompletion;
 
 describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
@@ -30,7 +31,11 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
     Medicine = models.Medicine;
     Batch = models.Batch;
     AiService = require('../src/ai/ai.service');
-    ({ resolveAiProviderConfig, generateAiCompletion } = require('../src/ai/ai-provider.service'));
+    ({
+      resolveAiProviderConfig,
+      getAiProviderDiagnostics,
+      generateAiCompletion,
+    } = require('../src/ai/ai-provider.service'));
 
     const { buildProductKey } = require('../src/inventory/product-identity');
 
@@ -304,15 +309,287 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
           { systemPrompt: 'sys', history: [], userMessage: 'Hello' },
           {} // empty env -> no credentials
         ),
-      (error) => error.getStatus && error.getStatus() === 503
+      (error) => {
+        const res = error.getResponse?.();
+        return error.getStatus?.() === 503 && res?.code === 'AI_NOT_CONFIGURED';
+      }
     );
 
     const geminiCfg = resolveAiProviderConfig({ GEMINI_API_KEY: 'test-key-placeholder' });
     assert.equal(geminiCfg.configured, true);
     assert.equal(geminiCfg.provider, 'gemini');
+    assert.equal(geminiCfg.keySource, 'GEMINI_API_KEY');
+
+    const googleAliasCfg = resolveAiProviderConfig({ GOOGLE_API_KEY: 'test-google-key' });
+    assert.equal(googleAliasCfg.configured, true);
+    assert.equal(googleAliasCfg.provider, 'gemini');
+    assert.equal(googleAliasCfg.keySource, 'GOOGLE_API_KEY');
+
+    const genericKeyOnlyCfg = resolveAiProviderConfig({ AI_API_KEY: 'AIzaTestGenericKey123' });
+    assert.equal(genericKeyOnlyCfg.configured, true);
+    assert.equal(genericKeyOnlyCfg.provider, 'gemini');
+    assert.equal(genericKeyOnlyCfg.keySource, 'AI_API_KEY');
 
     const openaiCfg = resolveAiProviderConfig({ AI_PROVIDER: 'openai', AI_API_KEY: 'test-key-placeholder' });
     assert.equal(openaiCfg.configured, true);
     assert.equal(openaiCfg.provider, 'openai');
+
+    const anthropicAliasCfg = resolveAiProviderConfig({ AI_PROVIDER: 'claude', AI_API_KEY: 'sk-ant-test' });
+    assert.equal(anthropicAliasCfg.configured, true);
+    assert.equal(anthropicAliasCfg.provider, 'anthropic');
+
+    const diagnostics = getAiProviderDiagnostics({ GEMINI_API_KEY: 'super-secret-value-never-log' });
+    assert.equal(diagnostics.configured, true);
+    assert.equal(diagnostics.provider, 'gemini');
+    assert.equal(diagnostics.hasApiKey, true);
+    assert.equal(diagnostics.keySource, 'GEMINI_API_KEY');
+    assert.ok(!JSON.stringify(diagnostics).includes('super-secret-value-never-log'));
+  });
+
+  test('sends Gemini key in x-goog-api-key header (never in URL) and returns completion on success', async () => {
+    const originalFetch = global.fetch;
+    let capturedUrl = '';
+    let capturedHeaders = null;
+
+    global.fetch = async (url, options) => {
+      capturedUrl = String(url);
+      capturedHeaders = options?.headers || {};
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: 'Paracetamol 500mg Tablets are in stock at ZMW 22.00.' }],
+              },
+            },
+          ],
+        }),
+      };
+    };
+
+    try {
+      const result = await generateAiCompletion(
+        { systemPrompt: 'sys', history: [], userMessage: 'Do you have Paracetamol?' },
+        { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'secret-gemini-key-xyz', AI_MODEL: 'gemini-2.5-flash' }
+      );
+
+      assert.equal(result.provider, 'gemini');
+      assert.equal(result.model, 'gemini-2.5-flash');
+      assert.match(result.text, /Paracetamol 500mg Tablets/);
+      assert.ok(!capturedUrl.includes('secret-gemini-key-xyz'), 'API key must never appear in request URL');
+      assert.equal(capturedHeaders['x-goog-api-key'], 'secret-gemini-key-xyz');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('calls OpenAI /chat/completions with Bearer auth and gpt-4o-mini default on success', async () => {
+    const originalFetch = global.fetch;
+    let capturedUrl = '';
+    let capturedHeaders = null;
+    let capturedBody = null;
+
+    global.fetch = async (url, options) => {
+      capturedUrl = String(url);
+      capturedHeaders = options?.headers || {};
+      capturedBody = JSON.parse(options?.body || '{}');
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: 'Paracetamol 500mg Tablets are available in our catalogue for ZMW 22.00.',
+              },
+              finish_reason: 'stop',
+            },
+          ],
+        }),
+      };
+    };
+
+    try {
+      const result = await generateAiCompletion(
+        { systemPrompt: 'sys', history: [], userMessage: 'Do you have Paracetamol?' },
+        { AI_PROVIDER: 'openai', OPENAI_API_KEY: 'sk-proj-test-key-xyz', AI_MODEL: '   ' }
+      );
+
+      assert.equal(result.provider, 'openai');
+      assert.equal(result.model, 'gpt-4o-mini');
+      assert.match(result.text, /Paracetamol 500mg Tablets/);
+      assert.equal(capturedUrl, 'https://api.openai.com/v1/chat/completions');
+      assert.equal(capturedHeaders.Authorization, 'Bearer sk-proj-test-key-xyz');
+      assert.equal(capturedBody.model, 'gpt-4o-mini');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('classifies invalid API keys (401/403 and Gemini 400 API_KEY_INVALID) as 503 AI_AUTH_ERROR without exposing secrets', async () => {
+    const originalFetch = global.fetch;
+    const originalConsoleError = console.error;
+    const loggedLines = [];
+    console.error = (...args) => loggedLines.push(args.join(' '));
+
+    try {
+      // 401 unauthorized from provider
+      global.fetch = async () => ({
+        ok: false,
+        status: 401,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ error: { status: 'UNAUTHENTICATED', message: 'Invalid API key secret-bad-key-123' } }),
+      });
+
+      await assert.rejects(
+        () =>
+          generateAiCompletion(
+            { systemPrompt: 'sys', history: [], userMessage: 'Hello' },
+            { GEMINI_API_KEY: 'secret-bad-key-123' }
+          ),
+        (error) => {
+          const res = error.getResponse?.();
+          return (
+            error.getStatus?.() === 503 &&
+            res?.code === 'AI_AUTH_ERROR' &&
+            !JSON.stringify(res).includes('secret-bad-key-123')
+          );
+        }
+      );
+
+      // Gemini 400 API_KEY_INVALID
+      global.fetch = async () => ({
+        ok: false,
+        status: 400,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          error: {
+            code: 400,
+            status: 'INVALID_ARGUMENT',
+            message: 'API key not valid. Please pass a valid API key.',
+            details: [{ reason: 'API_KEY_INVALID' }],
+          },
+        }),
+      });
+
+      await assert.rejects(
+        () =>
+          generateAiCompletion(
+            { systemPrompt: 'sys', history: [], userMessage: 'Hello' },
+            { GEMINI_API_KEY: 'secret-bad-key-123' }
+          ),
+        (error) => error.getStatus?.() === 503 && error.getResponse?.()?.code === 'AI_AUTH_ERROR'
+      );
+
+      const allLogs = loggedLines.join('\n');
+      assert.ok(allLogs.includes('"reason":"invalid_api_key"'));
+      assert.ok(!allLogs.includes('secret-bad-key-123'), 'Logs must never contain API keys');
+    } finally {
+      global.fetch = originalFetch;
+      console.error = originalConsoleError;
+    }
+  });
+
+  test('handles upstream timeouts (AbortError) as 504 AI_TIMEOUT with structured logging', async () => {
+    const originalFetch = global.fetch;
+    const originalConsoleWarn = console.warn;
+    const warnLines = [];
+    console.warn = (...args) => warnLines.push(args.join(' '));
+
+    global.fetch = async () => {
+      const abortErr = new Error('The operation was aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    };
+
+    try {
+      await assert.rejects(
+        () =>
+          generateAiCompletion(
+            { systemPrompt: 'sys', history: [], userMessage: 'Slow query' },
+            { GEMINI_API_KEY: 'test-key-timeout', AI_TIMEOUT_MS: '3000' }
+          ),
+        (error) => error.getStatus?.() === 504 && error.getResponse?.()?.code === 'AI_TIMEOUT'
+      );
+
+      assert.ok(warnLines.join('\n').includes('"reason":"timeout"'));
+    } finally {
+      global.fetch = originalFetch;
+      console.warn = originalConsoleWarn;
+    }
+  });
+
+  test('maps upstream provider 429 rate limits to 429 AI_RATE_LIMITED with Retry-After', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = async () => ({
+      ok: false,
+      status: 429,
+      headers: new Headers({
+        'content-type': 'application/json',
+        'retry-after': '45',
+      }),
+      json: async () => ({ error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' } }),
+    });
+
+    try {
+      await assert.rejects(
+        () =>
+          generateAiCompletion(
+            { systemPrompt: 'sys', history: [], userMessage: 'Busy query' },
+            { GEMINI_API_KEY: 'test-key-rl' }
+          ),
+        (error) => {
+          const res = error.getResponse?.();
+          return (
+            error.getStatus?.() === 429 &&
+            res?.code === 'AI_RATE_LIMITED' &&
+            res?.retryAfterSeconds === 45
+          );
+        }
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('maps upstream provider outages (503/500 and network errors) to 503 AI_PROVIDER_UNAVAILABLE', async () => {
+    const originalFetch = global.fetch;
+    try {
+      global.fetch = async () => ({
+        ok: false,
+        status: 503,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ error: { status: 'UNAVAILABLE', message: 'Overloaded' } }),
+      });
+
+      await assert.rejects(
+        () =>
+          generateAiCompletion(
+            { systemPrompt: 'sys', history: [], userMessage: 'Outage test' },
+            { GEMINI_API_KEY: 'test-key-outage' }
+          ),
+        (error) => error.getStatus?.() === 503 && error.getResponse?.()?.code === 'AI_PROVIDER_UNAVAILABLE'
+      );
+
+      global.fetch = async () => {
+        throw new TypeError('fetch failed');
+      };
+
+      await assert.rejects(
+        () =>
+          generateAiCompletion(
+            { systemPrompt: 'sys', history: [], userMessage: 'Network failure test' },
+            { GEMINI_API_KEY: 'test-key-net' }
+          ),
+        (error) => error.getStatus?.() === 503 && error.getResponse?.()?.code === 'AI_PROVIDER_UNAVAILABLE'
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });

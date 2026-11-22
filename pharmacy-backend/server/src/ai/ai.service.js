@@ -48,10 +48,19 @@ class AiService {
     const timestamps = (this.rateLimitBuckets.get(key) || []).filter((ts) => now - ts < windowMs);
     if (timestamps.length >= maxRequests) {
       const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - timestamps[0])) / 1000));
+      console.warn(
+        JSON.stringify({
+          event: 'ai_rate_limited',
+          retryAfterSeconds,
+          maxRequests,
+          windowMs,
+        })
+      );
       throw new HttpException(
         {
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
           error: 'Too Many Requests',
+          code: 'AI_RATE_LIMITED',
           message: `You have reached the Medical AI message limit. Please wait ${retryAfterSeconds}s or switch to the Pharmacy Support tab.`,
           retryAfterSeconds,
         },
@@ -186,11 +195,32 @@ class AiService {
     const historySnapshot = session.history.slice(-MAX_HISTORY_TURNS);
 
     // 4. Call configured external AI provider (never returns fake/mock AI replies in production)
-    const completion = await this.completionFn({
-      systemPrompt,
-      history: historySnapshot,
-      userMessage: rawMessage,
-    });
+    let completion;
+    try {
+      completion = await this.completionFn({
+        systemPrompt,
+        history: historySnapshot,
+        userMessage: rawMessage,
+      });
+    } catch (error) {
+      const statusCode = typeof error?.getStatus === 'function' ? error.getStatus() : 500;
+      const responseBody = typeof error?.getResponse === 'function' ? error.getResponse() : null;
+      const code =
+        responseBody && typeof responseBody === 'object' && typeof responseBody.code === 'string'
+          ? responseBody.code
+          : null;
+      console.error(
+        JSON.stringify({
+          event: 'ai_chat_error',
+          sessionId: session.id,
+          statusCode,
+          code,
+          catalogueMatches: products.length,
+          latencyMs: Date.now() - startedAt,
+        })
+      );
+      throw error;
+    }
 
     // 5. Persist conversation turn in ephemeral server session (never logged in plaintext)
     session.history.push(
