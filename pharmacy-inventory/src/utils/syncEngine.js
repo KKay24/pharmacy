@@ -1,7 +1,7 @@
 // src/utils/syncEngine.js
 // Client-side Synchronization Engine for MediQuick PWA
 
-import { apiFetch } from './api';
+import { apiFetch, apiHealthPath } from './api';
 import {
   getPendingOperations,
   removePendingOperation,
@@ -52,7 +52,7 @@ class SyncEngine {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
-      const res = await apiFetch('/health', { signal: controller.signal });
+      const res = await apiFetch(apiHealthPath(), { signal: controller.signal });
       clearTimeout(timeoutId);
 
       const wasOffline = !this.isOnline;

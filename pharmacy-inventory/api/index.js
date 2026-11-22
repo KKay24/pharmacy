@@ -46,11 +46,14 @@ function targetPathFromRequest(req) {
     : typeof routedPath === 'string'
       ? routedPath.replace(/^\/+/, '')
       : incomingUrl.pathname.replace(/^\/+/, '');
-  const apiPath = normalizedPath === 'api' || normalizedPath === ''
-    ? '/api'
-    : normalizedPath.startsWith('api/')
-      ? `/${normalizedPath}`
-      : `/api/${normalizedPath}`;
+  const isHealthPath = normalizedPath === 'health' || normalizedPath.startsWith('health/');
+  const apiPath = isHealthPath
+    ? `/${normalizedPath}`
+    : normalizedPath === 'api' || normalizedPath === ''
+      ? '/api'
+      : normalizedPath.startsWith('api/')
+        ? `/${normalizedPath}`
+        : `/api/${normalizedPath}`;
   const query = incomingUrl.searchParams.toString();
   return `${apiPath}${query ? `?${query}` : ''}`;
 }

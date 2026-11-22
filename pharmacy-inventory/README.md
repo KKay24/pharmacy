@@ -28,7 +28,7 @@ Deploy this repo to Vercel and keep the API on Render.
 ### Recommended Vercel environment behavior
 
 - Leave `REACT_APP_API_BASE_URL` unset in Vercel so the browser uses same-origin `/api/*` requests.
-- The checked-in [`vercel.json`](./vercel.json) rewrites `/api/*` to the local proxy function and sends SPA routes to `index.html`.
+- The checked-in [`vercel.json`](./vercel.json) rewrites `/api/*` to the local proxy function and sends SPA routes to `index.html`; `/api/health` is proxied to the backend `/health` route.
 - After the first Vercel deployment, copy the final production domain into the backend's Render `FRONTEND_URL` value so CORS is locked to the correct origin.
 
 ## Features

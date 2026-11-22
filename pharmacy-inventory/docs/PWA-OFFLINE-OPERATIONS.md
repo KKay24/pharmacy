@@ -42,6 +42,8 @@ Vercel production should leave `REACT_APP_API_BASE_URL` unset and set:
 BACKEND_API_URL=https://your-render-service.onrender.com
 ```
 
+The PWA uses the same-origin `/api/health` proxy route for its connectivity heartbeat, avoiding direct browser CORS requests to Render.
+
 Render must retain the existing PostgreSQL and authentication configuration, including `DATABASE_URL`, `JWT_SECRET`, and the exact production Vercel origin in `FRONTEND_URL`. Run `npm run migrate` through the existing Render build command; migrations are additive and do not reset production data.
 
 ## Backup and recovery

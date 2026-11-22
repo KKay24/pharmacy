@@ -36,6 +36,17 @@ describe('syncEngine unit tests', () => {
     expect(result.reason).toBe('offline');
   });
 
+  test('checks connectivity through the configured health endpoint', async () => {
+    api.apiHealthPath.mockReturnValue('/api/health');
+    api.apiFetch.mockResolvedValue({ ok: true });
+    syncEngine.isOnline = true;
+    syncEngine.pendingCount = 0;
+
+    await syncEngine.checkConnectivity();
+
+    expect(api.apiFetch).toHaveBeenCalledWith('/api/health', expect.objectContaining({ signal: expect.anything() }));
+  });
+
   test('triggerSync successfully processes pending operations', async () => {
     syncEngine.isOnline = true;
     offlineDb.getPendingOperations.mockResolvedValue([

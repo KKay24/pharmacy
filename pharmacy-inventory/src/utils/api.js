@@ -29,6 +29,8 @@ export const apiUrl = (path) => {
   return `${API_BASE_URL}${normalizedPath}`;
 };
 
+export const apiHealthPath = (baseUrl = API_BASE_URL) => (baseUrl ? '/health' : '/api/health');
+
 export const apiFetch = async (path, options = {}) => {
   const token = getAccessToken();
   const headers = {
