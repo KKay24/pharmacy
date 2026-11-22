@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { apiUrl } from "../utils/api";
+import {
+  extractPayloadMessage,
+  getHttpErrorMessage,
+  getNetworkErrorMessage,
+} from "../utils/errorMessages";
 
 export const StoreContext = createContext(null);
 
@@ -40,13 +45,25 @@ export function StoreProvider({ children }) {
 
   // --- Auth helpers ---
   const storeLogin = async (username, password) => {
-    const res = await fetch(apiUrl("/api/auth/login"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Login failed");
+    let res;
+    try {
+      res = await fetch(apiUrl("/api/auth/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+    } catch (error) {
+      throw new Error(getNetworkErrorMessage(error));
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        getHttpErrorMessage(res.status, extractPayloadMessage(data), {
+          context: "login",
+          fallback: "Login failed",
+        })
+      );
+    }
     localStorage.setItem("store_token", data.token);
     localStorage.setItem("store_user", JSON.stringify(data.user));
     setStoreToken(data.token);
@@ -55,13 +72,24 @@ export function StoreProvider({ children }) {
   };
 
   const storeRegister = async (payload) => {
-    const res = await fetch(apiUrl("/api/auth/register"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Registration failed");
+    let res;
+    try {
+      res = await fetch(apiUrl("/api/auth/register"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      throw new Error(getNetworkErrorMessage(error));
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        getHttpErrorMessage(res.status, extractPayloadMessage(data), {
+          fallback: "Registration failed",
+        })
+      );
+    }
     localStorage.setItem("store_token", data.token);
     localStorage.setItem("store_user", JSON.stringify(data.user));
     setStoreToken(data.token);
@@ -69,22 +97,43 @@ export function StoreProvider({ children }) {
     return data;
   };
 
-  const storeLogout = () => {
+  const storeLogout = useCallback(() => {
     localStorage.removeItem("store_token");
     localStorage.removeItem("store_user");
     setStoreToken(null);
     setStoreUser(null);
-  };
+  }, []);
 
   // --- API helpers ---
   const apiFetch = useCallback(async (path, options = {}) => {
+    const context = String(path).includes("/prescriptions/upload")
+      ? "prescription-upload"
+      : "general";
     const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
     if (storeToken) headers["Authorization"] = `Bearer ${storeToken}`;
-    const res = await fetch(apiUrl(path), { ...options, headers, credentials: "include" });
+
+    let res;
+    try {
+      res = await fetch(apiUrl(path), { ...options, headers, credentials: "include" });
+    } catch (error) {
+      throw new Error(getNetworkErrorMessage(error, { context }));
+    }
+
+    if (res.status === 401 && storeToken) {
+      storeLogout();
+    }
+
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || data.error || `Request failed (${res.status})`);
+    if (!res.ok) {
+      throw new Error(
+        getHttpErrorMessage(res.status, extractPayloadMessage(data), {
+          context,
+          fallback: `Request failed (${res.status})`,
+        })
+      );
+    }
     return data;
-  }, [storeToken]);
+  }, [storeToken, storeLogout]);
 
   // --- Cart helpers ---
   const addToCart = (product, qty = 1) => {

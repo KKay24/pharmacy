@@ -1,4 +1,10 @@
 import { clearAuthSession, emitForcedLogout, getAccessToken } from './authStorage';
+import {
+  extractPayloadMessage,
+  getHttpErrorMessage,
+  getNetworkErrorMessage,
+  isBrowserOffline,
+} from './errorMessages';
 
 const LOCALHOST_NAMES = new Set(['localhost', '127.0.0.1']);
 
@@ -27,10 +33,18 @@ export const apiFetch = async (path, options = {}) => {
   const token = getAccessToken();
   const headers = {
     ...options.headers,
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const response = await fetch(apiUrl(path), { ...options, headers, credentials: 'include' });
+  let response;
+  try {
+    response = await fetch(apiUrl(path), { ...options, headers, credentials: 'include' });
+  } catch (error) {
+    const friendly = new Error(getNetworkErrorMessage(error));
+    friendly.code = isBrowserOffline() ? 'OFFLINE' : 'BACKEND_UNAVAILABLE';
+    friendly.cause = error;
+    throw friendly;
+  }
 
   if (response.status === 401 && token) {
     clearAuthSession();
@@ -40,12 +54,16 @@ export const apiFetch = async (path, options = {}) => {
   return response;
 };
 
-export const getApiErrorMessage = async (response, fallback = "Request failed") => {
+export const getApiErrorMessage = async (response, fallback = "Request failed", options = {}) => {
+  let payloadMessage = "";
   try {
-    const payload = await response.json();
-    if (Array.isArray(payload?.message)) return payload.message.join(", ");
-    return payload?.message || payload?.error || fallback;
+    if (response && typeof response.json === "function") {
+      const payload = await response.json();
+      payloadMessage = extractPayloadMessage(payload);
+    }
   } catch (error) {
-    return fallback;
+    payloadMessage = "";
   }
+
+  return getHttpErrorMessage(response?.status, payloadMessage, { ...options, fallback });
 };

@@ -1,6 +1,8 @@
 // DataContext.js
 import React, { createContext, useState, useEffect, useCallback } from "react";
+import { toast } from "react-hot-toast";
 import { apiFetch, getApiErrorMessage } from "../utils/api";
+import { ERROR_MESSAGES } from "../utils/errorMessages";
 import { clearAuthSession, loadAuthSession, saveAuthSession } from "../utils/authStorage";
 import {
   getOfflineProducts,
@@ -336,7 +338,10 @@ export const DataProvider = ({ children }) => {
   }, [username, userRole, fetchInventory, fetchInventoryCategories, fetchSales, fetchCustomers]);
 
   useEffect(() => {
-    const handleForcedLogout = () => logoutUser();
+    const handleForcedLogout = () => {
+      logoutUser();
+      toast.error(ERROR_MESSAGES.SESSION_EXPIRED, { id: "mediquick-session-expired" });
+    };
 
     window.addEventListener("mediquick:logout", handleForcedLogout);
     return () => window.removeEventListener("mediquick:logout", handleForcedLogout);

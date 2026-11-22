@@ -12,7 +12,8 @@ import {
   User,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { apiFetch as staffApiFetch } from "../utils/api";
+import { apiFetch as staffApiFetch, getApiErrorMessage } from "../utils/api";
+import { getNetworkErrorMessage } from "../utils/errorMessages";
 import { DataContext } from "../context/DataContext";
 import { useStore } from "../context/StoreContext";
 import { ProductCard, ProductCardSkeleton } from "../components/store/ProductCard";
@@ -104,17 +105,18 @@ export default function LoginPage({ staffMode = false, heroBanners = HERO_BANNER
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: trimmedUsername, password: trimmedPassword }),
       });
-      const data = await response.json();
       if (!response.ok) {
-        toast.error(data.error || data.message || "Invalid credentials", { id: toastId });
+        const message = await getApiErrorMessage(response, "Invalid credentials", { context: "login" });
+        toast.error(message, { id: toastId });
         return;
       }
+      const data = await response.json();
       toast.success(`Welcome back, ${data.user?.username || "Staff"}`, { id: toastId });
       loginUser(data);
       navigate(data.user?.role === "admin" || data.user?.role === "manager" ? "/dashboard" : "/pos");
     } catch (error) {
       console.error("Login error", error);
-      toast.error("Network error: verification failed", { id: toastId });
+      toast.error(getNetworkErrorMessage(error), { id: toastId });
     } finally {
       setIsLoading(false);
     }

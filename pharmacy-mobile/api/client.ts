@@ -2,6 +2,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { NativeModules, Platform } from 'react-native';
+import { resolveMobileErrorMessage } from '../utils/errorMessages';
 
 const API_PORT = '5001';
 const LOCALHOST_NAMES = new Set(['localhost', '127.0.0.1']);
@@ -126,11 +127,14 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Interceptor to handle expired tokens and auth failures.
+// Interceptor to handle expired tokens, network/server failures, and consistent user messages.
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const requestUrl = String(error?.config?.url || '');
+    const isLoginRequest = requestUrl.includes('/auth/login');
+
+    if (error.response?.status === 401 && !isLoginRequest) {
       try {
         await SecureStore.deleteItemAsync(TOKEN_KEY);
         await SecureStore.deleteItemAsync('mediquick.auth');
@@ -138,6 +142,26 @@ apiClient.interceptors.response.use(
         // ignore
       }
     }
+
+    const friendlyMessage = resolveMobileErrorMessage(error);
+    if (error && typeof error === 'object') {
+      error.userMessage = friendlyMessage;
+      error.message = friendlyMessage;
+      if (
+        error.response?.data &&
+        typeof error.response.data === 'object' &&
+        (error.response.status === 401 ||
+          error.response.status === 403 ||
+          error.response.status >= 500)
+      ) {
+        error.response.data = {
+          ...error.response.data,
+          error: friendlyMessage,
+          message: friendlyMessage,
+        };
+      }
+    }
+
     return Promise.reject(error);
   }
 );

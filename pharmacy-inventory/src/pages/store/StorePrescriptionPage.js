@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Upload, FileText, CheckCircle, Search } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import { showToast } from "../../components/store/StoreToast";
+import { ERROR_MESSAGES, getNetworkErrorMessage } from "../../utils/errorMessages";
 
 export default function StorePrescriptionPage() {
   const { apiFetch, storeUser } = useStore();
@@ -30,9 +31,14 @@ export default function StorePrescriptionPage() {
 
   const handleFile = (file) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { setError("File must be under 5 MB"); return; }
+    if (file.size > 5 * 1024 * 1024) {
+      setError(ERROR_MESSAGES.UPLOAD_FAILED);
+      return;
+    }
+    setError("");
     const reader = new FileReader();
     reader.onload = (e) => { set("fileData", e.target.result); set("fileName", file.name); };
+    reader.onerror = () => { setError(ERROR_MESSAGES.UPLOAD_FAILED); };
     reader.readAsDataURL(file);
   };
 
@@ -46,7 +52,7 @@ export default function StorePrescriptionPage() {
       setSubmitResult(result);
       showToast("Prescription submitted successfully!", "success");
     } catch (err) {
-      setError(err.message || "Failed to submit prescription");
+      setError(getNetworkErrorMessage(err, { context: "prescription-upload", fallback: ERROR_MESSAGES.UPLOAD_FAILED }));
     } finally {
       setLoading(false);
     }

@@ -8,6 +8,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { ERROR_MESSAGES } from '@/utils/errorMessages';
 
 interface RoleGuardProps {
   /** The page key to check against canAccess() */
@@ -51,13 +52,6 @@ export function RoleGuard({ page, children }: RoleGuardProps) {
   }
 
   if (!canAccess(page)) {
-    const roleLabel =
-      user.role === 'admin'
-        ? 'Administrator'
-        : user.role === 'manager'
-        ? 'Manager'
-        : 'Staff';
-
     return (
       <View style={[styles.center, { backgroundColor: theme.background }]}>
         <View style={[styles.iconWrap, { backgroundColor: theme.dangerSoft }]}>
@@ -65,8 +59,7 @@ export function RoleGuard({ page, children }: RoleGuardProps) {
         </View>
         <Text style={[styles.title, { color: theme.text }]}>Access Denied</Text>
         <Text style={[styles.subtitle, { color: theme.mutedText }]}>
-          Your role ({roleLabel}) does not have permission to access this page.
-          {'\n'}Please contact your administrator.
+          {ERROR_MESSAGES.PERMISSION_DENIED}
         </Text>
         <Pressable
           style={[styles.btn, { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }]}

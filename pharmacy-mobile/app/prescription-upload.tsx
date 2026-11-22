@@ -25,6 +25,7 @@ import {
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
+import { ERROR_MESSAGES, resolveMobileErrorMessage } from '../utils/errorMessages';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -84,10 +85,13 @@ export default function PrescriptionUploadScreen() {
         data.referenceNumber ||
         `RX-${Math.floor(100000 + Math.random() * 900000)}`;
       setSubmitResult({ prescriptionNumber: rxNum });
-    } catch (e: any) {
+    } catch (e: unknown) {
       Alert.alert(
-        'Submission Error',
-        e.response?.data?.error || e.message || 'Failed to submit prescription.'
+        'Upload Failed',
+        resolveMobileErrorMessage(e, {
+          context: 'prescription-upload',
+          fallback: ERROR_MESSAGES.UPLOAD_FAILED,
+        })
       );
     } finally {
       setSubmitting(false);

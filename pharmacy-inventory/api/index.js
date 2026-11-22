@@ -107,7 +107,7 @@ const proxyHandler = async (req, res) => {
     console.error('Vercel API proxy error:', error?.name || 'UnknownError');
     res.statusCode = 502;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Unable to reach the backend API' }));
+    res.end(JSON.stringify({ error: "We're temporarily unable to connect. Please try again." }));
   }
 };
 
