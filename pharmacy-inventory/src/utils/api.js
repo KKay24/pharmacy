@@ -58,14 +58,16 @@ export const apiFetch = async (path, options = {}) => {
 
 export const getApiErrorMessage = async (response, fallback = "Request failed", options = {}) => {
   let payloadMessage = "";
+  let payloadCode;
   try {
     if (response && typeof response.json === "function") {
       const payload = await response.json();
       payloadMessage = extractPayloadMessage(payload);
+      payloadCode = payload?.code;
     }
   } catch (error) {
     payloadMessage = "";
   }
 
-  return getHttpErrorMessage(response?.status, payloadMessage, { ...options, fallback });
+  return getHttpErrorMessage(response?.status, payloadMessage, { ...options, fallback, code: payloadCode });
 };

@@ -488,6 +488,7 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
 
       const allLogs = loggedLines.join('\n');
       assert.ok(allLogs.includes('"reason":"invalid_api_key"'));
+      assert.ok(allLogs.includes('"applicationCode":"AI_AUTHENTICATION_FAILED"'));
       assert.ok(!allLogs.includes('secret-bad-key-123'), 'Logs must never contain API keys');
     } finally {
       global.fetch = originalFetch;
@@ -540,14 +541,18 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
       );
 
       assert.ok(warnLines.join('\n').includes('"reason":"timeout"'));
+      assert.ok(warnLines.join('\n').includes('"applicationCode":"AI_PROVIDER_TIMEOUT"'));
     } finally {
       global.fetch = originalFetch;
       console.warn = originalConsoleWarn;
     }
   });
 
-  test('maps upstream provider 429 rate limits to 429 AI_RATE_LIMITED with Retry-After', async () => {
+  test('maps OpenAI rate_limit_exceeded to 429 AI_RATE_LIMITED with Retry-After', async () => {
     const originalFetch = global.fetch;
+    const originalConsoleWarn = console.warn;
+    const loggedLines = [];
+    console.warn = (...args) => loggedLines.push(args.join(' '));
     global.fetch = async () => ({
       ok: false,
       status: 429,
@@ -555,7 +560,13 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
         'content-type': 'application/json',
         'retry-after': '45',
       }),
-      json: async () => ({ error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' } }),
+      json: async () => ({
+        error: {
+          type: 'rate_limit_error',
+          code: 'rate_limit_exceeded',
+          message: 'Rate limit exceeded',
+        },
+      }),
     });
 
     try {
@@ -563,7 +574,7 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
         () =>
           generateAiCompletion(
             { systemPrompt: 'sys', history: [], userMessage: 'Busy query' },
-            { GEMINI_API_KEY: 'test-key-rl' }
+            { AI_PROVIDER: 'openai', OPENAI_API_KEY: 'test-key-rl' }
           ),
         (error) => {
           const res = error.getResponse?.();
@@ -574,13 +585,69 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
           );
         }
       );
+      assert.ok(loggedLines.join('\n').includes('"applicationCode":"AI_RATE_LIMITED"'));
     } finally {
       global.fetch = originalFetch;
+      console.warn = originalConsoleWarn;
+    }
+  });
+
+  test('classifies exhausted OpenAI credits separately and does not return a retry delay', async () => {
+    const originalFetch = global.fetch;
+    const originalConsoleError = console.error;
+    const loggedLines = [];
+    console.error = (...args) => loggedLines.push(args.join(' '));
+
+    try {
+      for (const upstreamCode of ['credit_balance_exhausted', 'insufficient_quota']) {
+        global.fetch = async () => ({
+          ok: false,
+          status: 429,
+          headers: new Headers({
+            'content-type': 'application/json',
+            'retry-after': '30',
+          }),
+          json: async () => ({
+            error: {
+              type: 'insufficient_quota',
+              code: upstreamCode,
+              message: 'The account has no remaining API credits.',
+            },
+          }),
+        });
+
+        await assert.rejects(
+          () =>
+            generateAiCompletion(
+              { systemPrompt: 'sys', history: [], userMessage: 'Credit exhaustion test' },
+              { AI_PROVIDER: 'openai', OPENAI_API_KEY: 'test-key-credits' }
+            ),
+          (error) => {
+            const response = error.getResponse?.();
+            return error.getStatus?.() === 503
+              && response?.code === 'AI_CREDITS_EXHAUSTED'
+              && response?.message === 'The AI assistant is temporarily unavailable. Please try again later.'
+              && response?.retryAfterSeconds === undefined;
+          }
+        );
+      }
+
+      const events = loggedLines.map((line) => JSON.parse(line));
+      assert.equal(events.length, 2);
+      assert.ok(events.every((event) => event.applicationCode === 'AI_CREDITS_EXHAUSTED'));
+      assert.ok(events.every((event) => event.reason === 'provider_credits_exhausted'));
+      assert.ok(!loggedLines.join('\n').includes('test-key-credits'));
+    } finally {
+      global.fetch = originalFetch;
+      console.error = originalConsoleError;
     }
   });
 
   test('maps upstream provider outages (503/500 and network errors) to 503 AI_PROVIDER_UNAVAILABLE', async () => {
     const originalFetch = global.fetch;
+    const originalConsoleError = console.error;
+    const loggedLines = [];
+    console.error = (...args) => loggedLines.push(args.join(' '));
     try {
       global.fetch = async () => ({
         ok: false,
@@ -598,6 +665,7 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
         (error) => error.getStatus?.() === 503 && error.getResponse?.()?.code === 'AI_PROVIDER_UNAVAILABLE'
       );
 
+      assert.ok(loggedLines.join('\n').includes('"applicationCode":"AI_PROVIDER_UNAVAILABLE"'));
       global.fetch = async () => {
         throw new TypeError('fetch failed');
       };
@@ -612,6 +680,7 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
       );
     } finally {
       global.fetch = originalFetch;
+      console.error = originalConsoleError;
     }
   });
 });

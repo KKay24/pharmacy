@@ -96,7 +96,10 @@ export default function AddStock({
         if (file.type === "application/pdf") {
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const pdf = await pdfjsLib.getDocument({
+                    data: arrayBuffer,
+                    isEvalSupported: false,
+                }).promise;
                 
                 let fullText = "";
                 let hasText = false;

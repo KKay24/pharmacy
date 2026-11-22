@@ -194,7 +194,13 @@ async function readSafeUpstreamErrorMeta(response) {
   try {
     const contentType = String(response.headers?.get?.('content-type') || '').toLowerCase();
     if (!contentType.includes('application/json')) {
-      return { upstreamCode: null, upstreamType: null, isAuthHint: false };
+      return {
+        upstreamCode: null,
+        upstreamType: null,
+        isAuthHint: false,
+        isCreditBalanceExhausted: false,
+        isRateLimitHint: false,
+      };
     }
     const body = await response.json();
     const errObj = body?.error && typeof body.error === 'object' ? body.error : body;
@@ -204,28 +210,36 @@ async function readSafeUpstreamErrorMeta(response) {
     const details = Array.isArray(errObj?.details) ? errObj.details : [];
     const detailReason = details.find((item) => typeof item?.reason === 'string')?.reason || null;
     const combinedCode = detailReason || (upstreamCode ? String(upstreamCode) : null);
+    const classificationText = `${combinedCode || ''} ${upstreamCode || ''} ${upstreamType || ''} ${rawMsg}`;
 
     const isAuthHint =
       /API_KEY_INVALID|INVALID_API_KEY|PERMISSION_DENIED|UNAUTHENTICATED|AUTHENTICATION_ERROR/i.test(
         `${combinedCode || ''} ${upstreamType || ''}`
       ) || /api key not valid|invalid api key|incorrect api key/i.test(rawMsg);
 
-    const isQuotaHint =
-      /RESOURCE_EXHAUSTED|RATE_LIMIT_EXCEEDED|INSUFFICIENT_QUOTA/i.test(
-        `${combinedCode || ''} ${upstreamType || ''}`
-      );
+    const isCreditBalanceExhausted =
+      /CREDIT_BALANCE_EXHAUSTED|INSUFFICIENT_QUOTA/i.test(classificationText);
+    const isRateLimitHint =
+      /RESOURCE_EXHAUSTED|RATE_LIMIT_EXCEEDED/i.test(classificationText);
 
     return {
       upstreamCode: combinedCode ? String(combinedCode).slice(0, 80) : null,
       upstreamType: upstreamType ? String(upstreamType).slice(0, 80) : null,
       isAuthHint,
-      isQuotaHint,
+      isCreditBalanceExhausted,
+      isRateLimitHint,
     };
   } catch (parseError) {
     if (parseError?.name === 'AbortError' || parseError?.name === 'TimeoutError') {
       throw parseError;
     }
-    return { upstreamCode: null, upstreamType: null, isAuthHint: false, isQuotaHint: false };
+    return {
+      upstreamCode: null,
+      upstreamType: null,
+      isAuthHint: false,
+      isCreditBalanceExhausted: false,
+      isRateLimitHint: false,
+    };
   }
 }
 
@@ -234,10 +248,30 @@ async function handleUpstreamFailure(response, config, startedAt) {
   const latencyMs = Date.now() - startedAt;
   const meta = await readSafeUpstreamErrorMeta(response);
 
-  // 1. Rate limit / quota exceeded (429 or explicit quota exhaustion)
-  if (status === 429 || meta.isQuotaHint) {
+  if (meta.isCreditBalanceExhausted) {
+    logAiProviderEvent('error', {
+      applicationCode: 'AI_CREDITS_EXHAUSTED',
+      reason: 'provider_credits_exhausted',
+      provider: config.provider,
+      model: config.model,
+      upstreamStatus: status,
+      upstreamCode: meta.upstreamCode,
+      upstreamType: meta.upstreamType,
+      latencyMs,
+    });
+    throw new ServiceUnavailableException({
+      statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+      error: 'Service Unavailable',
+      code: 'AI_CREDITS_EXHAUSTED',
+      message: 'The AI assistant is temporarily unavailable. Please try again later.',
+    });
+  }
+
+  // 429 responses without an exhausted-credit code are treated as temporary limits.
+  if (status === 429 || meta.isRateLimitHint) {
     const retryAfterSeconds = parseRetryAfterSeconds(response.headers);
     logAiProviderEvent('warn', {
+      applicationCode: 'AI_RATE_LIMITED',
       reason: 'provider_rate_limited',
       provider: config.provider,
       model: config.model,
@@ -261,6 +295,7 @@ async function handleUpstreamFailure(response, config, startedAt) {
   // 2. Invalid or unauthorized API key (401/403 or Gemini 400 API_KEY_INVALID)
   if (status === 401 || status === 403 || (status === 400 && meta.isAuthHint)) {
     logAiProviderEvent('error', {
+      applicationCode: 'AI_AUTHENTICATION_FAILED',
       reason: 'invalid_api_key',
       provider: config.provider,
       model: config.model,
@@ -281,6 +316,7 @@ async function handleUpstreamFailure(response, config, startedAt) {
   // 3. Invalid model or bad provider request (400/404/422)
   if (status >= 400 && status < 500) {
     logAiProviderEvent('error', {
+      applicationCode: 'AI_CONFIG_ERROR',
       reason: 'invalid_model_or_request',
       provider: config.provider,
       model: config.model,
@@ -300,6 +336,7 @@ async function handleUpstreamFailure(response, config, startedAt) {
 
   // 4. Upstream provider outage (5xx)
   logAiProviderEvent('error', {
+    applicationCode: 'AI_PROVIDER_UNAVAILABLE',
     reason: 'provider_outage',
     provider: config.provider,
     model: config.model,
@@ -335,6 +372,7 @@ async function parseJsonOrThrow(response, config, startedAt) {
       throw error;
     }
     logAiProviderEvent('error', {
+      applicationCode: 'AI_PROVIDER_UNAVAILABLE',
       reason: 'invalid_provider_response',
       provider: config.provider,
       model: config.model,
@@ -537,6 +575,7 @@ async function generateAiCompletion({ systemPrompt, history = [], userMessage },
 
   if (!config.configured) {
     logAiProviderEvent('error', {
+      applicationCode: config.unsupportedProvider ? 'AI_CONFIG_ERROR' : 'AI_PROVIDER_UNAVAILABLE',
       reason: config.reason || 'missing_api_key',
       provider: config.provider,
       hasApiKey: false,
@@ -567,6 +606,7 @@ async function generateAiCompletion({ systemPrompt, history = [], userMessage },
     }
     if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
       logAiProviderEvent('warn', {
+        applicationCode: 'AI_PROVIDER_TIMEOUT',
         reason: 'timeout',
         provider: config.provider,
         model: config.model,
@@ -581,6 +621,7 @@ async function generateAiCompletion({ systemPrompt, history = [], userMessage },
       });
     }
     logAiProviderEvent('error', {
+      applicationCode: 'AI_PROVIDER_UNAVAILABLE',
       reason: 'network_error',
       provider: config.provider,
       model: config.model,
@@ -598,6 +639,7 @@ async function generateAiCompletion({ systemPrompt, history = [], userMessage },
   }
 
   logAiProviderEvent('error', {
+    applicationCode: 'AI_CONFIG_ERROR',
     reason: 'unsupported_provider',
     provider: config.provider,
   });

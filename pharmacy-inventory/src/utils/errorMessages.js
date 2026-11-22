@@ -1,5 +1,6 @@
 export const ERROR_MESSAGES = Object.freeze({
   BACKEND_UNAVAILABLE: "We're temporarily unable to connect. Please try again.",
+  AI_CREDITS_EXHAUSTED: "The AI assistant is temporarily unavailable. Please try again later.",
   SERVER_ERROR: "Something went wrong. Your information has been preserved.",
   OFFLINE: "It looks like you're offline. Check your internet connection and try again.",
   SESSION_EXPIRED: "Your session has expired for your security. Please sign in again to continue.",
@@ -31,9 +32,13 @@ export function extractPayloadMessage(payload) {
 export function getHttpErrorMessage(
   status,
   payloadMessage = "",
-  { context = "general", fallback = "Request failed" } = {}
+  { context = "general", fallback = "Request failed", code } = {}
 ) {
   const numericStatus = Number(status);
+
+  if (numericStatus === 503 && code === "AI_CREDITS_EXHAUSTED") {
+    return ERROR_MESSAGES.AI_CREDITS_EXHAUSTED;
+  }
 
   if (numericStatus === 401) {
     if (context === "login") {

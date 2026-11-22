@@ -129,6 +129,7 @@ export function StoreProvider({ children }) {
         getHttpErrorMessage(res.status, extractPayloadMessage(data), {
           context,
           fallback: `Request failed (${res.status})`,
+          code: data?.code,
         })
       );
       httpError.status = res.status;

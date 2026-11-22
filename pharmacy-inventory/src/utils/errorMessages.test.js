@@ -37,6 +37,25 @@ describe("MediQuick error message mapping", () => {
     );
   });
 
+  it("maps exhausted AI credits to the retry-later message", async () => {
+    const message = "The AI assistant is temporarily unavailable. Please try again later.";
+    expect(
+      getHttpErrorMessage(503, "Upstream credit balance exhausted", {
+        code: "AI_CREDITS_EXHAUSTED",
+      })
+    ).toBe(message);
+
+    await expect(
+      getApiErrorMessage({
+        status: 503,
+        json: async () => ({
+          code: "AI_CREDITS_EXHAUSTED",
+          message: "Upstream credit balance exhausted",
+        }),
+      })
+    ).resolves.toBe(message);
+  });
+
   it("maps 500 server errors without exposing internal details", async () => {
     const response = {
       status: 500,

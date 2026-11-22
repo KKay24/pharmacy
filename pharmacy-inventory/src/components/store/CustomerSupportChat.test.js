@@ -147,6 +147,24 @@ describe("MediQuick Smart Assistant (CustomerSupportChat)", () => {
     expect(screen.getByRole("tab", { name: /pharmacy support/i })).toHaveAttribute("aria-selected", "true");
   });
 
+  test("shows the exhausted-credits message without automatically retrying", async () => {
+    const error = new Error("The AI assistant is temporarily unavailable. Please try again later.");
+    error.code = "AI_CREDITS_EXHAUSTED";
+    apiFetch.mockRejectedValueOnce(error);
+
+    render(<CustomerSupportChat />);
+    fireEvent.click(screen.getByRole("button", { name: "Open pharmacy support chat" }));
+    fireEvent.change(screen.getByLabelText("Ask Medical AI"), {
+      target: { value: "Do you stock ibuprofen?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send AI message" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The AI assistant is temporarily unavailable. Please try again later."
+    );
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+  });
+
   test("preserves failed AI messages, supports one-click Retry without duplicating user bubbles, and prevents duplicate submissions", async () => {
     let resolveSecondCall;
     apiFetch

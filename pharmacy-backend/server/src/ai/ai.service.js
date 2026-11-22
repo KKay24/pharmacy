@@ -51,6 +51,7 @@ class AiService {
       console.warn(
         JSON.stringify({
           event: 'ai_rate_limited',
+          applicationCode: 'AI_RATE_LIMITED',
           retryAfterSeconds,
           maxRequests,
           windowMs,
@@ -214,6 +215,7 @@ class AiService {
           event: 'ai_chat_error',
           sessionId: session.id,
           statusCode,
+          applicationCode: code,
           code,
           catalogueMatches: products.length,
           latencyMs: Date.now() - startedAt,
