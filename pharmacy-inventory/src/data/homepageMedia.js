@@ -9,6 +9,7 @@ export const BABY_PRODUCTS_VIDEO = "/videos/baby-products.mp4";
 export const BABY_PRODUCTS_POSTER = "/images/baby-products/baby-diapers.jpg";
 export const PERSONAL_CARE_VIDEO = "/videos/personal-care.mp4";
 export const PERSONAL_CARE_POSTER = "/images/personal-care/skincare-lotion.jpg";
+export const MEDICAL_SUPPLIES_VIDEO = "/videos/medical-supplies.mp4";
 
 /**
  * Three distinct studio images for Medical Devices:
@@ -150,6 +151,14 @@ export const MEDICAL_SUPPLIES_IMAGES = [
     label: "Clinical Care Packaging",
     src: "https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=700&q=80",
     alt: "Clinical medical care supplies and sprays",
+  },
+  {
+    id: "medical-supplies-video",
+    label: "Medical Supplies",
+    src: MEDICAL_SUPPLIES_VIDEO,
+    poster: "https://images.unsplash.com/photo-1550572017-edd951b55104?auto=format&fit=crop&w=700&q=80",
+    alt: "Clinical and first aid medical supplies",
+    mediaType: "live-video",
   },
 ];
 

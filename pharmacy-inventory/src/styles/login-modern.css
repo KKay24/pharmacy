@@ -67,7 +67,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: linear-gradient(105deg, #eff9fa 0%, #eff8f9 78%, rgba(239, 248, 249, 0.65) 100%);
+  background: linear-gradient(90deg, #f3fafb 0%, #eff8f9 65%, #eff8f9 100%);
 }
 
 .hp-hero-title {
@@ -127,7 +127,8 @@
   position: relative;
   min-height: 430px;
   overflow: hidden;
-  background: #dfeff1;
+  background: var(--hp-mist);
+  margin-left: -1px;
 }
 
 .hp-hero-media__img {
@@ -141,7 +142,8 @@
 }
 
 .hp-bp-live-video,
-.hp-capsules-live-video {
+.hp-capsules-live-video,
+.hp-live-video {
   display: block;
   width: 100%;
   height: 100%;
@@ -152,7 +154,16 @@
 .hp-hero-media__fade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(239, 248, 249, 0.35) 0%, rgba(239, 248, 249, 0) 28%);
+  z-index: 2;
+  background: linear-gradient(
+    90deg,
+    #eff8f9 0%,
+    rgba(239, 248, 249, 0.92) 7%,
+    rgba(239, 248, 249, 0.72) 16%,
+    rgba(239, 248, 249, 0.38) 28%,
+    rgba(239, 248, 249, 0.12) 40%,
+    rgba(239, 248, 249, 0) 52%
+  );
   pointer-events: none;
 }
 
@@ -425,10 +436,18 @@
     min-height: 220px;
     aspect-ratio: 16 / 9;
     max-height: 280px;
+    margin-left: 0;
   }
 
   .hp-hero-media__fade {
-    background: linear-gradient(180deg, rgba(239, 248, 249, 0) 65%, rgba(239, 248, 249, 0.5) 100%);
+    background: linear-gradient(
+      180deg,
+      rgba(239, 248, 249, 0) 48%,
+      rgba(239, 248, 249, 0.22) 66%,
+      rgba(239, 248, 249, 0.65) 82%,
+      rgba(239, 248, 249, 0.92) 93%,
+      #eff8f9 100%
+    );
   }
 
   .hp-hero-slide .hp-hero-content {
