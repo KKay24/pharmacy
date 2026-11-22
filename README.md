@@ -169,8 +169,7 @@ Set variables in the relevant app's local `.env` file or deployment secret store
 | `ENABLE_DEMO_SEEDING` | Backend | Enables development demo seeding only outside production. |
 | `ALLOW_LEGACY_DEV_AUTH` | Backend | Optional legacy username-header authentication toggle; disabled in production. |
 | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | Backend | Inputs for the controlled `npm run seed` operation. |
-| `FRONTEND_URL`, `FRONTEND_URLS` | Backend | Allowed browser origins for production CORS. |
-| `ALLOW_VERCEL_PREVIEWS` | Backend | Controls whether HTTPS `*.vercel.app` preview origins are allowed. |
+| `FRONTEND_URL`, `FRONTEND_URLS` | Backend | Exact browser origins allowed by production CORS; the two MediQuick production domains are built-in defaults. |
 | `REACT_APP_API_BASE_URL` | Web | Optional API base URL; local default resolves to `http://localhost:5001`, production can use the same-origin proxy. |
 | `BACKEND_API_URL` | Web/Vercel | Destination backend base URL for the Vercel API proxy. |
 | `EXPO_PUBLIC_API_URL` | Mobile | Backend base URL required by the mobile app outside development. |

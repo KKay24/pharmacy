@@ -35,9 +35,9 @@ This repo is ready to deploy to Render with the checked-in [`render.yaml`](./ren
    - a `pharmacy-backend` web service
    - a `pharmacy-db` Postgres database
 3. After your Vercel frontend is live, set these Render environment variables:
-   - `FRONTEND_URL=https://your-production-app.vercel.app`
-   - `FRONTEND_URLS=https://your-custom-domain.com` if you add a custom domain
-4. Keep `ALLOW_VERCEL_PREVIEWS=true` if you want preview deployments on `*.vercel.app` to work against production.
+   - `FRONTEND_URL=https://www.mediquick.online`
+   - `FRONTEND_URLS=https://mediquick.online` (optional; both MediQuick domains are built-in CORS defaults)
+4. Add any trusted preview origin explicitly to `FRONTEND_URLS`; unconfigured origins are rejected.
 
 ### Manual service settings
 
@@ -46,6 +46,8 @@ If you prefer configuring Render in the dashboard instead of using the Blueprint
 - Build command: `npm install && npm run migrate`
 - Start command: `npm start`
 - Health check path: `/health`
+
+`/health` is the dependency-independent liveness endpoint; `/health/database` reports database connectivity separately.
 
 ### Required production environment variables
 

@@ -222,6 +222,9 @@ async function readSafeUpstreamErrorMeta(response) {
       isQuotaHint,
     };
   } catch (parseError) {
+    if (parseError?.name === 'AbortError' || parseError?.name === 'TimeoutError') {
+      throw parseError;
+    }
     return { upstreamCode: null, upstreamType: null, isAuthHint: false, isQuotaHint: false };
   }
 }
@@ -313,11 +316,12 @@ async function handleUpstreamFailure(response, config, startedAt) {
   });
 }
 
-async function fetchWithTimeout(url, options, timeoutMs) {
+async function fetchWithTimeout(url, options, timeoutMs, consumeResponse) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return await consumeResponse(response);
   } finally {
     clearTimeout(timer);
   }
@@ -327,6 +331,9 @@ async function parseJsonOrThrow(response, config, startedAt) {
   try {
     return await response.json();
   } catch (error) {
+    if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
+      throw error;
+    }
     logAiProviderEvent('error', {
       reason: 'invalid_provider_response',
       provider: config.provider,
@@ -354,7 +361,7 @@ async function callGeminiProvider(config, { systemPrompt, history, userMessage }
     { role: 'user', parts: [{ text: userMessage }] },
   ];
 
-  const response = await fetchWithTimeout(
+  return fetchWithTimeout(
     url,
     {
       method: 'POST',
@@ -371,38 +378,39 @@ async function callGeminiProvider(config, { systemPrompt, history, userMessage }
         },
       }),
     },
-    config.timeoutMs
+    config.timeoutMs,
+    async (response) => {
+      if (!response.ok) {
+        await handleUpstreamFailure(response, config, startedAt);
+      }
+
+      const data = await parseJsonOrThrow(response, config, startedAt);
+      const text = data?.candidates?.[0]?.content?.parts
+        ?.map((part) => part?.text || '')
+        .join('')
+        .trim();
+
+      if (!text) {
+        logAiProviderEvent('warn', {
+          reason: 'empty_response',
+          provider: config.provider,
+          model: config.model,
+          finishReason: data?.candidates?.[0]?.finishReason || null,
+          blockReason: data?.promptFeedback?.blockReason || null,
+          latencyMs: Date.now() - startedAt,
+        });
+        throw new ServiceUnavailableException({
+          statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+          error: 'Service Unavailable',
+          code: 'AI_EMPTY_RESPONSE',
+          message:
+            'Medical AI assistant did not return a response. Please try again or contact Pharmacy Support.',
+        });
+      }
+
+      return { text, provider: config.provider, model: config.model };
+    }
   );
-
-  if (!response.ok) {
-    await handleUpstreamFailure(response, config, startedAt);
-  }
-
-  const data = await parseJsonOrThrow(response, config, startedAt);
-  const text = data?.candidates?.[0]?.content?.parts
-    ?.map((part) => part?.text || '')
-    .join('')
-    .trim();
-
-  if (!text) {
-    logAiProviderEvent('warn', {
-      reason: 'empty_response',
-      provider: config.provider,
-      model: config.model,
-      finishReason: data?.candidates?.[0]?.finishReason || null,
-      blockReason: data?.promptFeedback?.blockReason || null,
-      latencyMs: Date.now() - startedAt,
-    });
-    throw new ServiceUnavailableException({
-      statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-      error: 'Service Unavailable',
-      code: 'AI_EMPTY_RESPONSE',
-      message:
-        'Medical AI assistant did not return a response. Please try again or contact Pharmacy Support.',
-    });
-  }
-
-  return { text, provider: config.provider, model: config.model };
 }
 
 async function callOpenAiCompatibleProvider(config, { systemPrompt, history, userMessage }, startedAt) {
@@ -416,7 +424,7 @@ async function callOpenAiCompatibleProvider(config, { systemPrompt, history, use
     { role: 'user', content: userMessage },
   ];
 
-  const response = await fetchWithTimeout(
+  return fetchWithTimeout(
     url,
     {
       method: 'POST',
@@ -431,33 +439,34 @@ async function callOpenAiCompatibleProvider(config, { systemPrompt, history, use
         max_tokens: 512,
       }),
     },
-    config.timeoutMs
+    config.timeoutMs,
+    async (response) => {
+      if (!response.ok) {
+        await handleUpstreamFailure(response, config, startedAt);
+      }
+
+      const data = await parseJsonOrThrow(response, config, startedAt);
+      const text = String(data?.choices?.[0]?.message?.content || '').trim();
+      if (!text) {
+        logAiProviderEvent('warn', {
+          reason: 'empty_response',
+          provider: config.provider,
+          model: config.model,
+          finishReason: data?.choices?.[0]?.finish_reason || null,
+          latencyMs: Date.now() - startedAt,
+        });
+        throw new ServiceUnavailableException({
+          statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+          error: 'Service Unavailable',
+          code: 'AI_EMPTY_RESPONSE',
+          message:
+            'Medical AI assistant did not return a response. Please try again or contact Pharmacy Support.',
+        });
+      }
+
+      return { text, provider: config.provider, model: config.model };
+    }
   );
-
-  if (!response.ok) {
-    await handleUpstreamFailure(response, config, startedAt);
-  }
-
-  const data = await parseJsonOrThrow(response, config, startedAt);
-  const text = String(data?.choices?.[0]?.message?.content || '').trim();
-  if (!text) {
-    logAiProviderEvent('warn', {
-      reason: 'empty_response',
-      provider: config.provider,
-      model: config.model,
-      finishReason: data?.choices?.[0]?.finish_reason || null,
-      latencyMs: Date.now() - startedAt,
-    });
-    throw new ServiceUnavailableException({
-      statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-      error: 'Service Unavailable',
-      code: 'AI_EMPTY_RESPONSE',
-      message:
-        'Medical AI assistant did not return a response. Please try again or contact Pharmacy Support.',
-    });
-  }
-
-  return { text, provider: config.provider, model: config.model };
 }
 
 async function callAnthropicProvider(config, { systemPrompt, history, userMessage }, startedAt) {
@@ -470,7 +479,7 @@ async function callAnthropicProvider(config, { systemPrompt, history, userMessag
     { role: 'user', content: userMessage },
   ];
 
-  const response = await fetchWithTimeout(
+  return fetchWithTimeout(
     url,
     {
       method: 'POST',
@@ -487,38 +496,39 @@ async function callAnthropicProvider(config, { systemPrompt, history, userMessag
         max_tokens: 512,
       }),
     },
-    config.timeoutMs
+    config.timeoutMs,
+    async (response) => {
+      if (!response.ok) {
+        await handleUpstreamFailure(response, config, startedAt);
+      }
+
+      const data = await parseJsonOrThrow(response, config, startedAt);
+      const text = (Array.isArray(data?.content) ? data.content : [])
+        .filter((block) => block.type === 'text')
+        .map((block) => block.text || '')
+        .join('')
+        .trim();
+
+      if (!text) {
+        logAiProviderEvent('warn', {
+          reason: 'empty_response',
+          provider: config.provider,
+          model: config.model,
+          stopReason: data?.stop_reason || null,
+          latencyMs: Date.now() - startedAt,
+        });
+        throw new ServiceUnavailableException({
+          statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+          error: 'Service Unavailable',
+          code: 'AI_EMPTY_RESPONSE',
+          message:
+            'Medical AI assistant did not return a response. Please try again or contact Pharmacy Support.',
+        });
+      }
+
+      return { text, provider: config.provider, model: config.model };
+    }
   );
-
-  if (!response.ok) {
-    await handleUpstreamFailure(response, config, startedAt);
-  }
-
-  const data = await parseJsonOrThrow(response, config, startedAt);
-  const text = (Array.isArray(data?.content) ? data.content : [])
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text || '')
-    .join('')
-    .trim();
-
-  if (!text) {
-    logAiProviderEvent('warn', {
-      reason: 'empty_response',
-      provider: config.provider,
-      model: config.model,
-      stopReason: data?.stop_reason || null,
-      latencyMs: Date.now() - startedAt,
-    });
-    throw new ServiceUnavailableException({
-      statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-      error: 'Service Unavailable',
-      code: 'AI_EMPTY_RESPONSE',
-      message:
-        'Medical AI assistant did not return a response. Please try again or contact Pharmacy Support.',
-    });
-  }
-
-  return { text, provider: config.provider, model: config.model };
 }
 
 async function generateAiCompletion({ systemPrompt, history = [], userMessage }, env = process.env) {

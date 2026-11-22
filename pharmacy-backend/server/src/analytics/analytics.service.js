@@ -1,4 +1,4 @@
-const { BadRequestException, Injectable, InternalServerErrorException } = require('@nestjs/common');
+const { BadRequestException, HttpException, Injectable, InternalServerErrorException } = require('@nestjs/common');
 const { buildForecastDataset, parseAnalyticsOptions, roundNumber } = require('../../services/analytics/forecast');
 const { buildStockInsights } = require('../../services/analytics/stockout');
 const { buildExpiryRiskReport } = require('../../services/analytics/expiry');
@@ -24,12 +24,22 @@ class AnalyticsService {
   async reports(query) { return this.financialReport(query); }
 
   async snapshot(query = {}) {
-    const options = parseAnalyticsOptions(query);
-    const { predictions, summary: forecastSummary } = await buildForecastDataset(options);
-    const stockInsights = buildStockInsights(predictions, options);
-    const expiryInsights = buildExpiryRiskReport(predictions, options);
-    const totalForecastDemand = predictions.reduce((total, item) => total + Number(item.forecast.forecastDemand || 0), 0);
-    return { generatedAt: new Date().toISOString(), parameters: options, predictions, stockInsights, expiryInsights, summary: { ...forecastSummary, ...stockInsights.summary, ...expiryInsights.summary, forecastDemandTotal: roundNumber(totalForecastDemand) } };
+    try {
+      const options = parseAnalyticsOptions(query);
+      const { predictions, summary: forecastSummary } = await buildForecastDataset(options);
+      const stockInsights = buildStockInsights(predictions, options);
+      const expiryInsights = buildExpiryRiskReport(predictions, options);
+      const totalForecastDemand = predictions.reduce((total, item) => total + Number(item.forecast.forecastDemand || 0), 0);
+      return { generatedAt: new Date().toISOString(), parameters: options, predictions, stockInsights, expiryInsights, summary: { ...forecastSummary, ...stockInsights.summary, ...expiryInsights.summary, forecastDemandTotal: roundNumber(totalForecastDemand) } };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      console.error(JSON.stringify({
+        event: 'analytics_snapshot_failed',
+        errorName: error?.name || 'UnknownError',
+        errorCode: error?.parent?.code || error?.code || null,
+      }));
+      throw new InternalServerErrorException('Failed to generate analytics snapshot');
+    }
   }
 
   async predictions(query) { const snapshot = await this.snapshot(query); return { generatedAt: snapshot.generatedAt, parameters: snapshot.parameters, summary: snapshot.summary, predictions: snapshot.predictions.map((prediction) => { const { batches, sales = {}, ...rest } = prediction; const { historyDailyQuantities, ...publicSales } = sales; return { ...rest, sales: publicSales }; }) }; }

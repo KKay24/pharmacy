@@ -79,6 +79,80 @@ test('production allows mediquick.online and www.mediquick.online CORS origins',
         NODE_ENV: 'production',
         JWT_SECRET: 'test-secret',
         DATABASE_URL: 'postgres://db.example.test/pharmacy',
+        POSTGRES_URL: '',
+        SQLITE_STORAGE_PATH: '',
+        FRONTEND_URL: 'https://www.mediquick.online',
+        FRONTEND_URLS: '',
+      },
+      stdio: 'pipe',
+    }
+  );
+});
+
+test('production CORS rejects unconfigured local and preview origins', () => {
+  execFileSync(
+    process.execPath,
+    [
+      '-e',
+      `
+        const { isAllowedOrigin } = require('./src/app.module');
+        const env = { NODE_ENV: 'production' };
+        if (
+          isAllowedOrigin('http://localhost:3000', env) ||
+          isAllowedOrigin('http://localhost:3000', { ...env, FRONTEND_URL: 'http://localhost:3000' }) ||
+          isAllowedOrigin('https://untrusted.vercel.app', env) ||
+          isAllowedOrigin('https://evil.example', env) ||
+          !isAllowedOrigin('https://preview.example', { ...env, FRONTEND_URLS: 'https://preview.example' })
+        ) {
+          process.exit(1);
+        }
+      `,
+    ],
+    {
+      cwd: serverDirectory,
+      env: {
+        NODE_ENV: 'production',
+        JWT_SECRET: 'test-secret',
+        DATABASE_URL: 'postgres://db.example.test/pharmacy',
+        POSTGRES_URL: '',
+        SQLITE_STORAGE_PATH: '',
+        FRONTEND_URL: 'https://www.mediquick.online',
+        FRONTEND_URLS: '',
+      },
+      stdio: 'pipe',
+    }
+  );
+});
+
+test('production CORS middleware rejects an unconfigured origin with 403', () => {
+  execFileSync(
+    process.execPath,
+    [
+      '-e',
+      `
+        const { rejectDisallowedOrigin } = require('./src/main');
+        const req = { get: () => 'https://evil.example' };
+        const res = {
+          status(code) { this.statusCode = code; return this; },
+          json(body) { this.body = body; return this; },
+        };
+        let nextCalled = false;
+        rejectDisallowedOrigin(req, res, () => { nextCalled = true; });
+        if (nextCalled || res.statusCode !== 403 || res.body.message !== 'Origin not allowed') {
+          process.exit(1);
+        }
+      `,
+    ],
+    {
+      cwd: serverDirectory,
+      env: {
+        NODE_ENV: 'production',
+        JWT_SECRET: 'test-secret',
+        DATABASE_URL: 'postgres://db.example.test/pharmacy',
+        POSTGRES_URL: '',
+        SQLITE_STORAGE_PATH: '',
+        FRONTEND_URL: 'https://www.mediquick.online',
+        FRONTEND_URLS: '',
       },
       stdio: 'pipe',
     }

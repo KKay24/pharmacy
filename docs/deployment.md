@@ -38,8 +38,7 @@ Configure these values through the deployment provider's environment/secret mana
 | `PORT` | Supplied by the host when applicable; application defaults to `5001`. |
 | `JWT_EXPIRES_IN_HOURS` | Optional token lifetime; code default is `12`. |
 | `FRONTEND_URL` | Primary browser origin allowed by backend CORS. |
-| `FRONTEND_URLS` | Optional comma-separated additional allowed origins. |
-| `ALLOW_VERCEL_PREVIEWS` | Set intentionally; when enabled, HTTPS `*.vercel.app` origins can be accepted. |
+| `FRONTEND_URLS` | Optional comma-separated additional exact origins. The production defaults already include `https://www.mediquick.online` and `https://mediquick.online`. |
 | `ENABLE_DEMO_SEEDING` | Keep disabled in production. |
 | `AI_PROVIDER` | Medical AI provider (`openai`, `gemini`, `anthropic`, or `openai-compatible`). Defaults to `openai` in Render blueprints. |
 | `OPENAI_API_KEY` | Provider secret for OpenAI (`<OPENAI_API_KEY>`). Alternatively set `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, or `AI_API_KEY` matching `AI_PROVIDER`. Required for `POST /api/ai/chat`. |
@@ -50,7 +49,9 @@ Configure these values through the deployment provider's environment/secret mana
 
 `POSTGRES_URL` is recognized by the Sequelize connection setup as a fallback, but production startup explicitly requires `DATABASE_URL`; configure the latter. Do not set `SQLITE_STORAGE_PATH` or a SQLite URL in production; the backend rejects SQLite production configuration.
 
-The checked-in Render blueprint links the backend to the database named `pharmacy-db`, generates a JWT secret, runs `npm install && npm run migrate` as its build command, uses `npm start` for startup, and checks `/health`. Verify plan, service names, database retention, backups and current provider requirements before applying the blueprint.
+The PostgreSQL Sequelize pool is capped at five connections and waits up to ten seconds to acquire a connection. Database initialization failures return a safe `503` for data routes without preventing the process from starting; `/health/database` is the separate connectivity diagnostic.
+
+The checked-in Render blueprint links the backend to the database named `pharmacy-db`, generates a JWT secret, runs `npm install && npm run migrate` as its build command, uses `npm start` for startup, and checks `/health`. `/health` is a liveness check and does not depend on PostgreSQL or AI availability; use `/health/database` for a separate database connectivity diagnostic. Verify plan, service names, database retention, backups and current provider requirements before applying the blueprint.
 
 ### Migrations and initial administrator
 
@@ -82,8 +83,7 @@ These files are present but are not the topology described by the root Render/Ve
 
 ## CORS and network requirements
 
-- Backend CORS is configured from `FRONTEND_URL` and `FRONTEND_URLS`, with local development origins allowed outside production.
-- Production only accepts configured origins plus Vercel preview origins if `ALLOW_VERCEL_PREVIEWS` permits them.
+- Backend CORS allows the two MediQuick production domains plus exact origins configured with `FRONTEND_URL` and `FRONTEND_URLS`. Local origins are accepted only outside production; Vercel preview hosts must be added explicitly.
 - Use HTTPS for public clients and backend endpoints.
 - Do not open PostgreSQL to the public internet unless the provider's documented network model requires it; restrict access to the application service.
 

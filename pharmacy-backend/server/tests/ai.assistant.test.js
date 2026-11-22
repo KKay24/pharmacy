@@ -517,6 +517,28 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
         (error) => error.getStatus?.() === 504 && error.getResponse?.()?.code === 'AI_TIMEOUT'
       );
 
+      global.fetch = async (url, options) => ({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => new Promise((resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const error = new Error('Response body timed out');
+            error.name = 'AbortError';
+            reject(error);
+          }, { once: true });
+        }),
+      });
+
+      await assert.rejects(
+        () =>
+          generateAiCompletion(
+            { systemPrompt: 'sys', history: [], userMessage: 'Slow response body' },
+            { OPENAI_API_KEY: 'test-key-timeout', AI_TIMEOUT_MS: '2000' }
+          ),
+        (error) => error.getStatus?.() === 504 && error.getResponse?.()?.code === 'AI_TIMEOUT'
+      );
+
       assert.ok(warnLines.join('\n').includes('"reason":"timeout"'));
     } finally {
       global.fetch = originalFetch;

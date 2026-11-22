@@ -336,13 +336,20 @@ function normalizeBatches(rawBatches = []) {
 }
 
 async function buildForecastDataset(options = DEFAULT_ANALYTICS_OPTIONS) {
+  const historyWindowDays = Math.max(options.historyDays, options.shortWindowDays * 2);
+  const today = startOfToday();
+  const earliestSalesDate = toDayKey(addDays(today, -(historyWindowDays - 1)));
+  const dayAfterToday = toDayKey(addDays(today, 1));
   const [medicines, sales] = await Promise.all([
     Medicine.findAll({
       order: [['name', 'ASC']],
       include: [{ model: Batch }],
     }),
     Sales.findAll({
-      where: { saleStatus: { [Op.ne]: 'REVERSED' } },
+      where: {
+        saleStatus: { [Op.ne]: 'REVERSED' },
+        date: { [Op.gte]: earliestSalesDate, [Op.lt]: dayAfterToday },
+      },
       order: [['date', 'ASC']],
     }),
   ]);

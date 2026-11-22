@@ -7,6 +7,7 @@ const authenticateToken = require('../middleware/auth');
 const requireRole = require('../middleware/roleMiddleware');
 const { enableDemoSeeding, isProduction } = require('../lib/config');
 const { runMigrations } = require('../lib/migrations');
+const HealthController = require('./health/health.controller');
 const AuthController = require('./auth/auth.controller');
 const AuthService = require('./auth/auth.service');
 const AuthGuard = require('./auth/auth.guard');
@@ -42,65 +43,41 @@ const IpGeolocationService = require('./security/ip-geolocation.service');
 const CashReconciliationController = require('./cash-reconciliation/cash-reconciliation.controller');
 const CashReconciliationService = require('./cash-reconciliation/cash-reconciliation.service');
 
-const localhostOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5000',
-  'http://localhost:5001',
-  'http://localhost:5002',
-  'http://localhost:8081',
-  'http://localhost:19006',
-];
-
 const defaultProductionOrigins = [
   'https://www.mediquick.online',
   'https://mediquick.online',
 ];
 
-const configuredOrigins = [
-  process.env.FRONTEND_URL,
-  ...(process.env.FRONTEND_URLS || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean),
-].filter(Boolean);
-
-const configuredVercelOriginExists = configuredOrigins.some((origin) => {
-  try {
-    return new URL(origin).hostname.endsWith('.vercel.app');
-  } catch (error) {
-    return false;
-  }
-});
-
-const allowVercelPreviews =
-  process.env.ALLOW_VERCEL_PREVIEWS === 'true' ||
-  (process.env.ALLOW_VERCEL_PREVIEWS !== 'false' && configuredVercelOriginExists);
-
-function isAllowedOrigin(origin) {
-  if (!origin || process.env.NODE_ENV !== 'production') {
+function isAllowedOrigin(origin, env = process.env) {
+  if (!origin || env.NODE_ENV !== 'production') {
     return true;
   }
 
   const normalized = String(origin).trim().replace(/\/$/, '');
-
+  let hostname;
+  try {
+    hostname = new URL(normalized).hostname.toLowerCase();
+  } catch (error) {
+    return false;
+  }
   if (
-    localhostOrigins.some((allowed) => allowed.replace(/\/$/, '') === normalized) ||
-    defaultProductionOrigins.some((allowed) => allowed.replace(/\/$/, '') === normalized) ||
-    configuredOrigins.some((allowed) => allowed.replace(/\/$/, '') === normalized)
+    hostname === 'localhost'
+    || hostname.endsWith('.localhost')
+    || hostname === '127.0.0.1'
+    || hostname === '[::1]'
   ) {
-    return true;
+    return false;
   }
 
-  if (allowVercelPreviews) {
-    try {
-      const { hostname, protocol } = new URL(normalized);
-      return protocol === 'https:' && hostname.endsWith('.vercel.app');
-    } catch (error) {
-      return false;
-    }
-  }
-
-  return false;
+  const configuredOrigins = [
+    env.FRONTEND_URL,
+    ...(env.FRONTEND_URLS || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  ].filter(Boolean);
+  return [...defaultProductionOrigins, ...configuredOrigins]
+    .some((allowed) => allowed.replace(/\/$/, '') === normalized);
 }
 
 let readyPromise;
@@ -117,7 +94,15 @@ function ensureApplicationReady() {
         const { seedDemoData } = require('../lib/seed');
         await seedDemoData();
       }
-    })();
+    })().catch((error) => {
+      readyPromise = null;
+      console.error(JSON.stringify({
+        event: 'database_initialization_failed',
+        errorName: error?.name || 'UnknownError',
+        errorCode: error?.parent?.code || error?.code || null,
+      }));
+      throw error;
+    });
   }
 
   return readyPromise;
@@ -129,20 +114,20 @@ function mountLegacyApi(expressApp, { deferFallback = false } = {}) {
   expressApp.use(validationMiddleware.use.bind(validationMiddleware));
 
   expressApp.use(async (req, res, next) => {
+    if (req.path === '/health' || req.path === '/health/database') {
+      return next();
+    }
+
     try {
       await ensureApplicationReady();
       next();
     } catch (error) {
-      next(error);
-    }
-  });
-
-  expressApp.get('/health', async (req, res, next) => {
-    try {
-      await ensureApplicationReady();
-      res.json({ status: 'ok' });
-    } catch (error) {
-      next(error);
+      res.status(503).json({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        code: 'DATABASE_UNAVAILABLE',
+        message: 'Database is temporarily unavailable.',
+      });
     }
   });
 
@@ -186,6 +171,7 @@ class AppModule {
 
 Module({
   controllers: [
+    HealthController,
     AuthController,
     InventoryController,
     SalesController,

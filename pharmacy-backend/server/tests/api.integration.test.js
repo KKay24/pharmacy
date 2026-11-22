@@ -311,6 +311,44 @@ test('removed seed and debug endpoints are not available', async () => {
   }
 });
 
+test('health is independent from AI and database diagnostics are separate', async () => {
+  const liveness = await fetch(`${baseUrl}/health`);
+  assert.equal(liveness.status, 200);
+  assert.deepEqual(await liveness.json(), { status: 'ok' });
+
+  const database = await fetch(`${baseUrl}/health/database`);
+  assert.equal(database.status, 200);
+  assert.deepEqual(await database.json(), { status: 'ok', database: 'ok' });
+});
+
+test('CORS handles OPTIONS and preserves allowed-origin headers on request errors', async () => {
+  const origin = 'https://www.mediquick.online';
+  const preflight = await fetch(`${baseUrl}/api/inventory`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: origin,
+      'Access-Control-Request-Method': 'GET',
+      'Access-Control-Request-Headers': 'authorization,content-type',
+    },
+  });
+
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), origin);
+  assert.equal(preflight.headers.get('access-control-allow-credentials'), 'true');
+  assert.match(preflight.headers.get('access-control-allow-methods'), /GET/);
+  assert.match(preflight.headers.get('access-control-allow-methods'), /OPTIONS/);
+  assert.match(preflight.headers.get('access-control-allow-headers').toLowerCase(), /authorization/);
+  assert.match(preflight.headers.get('access-control-allow-headers').toLowerCase(), /content-type/);
+
+  const invalidChat = await fetch(`${baseUrl}/api/ai/chat`, {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(invalidChat.status, 400);
+  assert.equal(invalidChat.headers.get('access-control-allow-origin'), origin);
+});
+
 test('inventory taxonomy is hierarchical and limits forms to the selected subcategory', async () => {
   const response = await fetch(`${baseUrl}/api/inventory/categories`, {
     headers: { Authorization: `Bearer ${authToken}` },

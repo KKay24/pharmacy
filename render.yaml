@@ -20,8 +20,6 @@ services:
         value: "12"
       - key: ENABLE_DEMO_SEEDING
         value: "false"
-      - key: ALLOW_VERCEL_PREVIEWS
-        value: "true"
       - key: TRUST_PROXY_HOPS
         value: "1"
       - key: IP_GEO_ENABLED

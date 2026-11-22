@@ -16,6 +16,12 @@ if (isProduction && (!databaseUrl || hasConfiguredSqlitePath)) {
 if (databaseUrl) {
   sequelize = new Sequelize(databaseUrl, {
     dialect: 'postgres',
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 10000,
+      idle: 10000,
+    },
     dialectOptions: {
       ssl: isProduction
         ? {

@@ -5,13 +5,24 @@ require('reflect-metadata');
 const { NestFactory } = require('@nestjs/core');
 const {
   AppModule,
-  ensureApplicationReady,
   isAllowedOrigin,
   mountApiFallback,
   mountLegacyApi,
 } = require('./app.module');
 const { resolveTrustProxySetting } = require('./security/request-context');
 const { getAiProviderDiagnostics } = require('./ai/ai-provider.service');
+
+function rejectDisallowedOrigin(req, res, next) {
+  const origin = req.get('Origin');
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({
+      statusCode: 403,
+      error: 'Forbidden',
+      message: 'Origin not allowed',
+    });
+  }
+  next();
+}
 
 async function createApplication() {
   const app = await NestFactory.create(AppModule, {
@@ -24,17 +35,17 @@ async function createApplication() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (isAllowedOrigin(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+      callback(null, isAllowedOrigin(origin));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    optionsSuccessStatus: 204,
   });
 
+  expressApp.use(rejectDisallowedOrigin);
+
   mountLegacyApi(expressApp, { deferFallback: true });
-  await ensureApplicationReady();
   await app.init();
   mountApiFallback(expressApp);
   return app;
@@ -83,3 +94,4 @@ module.exports = handler;
 module.exports.bootstrap = bootstrap;
 module.exports.createApplication = createApplication;
 module.exports.handler = handler;
+module.exports.rejectDisallowedOrigin = rejectDisallowedOrigin;
