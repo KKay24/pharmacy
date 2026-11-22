@@ -25,7 +25,8 @@ import {
   CheckCircle,
 } from 'lucide-react-native';
 import { useTheme } from '../../constants/theme';
-import apiClient from '../../api/client';
+import apiClient, { API_URL } from '../../api/client';
+import { resolveProductImageUrl } from '../../utils/inventory';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
@@ -68,14 +69,21 @@ export default function ProductDetailScreen() {
       setError(null);
       try {
         const res = await apiClient.get(`/api/products/${id}`);
-        setProduct(res.data);
+        setProduct({
+          ...res.data,
+          imageUrl: resolveProductImageUrl(res.data?.imageUrl, API_URL) || undefined,
+        });
       } catch (e: any) {
         // Fallback to inventory endpoint
         try {
           const invRes = await apiClient.get(`/api/inventory/${id}`);
           const invData = invRes.data;
           const batchPrice = invData.Batches?.[0]?.sellingPrice || invData.price || 0;
-          setProduct({ ...invData, price: Number(batchPrice) });
+          setProduct({
+            ...invData,
+            price: Number(batchPrice),
+            imageUrl: resolveProductImageUrl(invData?.imageUrl, API_URL) || undefined,
+          });
         } catch (invErr: any) {
           setError(e.response?.data?.error || 'Product details could not be found.');
         }

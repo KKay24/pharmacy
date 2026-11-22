@@ -64,3 +64,31 @@ export const getMedicineStockValue = (value: unknown) => {
     0
   );
 };
+
+export const resolveProductImageUrl = (
+  rawUrl?: string | null,
+  apiBaseUrl?: string | null
+): string | null => {
+  if (typeof rawUrl !== 'string') {
+    return null;
+  }
+
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^(https?:\/\/|data:image\/)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`;
+  }
+
+  if (trimmed.startsWith('/') && apiBaseUrl) {
+    return `${apiBaseUrl.replace(/\/+$/, '')}${trimmed}`;
+  }
+
+  return trimmed;
+};

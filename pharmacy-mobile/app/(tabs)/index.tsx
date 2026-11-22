@@ -49,7 +49,8 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react-native';
-import apiClient from '@/api/client';
+import apiClient, { API_URL } from '@/api/client';
+import { resolveProductImageUrl } from '@/utils/inventory';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { BrandLogo } from '@/components/ui/BrandLogo';
@@ -216,7 +217,7 @@ export default function HomeScreen() {
       brandName: m.brandName,
       price: Number(m.price ?? m.basePrice ?? 0),
       imageUrl:
-        m.imageUrl ||
+        resolveProductImageUrl(m.imageUrl, API_URL) ||
         CATEGORY_DEFAULT_IMAGES[catSlug] ||
         'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80',
       category: catSlug,

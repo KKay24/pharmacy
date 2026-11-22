@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   FlatList,
+  Image,
   Pressable,
   Alert,
   Modal,
@@ -10,7 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Text, View } from '@/components/Themed';
-import apiClient from '@/api/client';
+import apiClient, { API_URL } from '@/api/client';
 import { useAuth } from '@/context/AuthContext';
 import {
   Search,
@@ -29,7 +30,12 @@ import {
   X,
   Layers,
 } from 'lucide-react-native';
-import { getMedicineBatches, getMedicineCurrentPrice, getMedicineTotalQuantity } from '@/utils/inventory';
+import {
+  getMedicineBatches,
+  getMedicineCurrentPrice,
+  getMedicineTotalQuantity,
+  resolveProductImageUrl,
+} from '@/utils/inventory';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
@@ -47,6 +53,7 @@ interface Medicine {
   genericName?: string;
   brandName?: string;
   barcode?: string;
+  imageUrl?: string | null;
   totalQuantity: number;
   price: number;
   mainCategoryId?: number;
@@ -92,6 +99,7 @@ export default function PosScreen() {
   const [showCart, setShowCart] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [failedImageIds, setFailedImageIds] = useState<Record<number, boolean>>({});
   const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   // Customers
@@ -156,12 +164,14 @@ export default function PosScreen() {
           genericName: med.genericName,
           brandName: med.brandName,
           barcode: med.barcode || med.sku || '',
+          imageUrl: resolveProductImageUrl(med.imageUrl, API_URL),
           totalQuantity: getMedicineTotalQuantity(batches),
           price: getMedicineCurrentPrice(batches),
           mainCategoryId: med.mainCategoryId,
         };
       });
       setMedicines(data);
+      setFailedImageIds({});
 
       if (catRes.status === 'fulfilled') {
         const catRows = Array.isArray(catRes.value.data) ? catRes.value.data : [];
@@ -486,6 +496,7 @@ export default function PosScreen() {
           }
           renderItem={({ item }) => {
             const outOfStock = item.totalQuantity <= 0;
+            const showImage = Boolean(item.imageUrl && !failedImageIds[item.id]);
             return (
               <Pressable
                 accessibilityRole="button"
@@ -501,8 +512,26 @@ export default function PosScreen() {
                 ]}
                 onPress={() => addToCart(item)}
               >
-                <View style={[styles.productVisual, { backgroundColor: theme.primarySoft }]}>
-                  <Pill size={36} color={theme.primary} strokeWidth={1.8} />
+                <View
+                  style={[
+                    styles.productVisual,
+                    { backgroundColor: showImage ? theme.surfaceMuted : theme.primarySoft },
+                  ]}
+                >
+                  {showImage && item.imageUrl ? (
+                    <Image
+                      source={{ uri: item.imageUrl }}
+                      style={styles.productImage}
+                      resizeMode="contain"
+                      onError={() =>
+                        setFailedImageIds((prev) =>
+                          prev[item.id] ? prev : { ...prev, [item.id]: true }
+                        )
+                      }
+                    />
+                  ) : (
+                    <Pill size={36} color={theme.primary} strokeWidth={1.8} />
+                  )}
                   {outOfStock ? (
                     <View style={styles.outOfStockBadge}>
                       <Text style={styles.outOfStockText}>Out of stock</Text>
@@ -906,7 +935,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
     marginBottom: 8,
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   outOfStockBadge: {
     position: 'absolute',
