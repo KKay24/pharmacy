@@ -7,6 +7,15 @@ const HOP_BY_HOP_HEADERS = new Set([
   'x-mediquick-client-ip',
 ]);
 
+const RESPONSE_HEADERS_TO_OMIT = new Set([
+  ...HOP_BY_HOP_HEADERS,
+  'content-encoding',
+]);
+
+function shouldForwardResponseHeader(name) {
+  return !RESPONSE_HEADERS_TO_OMIT.has(name.toLowerCase());
+}
+
 function extractVercelClientIp(req) {
   // Vercel sets x-vercel-forwarded-for / x-real-ip at the edge from the true peer connection.
   const vercelForwarded = req.headers['x-vercel-forwarded-for'];
@@ -98,7 +107,7 @@ const proxyHandler = async (req, res) => {
 
     res.statusCode = response.status;
     response.headers.forEach((value, key) => {
-      if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+      if (shouldForwardResponseHeader(key)) {
         res.setHeader(key, value);
       }
     });
@@ -117,3 +126,4 @@ const proxyHandler = async (req, res) => {
 module.exports = proxyHandler;
 // Exported for lightweight route verification; Vercel still receives the handler.
 module.exports.targetPathFromRequest = targetPathFromRequest;
+module.exports.shouldForwardResponseHeader = shouldForwardResponseHeader;

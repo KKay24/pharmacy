@@ -42,7 +42,7 @@ For local web development, `REACT_APP_API_BASE_URL` points directly to the API (
 
 `utils/api.js` builds requests and attaches the stored bearer token. `utils/offlineDb.js` stores selected inventory, customers, recent sales, pending operations and sync metadata in IndexedDB. `utils/syncEngine.js` monitors connectivity and submits operations to the backend `/api/sync` endpoint. The service worker caches an application shell/static resources and uses a network-first navigation fallback; it does not cache API data.
 
-Stock/invoice capture has browser OCR support using Tesseract.js and PDF.js. A prescription OCR flow was not verified.
+Stock/invoice capture has browser OCR support using Tesseract.js and PDF.js. A prescription OCR flow was not verified. The PDF.js worker is served from the web build and included in the PWA app-shell cache, so PDF parsing does not require a third-party worker CDN at runtime.
 
 ### Mobile client
 
@@ -52,7 +52,7 @@ Stock/invoice capture has browser OCR support using Tesseract.js and PDF.js. A p
 
 `pharmacy-backend/server/src/main.js` creates the Nest application with the Express adapter, configures CORS, readiness/migrations and the API fallback. `src/app.module.js` registers resource controllers and services. Controllers declare route paths and guards; services implement validation, database operations and business rules.
 
-Major modules include auth, inventory, sales, customers, prescriptions, suppliers, expenses, analytics/reports, audit logging and sync. Sequelize models are under `server/models`; migrations are under `server/migrations`. The `pharmacy-inventory/server` tree is legacy and is not the canonical API.
+Major modules include auth, inventory, sales, customers, prescriptions, suppliers, expenses, analytics/reports, audit logging and sync. Sequelize models are under `server/models`; migrations are under `server/migrations`. The `pharmacy-inventory/server` tree is legacy and is not the canonical API; its server-only dependencies are isolated in its own package manifest rather than the web client package.
 
 ## 5. Database architecture
 
@@ -125,6 +125,8 @@ The authenticated `GET /api/inventory/categories` endpoint returns the seeded hi
 
 The web POS builds sale data and submits it to `/api/sales`. The backend validates positive whole-number quantities, non-negative sale totals, product identity and stock. It locks/updates batches in expiry-date order, writes sales and negative stock movements in a database transaction, and updates medicine aggregate quantity. A supplied `clientTransactionId` provides retry/idempotency support. The mobile POS currently creates online sales with a cash payment label.
 
+Storefront `POST /api/orders` and `POST /api/prescriptions/upload` accept guests and use optional bearer authentication to associate signed-in customer activity with the account. Online orders lock saleable stock, reject insufficient quantities with `409 INSUFFICIENT_STOCK`, and persist the order, sales rows and movements atomically. Prescription uploads are limited to 5 MB per file.
+
 The web PWA can store supported pending `SALE` operations locally and replay them at `/api/sync`. Sync requires a client transaction ID and checks operation permissions, idempotency and server stock; conflicts/failures are returned per operation. Local optimistic data is not authoritative.
 
 ## 8.1 Customer support workflow
@@ -155,11 +157,13 @@ Confirmed repository-level integrations/configuration:
 
 - Vercel serverless API proxy and URL rewrites for the web client.
 - Render backend/PostgreSQL blueprint.
-- Tesseract.js and PDF.js in web stock/invoice intake.
+- Tesseract.js and PDF.js in web stock/invoice intake; the PDF worker is bundled locally.
 - Browser IndexedDB and service worker for the web PWA.
 - Expo SecureStore for mobile session storage.
 
 `firebase-admin` and Firebase-related configuration files exist in the backend dependency/configuration tree, but an active Firebase runtime workflow was not confirmed in the canonical API. Payment processor, e-prescribing, insurer and external pharmacy-system integrations are not currently documented/verified.
+
+AI session histories and rate-limit buckets use in-process memory. Sessions expire after 30 minutes and are capped at 1,000 per process; expired rate-limit buckets are pruned. State resets on restart and does not synchronize across backend instances; a shared store is required before horizontal scaling.
 
 ## 12. Deployment architecture
 
@@ -213,5 +217,8 @@ All API paths below are rooted at the same host. Except `POST /api/auth/login`, 
 | `GET` | `/api/analytics/reorder-suggestions` | Reorder suggestions | Admin/manager role plus analytics read permission |
 | `GET` | `/api/analytics/risks` | Stockout/expiry/dead-stock data | Admin/manager role plus analytics read permission |
 | `POST` | `/api/sync` | Reconcile offline operations | Authenticated; per-operation permissions checked by sync service |
+| `GET`, `POST` | `/api/orders` | Customer order history/tracking and online checkout | Optional bearer auth associates signed-in customer orders; guest tracking requires order number and at least 7 phone digits |
+| `POST` | `/api/prescriptions/upload` | Customer prescription submission | Optional bearer auth associates signed-in submissions; maximum 5 MB file |
+| `GET` | `/api/prescriptions/my` | Current customer's prescription history | Authenticated |
 
 The user-management path family includes `GET/POST /api/auth/users`, `PUT/DELETE /api/auth/users/:id` and `PATCH /api/auth/users/:id/status`. Selected list routes use pagination (`page`, `limit`; default 25, maximum 100) and return `{ data, pagination }`; response envelopes vary across routes. No OpenAPI specification was found.

@@ -49,11 +49,11 @@ class SyncEngine {
 
   async checkConnectivity() {
     if (typeof window === 'undefined') return;
+    let timeoutId;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      timeoutId = setTimeout(() => controller.abort(), 10000);
       const res = await apiFetch(apiHealthPath(), { signal: controller.signal });
-      clearTimeout(timeoutId);
 
       const wasOffline = !this.isOnline;
       this.isOnline = res.ok;
@@ -64,6 +64,8 @@ class SyncEngine {
     } catch {
       this.isOnline = false;
       this.notify();
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 

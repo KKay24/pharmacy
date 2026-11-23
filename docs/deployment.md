@@ -22,7 +22,7 @@ flowchart LR
     Backend -->|PostgreSQL connection| Database[(Render PostgreSQL)]
 ```
 
-The Vercel proxy forwards requests and most headers to the configured backend. Set the backend CORS frontend origin values to the intended web origin. The mobile client calls the backend directly using its configured base URL.
+The Vercel proxy forwards requests and most headers to the configured backend, removing content-encoding metadata after Node fetch decodes compressed responses. Set the backend CORS frontend origin values to the intended web origin. The mobile client calls the backend directly using its configured base URL.
 
 ## Backend and database setup
 
@@ -51,6 +51,10 @@ Configure these values through the deployment provider's environment/secret mana
 
 The PostgreSQL Sequelize pool is capped at five connections and waits up to ten seconds to acquire a connection. Database initialization failures return a safe `503` for data routes without preventing the process from starting; `/health/database` is the separate connectivity diagnostic.
 
+The canonical API applies a 2 MB JSON body limit by default and an 8 MB limit only to `POST /api/prescriptions/upload`. The prescription file itself is limited to 5 MB; keep upload limits aligned if the storefront limit changes.
+
+AI conversation history and per-client rate-limit buckets are held in process memory. Sessions expire after 30 minutes and are capped at 1,000 per process; rate-limit buckets are pruned as they expire. Both are lost on process restart and are not shared across instances. Keep a single backend instance for consistent rate limiting/session continuity, or introduce a reviewed shared store before horizontal scaling.
+
 The checked-in Render blueprint links the backend to the database named `pharmacy-db`, generates a JWT secret, runs `npm install && npm run migrate` as its build command, uses `npm start` for startup, and checks `/health`. `/health` is a liveness check and does not depend on PostgreSQL or AI availability; use `/health/database` for a separate database connectivity diagnostic. Verify plan, service names, database retention, backups and current provider requirements before applying the blueprint.
 
 ### Migrations and initial administrator
@@ -61,13 +65,15 @@ Create the initial admin only through the controlled backend seed command, with 
 
 ## Web client setup
 
-The Vercel config serves the Create React App build and rewrites `/api/:path*` to the Vercel function. That function requires a backend base URL:
+The Vercel config serves the Create React App build and rewrites `/api/:path*` to the Vercel function. Production browser API calls use same-origin relative URLs; the function requires a backend base URL:
 
 ```text
 BACKEND_API_URL=<BACKEND_API_BASE_URL>
 ```
 
-For Vercel production, leave `REACT_APP_API_BASE_URL` unset if using the same-origin `/api` proxy. In local development set `REACT_APP_API_BASE_URL=http://localhost:5001` (or the appropriate local API URL).
+Set `BACKEND_API_URL` in each Vercel environment that should reach the API (Production and any approved Preview environment). Leave `REACT_APP_API_BASE_URL` unset on Vercel; the browser client ignores direct backend base URLs outside local development and routes through the same-origin proxy. In local development set `REACT_APP_API_BASE_URL=http://localhost:5001` (or the appropriate local API URL).
+
+Backend-only packages for the non-canonical legacy server are declared in `pharmacy-inventory/server/package.json`, not in the web client manifest. To run that legacy server manually, install its dependencies from that directory; Vercel's web build does not install them.
 
 The repository README identifies the web package as a Create React App project. Validate the production build with `npm run build` from `pharmacy-inventory` before deployment.
 
@@ -83,7 +89,7 @@ These files are present but are not the topology described by the root Render/Ve
 
 ## CORS and network requirements
 
-- Backend CORS allows the two MediQuick production domains plus exact origins configured with `FRONTEND_URL` and `FRONTEND_URLS`. Local origins are accepted only outside production; Vercel preview hosts must be added explicitly.
+- Backend CORS allows the two MediQuick production domains plus exact origins configured with `FRONTEND_URL` and `FRONTEND_URLS`. Allowed request headers include `Authorization`, `Content-Type`, `Cache-Control`, `Pragma` and `X-Requested-With`. Local origins are accepted only outside production; Vercel preview hosts must be added explicitly. `ALLOW_VERCEL_PREVIEWS` is not read by the current backend and is absent from the checked-in Render blueprints; use exact `FRONTEND_URLS` entries for any approved preview origin.
 - Use HTTPS for public clients and backend endpoints.
 - Do not open PostgreSQL to the public internet unless the provider's documented network model requires it; restrict access to the application service.
 

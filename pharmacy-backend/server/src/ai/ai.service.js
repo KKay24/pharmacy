@@ -103,18 +103,16 @@ class AiService {
         ? requestedSessionId.trim()
         : null;
 
-    if (cleanId && this.sessions.has(cleanId)) {
-      const existing = this.sessions.get(cleanId);
-      // Prevent cross-user session reuse when authenticated
-      if (!existing.userId || !userId || existing.userId === userId) {
-        existing.updatedAt = Date.now();
-        return existing;
-      }
+    const ownerId = userId || null;
+    const existing = cleanId ? this.sessions.get(cleanId) : null;
+    if (existing && existing.userId === ownerId) {
+      existing.updatedAt = Date.now();
+      return existing;
     }
 
     const session = {
-      id: cleanId || randomUUID(),
-      userId: userId || null,
+      id: cleanId && !existing ? cleanId : randomUUID(),
+      userId: ownerId,
       history: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),

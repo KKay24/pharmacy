@@ -11,6 +11,7 @@ const HealthController = require('./health/health.controller');
 const AuthController = require('./auth/auth.controller');
 const AuthService = require('./auth/auth.service');
 const AuthGuard = require('./auth/auth.guard');
+const OptionalAuthGuard = require('./auth/optional-auth.guard');
 const { RolesGuard } = require('./auth/roles.guard');
 const PermissionsGuard = require('./auth/permissions.guard');
 const AuditService = require('./audit/audit.service');
@@ -109,7 +110,23 @@ function ensureApplicationReady() {
 }
 
 function mountLegacyApi(expressApp, { deferFallback = false } = {}) {
-  expressApp.use(express.json({ limit: '50mb' }));
+  const defaultJsonParser = express.json({ limit: '2mb' });
+  const prescriptionJsonParser = express.json({ limit: '8mb' });
+  expressApp.use((req, res, next) => {
+    const parser = req.method === 'POST' && req.path === '/api/prescriptions/upload'
+      ? prescriptionJsonParser
+      : defaultJsonParser;
+    return parser(req, res, (error) => {
+      if (error?.type === 'entity.too.large') {
+        return res.status(413).json({
+          statusCode: 413,
+          error: 'Payload Too Large',
+          message: 'Request body exceeds the allowed size.',
+        });
+      }
+      return next(error);
+    });
+  });
   const validationMiddleware = new RequestValidationMiddleware();
   expressApp.use(validationMiddleware.use.bind(validationMiddleware));
 
@@ -203,6 +220,7 @@ Module({
     AuthSecurityService,
     CashReconciliationService,
     AuthGuard,
+    OptionalAuthGuard,
     RolesGuard,
     PermissionsGuard,
     AuditService,

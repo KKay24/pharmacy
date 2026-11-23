@@ -1,12 +1,13 @@
 // public/service-worker.js
 // MediQuick Pharmacy PWA Service Worker
 
-const CACHE_NAME = 'mediquick-pwa-v2';
+const CACHE_NAME = 'mediquick-pwa-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
   '/favicon.ico',
+  '/pdf.worker.min.mjs',
 ];
 
 // Install: Cache App Shell
@@ -87,6 +88,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.jpg') ||
     url.pathname.endsWith('.svg') ||
     url.pathname.endsWith('.ico') ||
+    url.pathname.endsWith('.mjs') ||
     url.pathname.endsWith('.woff2');
 
   if (isStaticAsset) {

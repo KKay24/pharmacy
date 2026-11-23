@@ -14,7 +14,7 @@ import { parseInvoiceText } from "../utils/invoiceParser";
 import "../styles/add-stock-modern.css";
 
 // Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ''}/pdf.worker.min.mjs`;
 
 const WAREHOUSES = ["Warehouse A", "Warehouse B", "Head Office", "Satellite Stacker"];
 

@@ -8,6 +8,10 @@ const HOP_BY_HOP_HEADERS = new Set([
   'host',
   'transfer-encoding',
 ]);
+const RESPONSE_HEADERS_TO_OMIT = new Set([
+  ...HOP_BY_HOP_HEADERS,
+  'content-encoding',
+]);
 
 const CANONICAL_BACKEND_CANDIDATES = [
   path.resolve(__dirname, '../../pharmacy-backend/server/server.js'),
@@ -92,7 +96,7 @@ function createFallbackServer(loadErrors) {
 
       res.status(response.status);
       response.headers.forEach((value, key) => {
-        if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+        if (!RESPONSE_HEADERS_TO_OMIT.has(key.toLowerCase())) {
           res.setHeader(key, value);
         }
       });

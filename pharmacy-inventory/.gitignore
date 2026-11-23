@@ -8,6 +8,7 @@ node_modules/
 
 # testing
 /coverage
+/public/pdf.worker.min.mjs
 
 # production
 /build

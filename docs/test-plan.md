@@ -35,6 +35,9 @@ Backend automated coverage includes:
 - Admin creation is restricted to the controlled seed process.
 - Authenticated inventory fetch, batch receiving and sale creation.
 - Hierarchical taxonomy retrieval, allowed-form scoping, product creation with classification, ID/name inventory filtering and rejection of mismatched form/subcategory filters.
+- Optional-auth customer order and prescription account associations, guest tracking phone-length validation, insufficient-stock order rejection with transaction safety, preflight headers and endpoint-specific JSON body limits.
+- Customer account sign-in-to-registration mode switching.
+- AI session ownership isolation across guest and authenticated users.
 
 Web automated coverage includes:
 
@@ -43,6 +46,7 @@ Web automated coverage includes:
 - Sync status indicator rendering and user-visible states.
 - Dependent stock-entry category/subcategory/form selectors, POS main-category → subcategory → form filtering, and inventory taxonomy, generic-name and brand filters.
 - Staff support inbox rendering, contact links, status updates, API error handling, and authenticated backend inquiry listing/status transitions.
+- Production API URL resolution through the same-origin Vercel proxy and response-header filtering for transparently decoded proxy responses.
 
 The inventory of test files may change; inspect the package before relying on this list.
 
@@ -50,7 +54,7 @@ The inventory of test files may change; inspect the package before relying on th
 
 | Change area | Minimum verification |
 |---|---|
-| API routes | Authenticated/unauthenticated access, role/permission boundary, valid/invalid input, response/error shape, database effect and web/mobile caller compatibility. |
+| API routes | Authenticated/unauthenticated access, role/permission boundary, valid/invalid input, response/error shape, database effect and web/mobile caller compatibility. Verify optional-auth storefront associations, stock reservation, and guest tracking phone length. |
 | Models/migrations | Migration on a disposable database, idempotent rerun behavior where intended, relationship/constraint checks, index checks and preservation of existing data. |
 | Authentication | Valid/invalid credentials, expired/invalid token, suspended account, forced password change, password hashing and prohibited role changes. |
 | Inventory/products | Product identity match/ambiguity, unique product/batch behavior, receiving, stock aggregate, low-stock thresholds and movement records. Validate main category requirement, subcategory/form parentage, dependent selector resets, generic/brand/supplier filters and safe legacy-data migration. |
@@ -62,7 +66,7 @@ The inventory of test files may change; inspect the package before relying on th
 | Reports/analytics | Empty and representative datasets, Africa/Lusaka date boundaries, explicit half-open reporting intervals, Week/Current Month/Previous Month/Yearly calendar ranges, daily versus yearly-monthly analytics, verified/unknown COGS, active/voided expenses, payment allocation warnings, refunds, period-filtered cash-reconciliation immutability, forecast input, stockout/expiry results and no sensitive-field leakage. |
 | UI components/pages | Loading/error/empty states, keyboard/accessible interactions where established, API failure messaging and role-based display. |
 | Mobile client | API URL resolution, SecureStore session behavior, login redirect, inventory loading/search and category → subcategory → form filters, online POS success/error and `npm run typecheck`. |
-| Deployment/configuration | Production config checks, build output, CORS/proxy path, `/health`, PostgreSQL connectivity, migration rollout and client-to-backend connectivity. |
+| Deployment/configuration | Production config checks, build output including the local PDF worker, CORS/proxy path and headers, JSON body-size limits, `/health`, PostgreSQL connectivity, migration rollout and client-to-backend connectivity. |
 
 ## 6. Manual acceptance scenarios
 

@@ -98,7 +98,7 @@ describe('Store E-Commerce Endpoints', () => {
   test('POST /api/orders creates order and deducts inventory', async () => {
     const listRes = await request('/api/products?limit=1');
     const sample = listRes.data.data[0];
-    const { Batch, InventoryMovement, Medicine } = require('../models');
+    const { Batch, InventoryMovement, Medicine, Order, Sales } = require('../models');
     const medicine = await Medicine.findByPk(sample.id);
     const batches = await Batch.findAll({ where: { medicineId: sample.id } });
     const today = new Date().toISOString().slice(0, 10);
@@ -107,6 +107,11 @@ describe('Store E-Commerce Endpoints', () => {
         .reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
       : Number(medicine.totalQuantity || 0);
     assert.ok(initialStock > 0, 'The selected product has stock for the regular checkout case');
+    const initialMovementCount = await InventoryMovement.count({
+      where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
+    });
+    const initialSalesCount = await Sales.count({ where: { medicineId: sample.id } });
+    const initialOrderCount = await Order.count();
 
     const overstockOrder = await request('/api/orders', {
       method: 'POST',
@@ -117,9 +122,14 @@ describe('Store E-Commerce Endpoints', () => {
         items: [{ id: sample.id, quantity: initialStock + 1 }],
       }),
     });
-    assert.equal(overstockOrder.status, 201);
-    assert.equal(overstockOrder.data.order.items[0].quantity, initialStock + 1);
-    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 0);
+    assert.equal(overstockOrder.status, 409);
+    assert.equal(overstockOrder.data.code, 'INSUFFICIENT_STOCK');
+    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), Number(medicine.totalQuantity));
+    assert.equal(await InventoryMovement.count({
+      where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
+    }), initialMovementCount);
+    assert.equal(await Sales.count({ where: { medicineId: sample.id } }), initialSalesCount);
+    assert.equal(await Order.count(), initialOrderCount);
 
     const orderPayload = {
       customerName: 'Test Customer',
@@ -159,6 +169,10 @@ describe('Store E-Commerce Endpoints', () => {
     );
     assert.equal(trackRes.status, 200);
     assert.ok(trackRes.data.data.some((order) => order.orderNumber === res.data.order.orderNumber));
+    const shortPhoneTrack = await request(
+      `/api/orders?orderNumber=${res.data.order.orderNumber}&phone=1`
+    );
+    assert.equal(shortPhoneTrack.status, 400);
 
     for (const batch of batches) {
       await batch.update({ quantity: 0 });
@@ -176,8 +190,8 @@ describe('Store E-Commerce Endpoints', () => {
         items: [{ id: sample.id, quantity: 2 }],
       }),
     });
-    assert.equal(outOfStockOrder.status, 201);
-    assert.equal(outOfStockOrder.data.order.items[0].quantity, 2);
+    assert.equal(outOfStockOrder.status, 409);
+    assert.equal(outOfStockOrder.data.code, 'INSUFFICIENT_STOCK');
     assert.equal(await InventoryMovement.count({
       where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
     }), movementCount);
@@ -185,11 +199,20 @@ describe('Store E-Commerce Endpoints', () => {
 
     const StoreService = require('../src/store/store.service');
     const storeService = new StoreService();
+    const unallocatedOrder = await Order.create({
+      orderNumber: `ORD-TEST-${Date.now()}`,
+      customerName: 'Backorder Customer',
+      customerPhone: '+260971230000',
+      deliveryMethod: 'pickup',
+      paymentMethod: 'Cash on Delivery',
+      orderStatus: 'Order Placed',
+      items: [{ id: sample.id, name: sample.name, quantity: 2 }],
+    });
     await assert.rejects(
-      storeService.updateOrderStatus(outOfStockOrder.data.order.id, 'Confirmed'),
+      storeService.updateOrderStatus(unallocatedOrder.id, 'Confirmed'),
       (error) => error.getStatus() === 409 && error.message.includes('Insufficient stock')
     );
-    assert.equal(outOfStockOrder.data.order.orderStatus, 'Order Placed');
+    assert.equal(unallocatedOrder.orderStatus, 'Order Placed');
 
     if (batches.length > 0) {
       await Batch.update({ quantity: 0 }, { where: { medicineId: sample.id } });
@@ -198,7 +221,7 @@ describe('Store E-Commerce Endpoints', () => {
     await medicine.update({ totalQuantity: 2 });
 
     const confirmedOrder = await storeService.updateOrderStatus(
-      outOfStockOrder.data.order.id,
+      unallocatedOrder.id,
       'Confirmed'
     );
     assert.equal(confirmedOrder.orderStatus, 'Confirmed');
@@ -209,7 +232,7 @@ describe('Store E-Commerce Endpoints', () => {
 
     const cancellationReason = 'Customer changed their mind';
     const cancelledOrder = await storeService.updateOrderStatus(
-      outOfStockOrder.data.order.id,
+      unallocatedOrder.id,
       'Cancelled',
       cancellationReason,
       { id: 1, role: 'user' }
@@ -282,7 +305,7 @@ describe('Store E-Commerce Endpoints', () => {
     assert.ok(res.data.inquiry);
   });
 
-  test('POST /api/auth/register creates new customer account and returns token', async () => {
+  test('authenticated store orders and prescriptions are linked to the customer account', async () => {
     const username = `cust_${Date.now()}`;
     const res = await request('/api/auth/register', {
       method: 'POST',
@@ -306,5 +329,74 @@ describe('Store E-Commerce Endpoints', () => {
     });
     assert.equal(profileRes.status, 200);
     assert.equal(profileRes.data.user.role, 'customer');
+
+    const productsResponse = await request('/api/products?limit=100');
+    const { Batch, Customer, Medicine, Order, Prescription } = require('../models');
+    const today = new Date().toISOString().slice(0, 10);
+    let orderableProduct;
+    for (const product of productsResponse.data.data) {
+      if (product.prescriptionRequired) continue;
+      const medicine = await Medicine.findByPk(product.id);
+      const batches = await Batch.findAll({ where: { medicineId: product.id } });
+      const available = batches.length > 0
+        ? batches.filter((batch) => String(batch.expiryDate) >= today)
+          .reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
+        : Number(medicine?.totalQuantity || 0);
+      if (available > 0) {
+        orderableProduct = product;
+        break;
+      }
+    }
+    assert.ok(orderableProduct, 'A customer-orderable product has available stock');
+
+    const orderResponse = await request('/api/orders', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${res.data.token}` },
+      body: JSON.stringify({
+        customerName: 'Chipo Zulu',
+        customerPhone: res.data.customer.phone,
+        deliveryMethod: 'pickup',
+        items: [{ id: orderableProduct.id, quantity: 1 }],
+      }),
+    });
+    assert.equal(orderResponse.status, 201);
+    const customer = await Customer.findOne({ where: { userId: res.data.user.id } });
+    const storedOrder = await Order.findOne({
+      where: { orderNumber: orderResponse.data.order.orderNumber },
+    });
+    assert.equal(storedOrder.userId, res.data.user.id);
+    assert.equal(storedOrder.customerId, customer.id);
+
+    const accountOrders = await request('/api/orders', {
+      headers: { Authorization: `Bearer ${res.data.token}` },
+    });
+    assert.equal(accountOrders.status, 200);
+    assert.ok(accountOrders.data.data.some(
+      (order) => order.orderNumber === orderResponse.data.order.orderNumber
+    ));
+
+    const prescriptionResponse = await request('/api/prescriptions/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${res.data.token}` },
+      body: JSON.stringify({
+        patientName: 'Chipo Zulu',
+        patientPhone: res.data.customer.phone,
+        deliveryPreference: 'pickup',
+        medications: 'Test prescription',
+      }),
+    });
+    assert.equal(prescriptionResponse.status, 201);
+    const storedPrescription = await Prescription.findOne({
+      where: { prescriptionNumber: prescriptionResponse.data.prescriptionNumber },
+    });
+    assert.equal(storedPrescription.customerId, customer.id);
+
+    const accountPrescriptions = await request('/api/prescriptions/my', {
+      headers: { Authorization: `Bearer ${res.data.token}` },
+    });
+    assert.equal(accountPrescriptions.status, 200);
+    assert.ok(accountPrescriptions.data.some(
+      (prescription) => prescription.prescriptionNumber === prescriptionResponse.data.prescriptionNumber
+    ));
   });
 });

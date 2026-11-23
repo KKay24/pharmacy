@@ -473,7 +473,13 @@ class StoreService {
         const availableStock = batches.length > 0
           ? saleableBatches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
           : Number(medicine.totalQuantity || 0);
-        // Record the full requested order; inventory deductions are limited to saleable stock.
+        if (availableStock < requestedQuantity) {
+          throw new InsufficientStockException(
+            `Insufficient stock for ${medicine.name}. `
+            + `Required: ${requestedQuantity}, available: ${availableStock}.`
+          );
+        }
+        // Only create the order after confirming that all requested units are saleable.
         let itemPrice = calculateProductPrice({
           basePrice: medicine.basePrice,
           Batches: batches,
@@ -628,6 +634,9 @@ class StoreService {
       if (query.orderNumber && query.phone) {
         where.orderNumber = query.orderNumber.trim();
         const cleanPhone = String(query.phone).replace(/\D/g, '').slice(-9);
+        if (cleanPhone.length < 7) {
+          throw new BadRequestException('Order tracking requires at least 7 phone digits');
+        }
         where.customerPhone = { [Op.like]: `%${cleanPhone}%` };
       } else {
         throw new BadRequestException('Order tracking requires order number and phone');

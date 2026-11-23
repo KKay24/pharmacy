@@ -252,6 +252,34 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
     assert.equal(receivedHistories[2].length, 0);
   });
 
+  test('does not reuse or overwrite sessions across authenticated and guest users', async () => {
+    const receivedHistories = [];
+    const service = new AiService({
+      completionFn: async ({ history }) => {
+        receivedHistories.push(history);
+        return { text: 'Safe reply', provider: 'test' };
+      },
+    });
+
+    const customerSession = await service.chat(
+      { message: 'A private customer question' },
+      { clientIp: '10.0.0.6', user: { id: 21, role: 'customer' } }
+    );
+    const guestSession = await service.chat(
+      { sessionId: customerSession.sessionId, message: 'A guest question' },
+      { clientIp: '10.0.0.7' }
+    );
+    const continuingCustomerSession = await service.chat(
+      { sessionId: customerSession.sessionId, message: 'Continue privately' },
+      { clientIp: '10.0.0.6', user: { id: 21, role: 'customer' } }
+    );
+
+    assert.notEqual(guestSession.sessionId, customerSession.sessionId);
+    assert.equal(continuingCustomerSession.sessionId, customerSession.sessionId);
+    assert.equal(receivedHistories[1].length, 0);
+    assert.equal(receivedHistories[2].length, 2);
+  });
+
   test('flags recommendPharmacist for dosing, pregnancy, or interaction questions', async () => {
     const service = new AiService({
       completionFn: async () => ({ text: 'Please consult a MediQuick pharmacist.', provider: 'test' }),

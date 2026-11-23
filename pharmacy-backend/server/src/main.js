@@ -26,7 +26,7 @@ function rejectDisallowedOrigin(req, res, next) {
 
 async function createApplication() {
   const app = await NestFactory.create(AppModule, {
-    bodyParser: true,
+    bodyParser: false,
     logger: ['error', 'warn', 'log'],
   });
 
@@ -39,7 +39,13 @@ async function createApplication() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    allowedHeaders: [
+      'Authorization',
+      'Content-Type',
+      'Cache-Control',
+      'Pragma',
+      'X-Requested-With',
+    ],
     optionsSuccessStatus: 204,
   });
 

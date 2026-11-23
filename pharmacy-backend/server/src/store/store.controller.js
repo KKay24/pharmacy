@@ -136,6 +136,7 @@ applyParameterDecorator(Param, StoreController.prototype, 'getProduct', 0);
 applyMethodDecorator(Post, StoreController.prototype, 'createOrder', 'orders');
 applyParameterDecorator(Body, StoreController.prototype, 'createOrder', 0);
 applyParameterDecorator(Req, StoreController.prototype, 'createOrder', 1);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'createOrder', OptionalAuthGuard);
 
 applyMethodDecorator(Get, StoreController.prototype, 'listOrders', 'orders');
 applyParameterDecorator(Query, StoreController.prototype, 'listOrders', 0);
@@ -158,6 +159,7 @@ Roles('admin', 'manager', 'user')(StoreController.prototype, 'updateOrderStatus'
 applyMethodDecorator(Post, StoreController.prototype, 'uploadPrescription', 'prescriptions/upload');
 applyParameterDecorator(Body, StoreController.prototype, 'uploadPrescription', 0);
 applyParameterDecorator(Req, StoreController.prototype, 'uploadPrescription', 1);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'uploadPrescription', OptionalAuthGuard);
 
 applyMethodDecorator(Get, StoreController.prototype, 'trackPrescription', 'prescriptions/track/:ref');
 applyParameterDecorator(Param, StoreController.prototype, 'trackPrescription', 0);

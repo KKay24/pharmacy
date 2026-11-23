@@ -328,7 +328,7 @@ test('CORS handles OPTIONS and preserves allowed-origin headers on request error
     headers: {
       Origin: origin,
       'Access-Control-Request-Method': 'GET',
-      'Access-Control-Request-Headers': 'authorization,content-type',
+      'Access-Control-Request-Headers': 'authorization,content-type,cache-control,x-requested-with',
     },
   });
 
@@ -339,6 +339,8 @@ test('CORS handles OPTIONS and preserves allowed-origin headers on request error
   assert.match(preflight.headers.get('access-control-allow-methods'), /OPTIONS/);
   assert.match(preflight.headers.get('access-control-allow-headers').toLowerCase(), /authorization/);
   assert.match(preflight.headers.get('access-control-allow-headers').toLowerCase(), /content-type/);
+  assert.match(preflight.headers.get('access-control-allow-headers').toLowerCase(), /cache-control/);
+  assert.match(preflight.headers.get('access-control-allow-headers').toLowerCase(), /x-requested-with/);
 
   const invalidChat = await fetch(`${baseUrl}/api/ai/chat`, {
     method: 'POST',
@@ -347,6 +349,26 @@ test('CORS handles OPTIONS and preserves allowed-origin headers on request error
   });
   assert.equal(invalidChat.status, 400);
   assert.equal(invalidChat.headers.get('access-control-allow-origin'), origin);
+});
+
+test('JSON body limits are small by default and larger only for prescription uploads', async () => {
+  const oversizedLogin = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: 'test',
+      password: 'test',
+      extra: 'x'.repeat(3 * 1024 * 1024),
+    }),
+  });
+  assert.equal(oversizedLogin.status, 413);
+
+  const largePrescriptionPayload = await fetch(`${baseUrl}/api/prescriptions/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ extra: 'x'.repeat(5 * 1024 * 1024) }),
+  });
+  assert.equal(largePrescriptionPayload.status, 400);
 });
 
 test('inventory taxonomy is hierarchical and limits forms to the selected subcategory', async () => {

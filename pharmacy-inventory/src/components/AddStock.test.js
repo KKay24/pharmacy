@@ -12,7 +12,7 @@ jest.mock("pdfjs-dist", () => ({
   getDocument: jest.fn(),
   GlobalWorkerOptions: {},
   version: "test",
-}));
+}), { virtual: true });
 
 jest.mock("../utils/invoiceParser", () => ({
   parseInvoiceText: jest.fn(() => ({ items: [], metadata: {} })),

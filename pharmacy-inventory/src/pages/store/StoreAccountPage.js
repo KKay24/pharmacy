@@ -20,6 +20,7 @@ export default function StoreAccountPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("profile");
   const [authOpen, setAuthOpen] = useState(!storeUser);
+  const [authMode, setAuthMode] = useState("login");
   const [orders, setOrders] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
   const [, setProfile] = useState(null);
@@ -95,7 +96,7 @@ export default function StoreAccountPage() {
           <button onClick={() => setAuthOpen(true)} style={{ background: "var(--brand-blue)", color: "white", border: "none", padding: "0.8rem 1.75rem", borderRadius: "var(--radius)", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer" }}>
             Sign In
           </button>
-          {authOpen && <StoreAuthModal mode="login" onClose={() => setAuthOpen(false)} onSwitchMode={() => {}} />}
+          {authOpen && <StoreAuthModal mode={authMode} onClose={() => setAuthOpen(false)} onSwitchMode={setAuthMode} />}
         </div>
       </div>
     );

@@ -8,17 +8,16 @@ import {
 
 const LOCALHOST_NAMES = new Set(['localhost', '127.0.0.1']);
 
-const resolveApiBaseUrl = () => {
-  const explicitBase = process.env.REACT_APP_API_BASE_URL;
-  if (explicitBase) {
-    return explicitBase.replace(/\/$/, '');
-  }
-
-  if (typeof window !== 'undefined' && LOCALHOST_NAMES.has(window.location.hostname)) {
+export const resolveApiBaseUrl = (
+  explicitBase = process.env.REACT_APP_API_BASE_URL,
+  hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+) => {
+  if (LOCALHOST_NAMES.has(hostname)) {
+    if (explicitBase) return explicitBase.replace(/\/$/, '');
     return 'http://localhost:5001';
   }
 
-  // In production without an explicit backend base URL, fall back to relative URLs (e.g. Vercel /api proxy)
+  // Browser requests in production use the same-origin Vercel proxy.
   return '';
 };
 
