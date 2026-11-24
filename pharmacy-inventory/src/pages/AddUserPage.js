@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import toast from "react-hot-toast";
 import { 
     UserPlus, 
@@ -14,10 +14,13 @@ import {
     XCircle,
     X,
     Key,
+    KeyRound,
+    Trash2,
     Activity,
     Lock
 } from "lucide-react";
-import { apiFetch } from "../utils/api";
+import { DataContext } from "../context/DataContext";
+import { apiFetch, getApiErrorMessage } from "../utils/api";
 import "../styles/team-modern.css";
 
 const ROLES = [
@@ -36,10 +39,18 @@ const PERMISSIONS = [
 ];
 
 export default function TeamHubPage() {
+    const dataContext = useContext(DataContext) || {};
+    const currentUsername = String(dataContext.username || "").trim().toLowerCase();
     const [users, setUsers] = useState([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [showForm, setShowForm] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
+    const [savingUser, setSavingUser] = useState(false);
+    const [passwordTarget, setPasswordTarget] = useState(null);
+    const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" });
+    const [savingPassword, setSavingPassword] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deletingUser, setDeletingUser] = useState(false);
     const [formData, setFormData] = useState({
         username: "",
         password: "",
@@ -75,16 +86,36 @@ export default function TeamHubPage() {
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
+        if (savingUser) return;
+        const trimmedEmail = String(formData.email || "").trim();
+        const trimmedPassword = String(formData.password || "").trim();
+        if (!editingUser && trimmedPassword.length < 12) {
+            toast.error("Password must be at least 12 characters long");
+            return;
+        }
+        if (editingUser && trimmedPassword && trimmedPassword.length < 12) {
+            toast.error("New password must be at least 12 characters long");
+            return;
+        }
+
+        setSavingUser(true);
         try {
             const endpoint = editingUser ? `/api/auth/users/${editingUser.id}` : "/api/auth/users";
             const method = editingUser ? "PUT" : "POST";
-            
-            // Password is not required when editing unless we add reset logic
-            const payload = { ...formData };
-            if (editingUser && !payload.password) delete payload.password;
+
+            const payload = {
+                ...formData,
+                username: String(formData.username || "").trim(),
+                email: trimmedEmail || null,
+            };
+            if (editingUser && !trimmedPassword) {
+                delete payload.password;
+            } else if (trimmedPassword) {
+                payload.password = trimmedPassword;
+            }
 
             const res = await apiFetch(endpoint, {
-                method: method,
+                method,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
@@ -96,11 +127,12 @@ export default function TeamHubPage() {
                 setFormData({ username: "", password: "", role: "user", email: "", locations: ["Main Pharmacy"] });
                 fetchUsers();
             } else {
-                const data = await res.json().catch(() => ({}));
-                toast.error(data.error || "Failed to save user");
+                toast.error(await getApiErrorMessage(res, "Failed to save user"));
             }
         } catch (err) {
-            toast.error("Server error");
+            toast.error(err?.message || "Server error");
+        } finally {
+            setSavingUser(false);
         }
     };
 
@@ -116,6 +148,71 @@ export default function TeamHubPage() {
         setShowForm(true);
     };
 
+    const handleOpenPasswordModal = (user) => {
+        setPasswordTarget(user);
+        setPasswordForm({ newPassword: "", confirmPassword: "" });
+    };
+
+    const handleResetUserPassword = async (e) => {
+        e.preventDefault();
+        if (!passwordTarget || savingPassword) return;
+        const nextPassword = passwordForm.newPassword.trim();
+        if (nextPassword.length < 12) {
+            toast.error("New password must be at least 12 characters long");
+            return;
+        }
+        if (nextPassword !== passwordForm.confirmPassword.trim()) {
+            toast.error("Passwords do not match");
+            return;
+        }
+
+        setSavingPassword(true);
+        try {
+            const res = await apiFetch(`/api/auth/users/${passwordTarget.id}/password`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ newPassword: nextPassword }),
+            });
+            if (res.ok) {
+                toast.success(`Password updated for ${passwordTarget.username}`);
+                setPasswordTarget(null);
+                setPasswordForm({ newPassword: "", confirmPassword: "" });
+            } else {
+                toast.error(await getApiErrorMessage(res, "Failed to change password"));
+            }
+        } catch (err) {
+            toast.error(err?.message || "Failed to change password");
+        } finally {
+            setSavingPassword(false);
+        }
+    };
+
+    const handleConfirmDeleteUser = async () => {
+        if (!deleteTarget || deletingUser) return;
+        setDeletingUser(true);
+        try {
+            const res = await apiFetch(`/api/auth/users/${deleteTarget.id}`, {
+                method: "DELETE",
+            });
+            if (res.ok) {
+                toast.success(`Deleted user ${deleteTarget.username}`);
+                setDeleteTarget(null);
+                fetchUsers();
+            } else {
+                toast.error(await getApiErrorMessage(res, "Failed to delete user"));
+            }
+        } catch (err) {
+            toast.error(err?.message || "Failed to delete user");
+        } finally {
+            setDeletingUser(false);
+        }
+    };
+
+    const canManageCredentialsOrDelete = (targetUser) => {
+        const isSelf = currentUsername && String(targetUser.username || "").trim().toLowerCase() === currentUsername;
+        return targetUser.role !== "admin" && !isSelf;
+    };
+
     const getRoleData = (roleName) => {
         return ROLES.find(r => r.id.toLowerCase() === roleName.toLowerCase()) || ROLES[2];
     };
@@ -128,7 +225,14 @@ export default function TeamHubPage() {
                     <h1 style={{margin:0, fontSize:'1.5rem', fontWeight:800}}>Team & HR Hub</h1>
                     <p style={{margin:'0.25rem 0 0 0', color:'#64748b'}}>Provision staff accounts, manage access levels, and monitor system security.</p>
                 </div> */}
-                <button className="asm-btn asm-btn-primary" onClick={() => setShowForm(true)}>
+                <button
+                    className="asm-btn asm-btn-primary"
+                    onClick={() => {
+                        setEditingUser(null);
+                        setFormData({ username: "", password: "", role: "user", email: "", locations: ["Main Pharmacy"] });
+                        setShowForm(true);
+                    }}
+                >
                     <UserPlus size={18} /> Onboard New Staff
                 </button>
             </div>
@@ -189,14 +293,39 @@ export default function TeamHubPage() {
                                         {user.status === 'active' ? 'System Active' : 'Access Revoked'}
                                     </span>
                                 </div>
-                                <div style={{display:'flex', gap:'0.5rem'}}>
+                                <div style={{display:'flex', gap:'0.4rem', flexWrap:'wrap', justifyContent:'flex-end'}}>
                                     <button 
+                                        type="button"
                                         className="asm-btn asm-btn-secondary" 
                                         style={{padding:'0.4rem 0.6rem', fontSize:'0.75rem'}}
                                         onClick={() => handleEditInitiated(user)}
                                     >
                                         Edit Profile
                                     </button>
+                                    {canManageCredentialsOrDelete(user) && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                className="asm-btn asm-btn-secondary"
+                                                style={{padding:'0.4rem 0.6rem', fontSize:'0.75rem', display:'inline-flex', alignItems:'center', gap:'0.3rem'}}
+                                                aria-label={`Change password for ${user.username}`}
+                                                onClick={() => handleOpenPasswordModal(user)}
+                                            >
+                                                <KeyRound size={13} aria-hidden="true" />
+                                                Change Password
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="asm-btn asm-btn-secondary"
+                                                style={{padding:'0.4rem 0.6rem', fontSize:'0.75rem', color:'#dc2626', borderColor:'#fecaca', background:'#fef2f2', display:'inline-flex', alignItems:'center', gap:'0.3rem'}}
+                                                aria-label={`Delete user ${user.username}`}
+                                                onClick={() => setDeleteTarget(user)}
+                                            >
+                                                <Trash2 size={13} aria-hidden="true" />
+                                                Delete
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -288,7 +417,8 @@ export default function TeamHubPage() {
                                 <div className="asm-field">
                                     <label>Set Password</label>
                                     <input 
-                                        type="password" className="asm-input" required
+                                        type="password" className="asm-input" required minLength={12}
+                                        placeholder="Minimum 12 characters"
                                         value={formData.password || ""}
                                         onChange={e => setFormData({...formData, password:e.target.value})}
                                     />
@@ -298,10 +428,11 @@ export default function TeamHubPage() {
                                 <label>Operational Role</label>
                                 <select 
                                     className="asm-input"
+                                    disabled={editingUser?.role === "admin"}
                                     value={formData.role}
                                     onChange={e => setFormData({...formData, role:e.target.value})}
                                 >
-                                    <option value="admin">Administrator</option>
+                                    {editingUser?.role === "admin" && <option value="admin">Administrator</option>}
                                     <option value="manager">Manager</option>
                                     <option value="user">Staff</option>
                                 </select>
@@ -312,10 +443,124 @@ export default function TeamHubPage() {
                                     By creating this account, the user will be granted access to clinical and financial data based on their role.
                                 </div>
                             </div>
-                            <button type="submit" className="asm-btn asm-btn-primary" style={{marginTop:'auto', width:'100%'}}>
-                                Save Staff Profile
+                            <button type="submit" disabled={savingUser} className="asm-btn asm-btn-primary" style={{marginTop:'auto', width:'100%'}}>
+                                {savingUser ? "Saving..." : "Save Staff Profile"}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Change User Password Modal */}
+            {passwordTarget && (
+                <div className="crm-sidebar-overlay" onClick={() => !savingPassword && setPasswordTarget(null)}>
+                    <div className="crm-sidebar" style={{width:440}} role="dialog" aria-modal="true" aria-label={`Change password for ${passwordTarget.username}`} onClick={e => e.stopPropagation()}>
+                        <div className="crm-side-header">
+                            <div>
+                                <h2 style={{margin:0, fontSize:'1.2rem', fontWeight:800}}>Change User Password</h2>
+                                <span style={{fontSize:'0.8rem', color:'#64748b'}}>
+                                    Set a new password for <strong>{passwordTarget.username}</strong>
+                                </span>
+                            </div>
+                            <button type="button" onClick={() => !savingPassword && setPasswordTarget(null)} style={{border:'none', background:'none', cursor:'pointer'}} aria-label="Close password modal">
+                                <X size={22}/>
+                            </button>
+                        </div>
+                        <form onSubmit={handleResetUserPassword} className="crm-side-body">
+                            <div className="asm-field">
+                                <label htmlFor="admin-reset-new-password">New Password</label>
+                                <input
+                                    id="admin-reset-new-password"
+                                    type="password"
+                                    className="asm-input"
+                                    required
+                                    minLength={12}
+                                    placeholder="Minimum 12 characters"
+                                    value={passwordForm.newPassword}
+                                    onChange={e => setPasswordForm(current => ({ ...current, newPassword: e.target.value }))}
+                                />
+                            </div>
+                            <div className="asm-field">
+                                <label htmlFor="admin-reset-confirm-password">Confirm New Password</label>
+                                <input
+                                    id="admin-reset-confirm-password"
+                                    type="password"
+                                    className="asm-input"
+                                    required
+                                    minLength={12}
+                                    placeholder="Re-enter new password"
+                                    value={passwordForm.confirmPassword}
+                                    onChange={e => setPasswordForm(current => ({ ...current, confirmPassword: e.target.value }))}
+                                />
+                            </div>
+                            <div className="allergy-alert" style={{background:'#f8fafc', border:'1px solid #e2e8f0', color:'#64748b'}}>
+                                <Lock size={18} />
+                                <div style={{fontSize:'0.75rem', fontWeight:400}}>
+                                    Passwords must be at least 12 characters. Share the updated password securely with the user.
+                                </div>
+                            </div>
+                            <div style={{marginTop:'auto', display:'flex', gap:'0.75rem'}}>
+                                <button
+                                    type="button"
+                                    className="asm-btn asm-btn-secondary"
+                                    style={{flex:1}}
+                                    disabled={savingPassword}
+                                    onClick={() => setPasswordTarget(null)}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="asm-btn asm-btn-primary"
+                                    style={{flex:2}}
+                                    disabled={savingPassword}
+                                >
+                                    {savingPassword ? "Updating..." : "Update Password"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete User Confirmation Modal */}
+            {deleteTarget && (
+                <div className="crm-sidebar-overlay" onClick={() => !deletingUser && setDeleteTarget(null)}>
+                    <div className="crm-sidebar" style={{width:420, height:'auto', maxHeight:'90vh', margin:'auto', borderRadius:'14px'}} role="dialog" aria-modal="true" aria-label={`Delete user ${deleteTarget.username}`} onClick={e => e.stopPropagation()}>
+                        <div className="crm-side-header">
+                            <div>
+                                <h2 style={{margin:0, fontSize:'1.15rem', fontWeight:800, color:'#b91c1c'}}>Delete User Account</h2>
+                                <span style={{fontSize:'0.8rem', color:'#64748b'}}>This action cannot be undone.</span>
+                            </div>
+                            <button type="button" onClick={() => !deletingUser && setDeleteTarget(null)} style={{border:'none', background:'none', cursor:'pointer'}} aria-label="Close delete modal">
+                                <X size={22}/>
+                            </button>
+                        </div>
+                        <div className="crm-side-body" style={{gap:'1rem'}}>
+                            <p style={{margin:0, fontSize:'0.9rem', color:'#334155', lineHeight:1.5}}>
+                                Are you sure you want to permanently delete <strong>{deleteTarget.username}</strong>? Historical sales and order records will be preserved, but this user will immediately lose system access.
+                            </p>
+                            <div style={{display:'flex', gap:'0.75rem', marginTop:'0.5rem'}}>
+                                <button
+                                    type="button"
+                                    className="asm-btn asm-btn-secondary"
+                                    style={{flex:1}}
+                                    disabled={deletingUser}
+                                    onClick={() => setDeleteTarget(null)}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="asm-btn"
+                                    style={{flex:1, background:'#dc2626', color:'#ffffff', border:'none'}}
+                                    disabled={deletingUser}
+                                    onClick={handleConfirmDeleteUser}
+                                >
+                                    {deletingUser ? "Deleting..." : "Confirm Delete"}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

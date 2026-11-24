@@ -166,7 +166,7 @@ class AuthService {
     const username = normalizeUsernameInput(body?.username);
     const password = typeof body?.password === 'string' ? body.password.trim() : '';
     const role = typeof body?.role === 'string' ? body.role.trim().toLowerCase() : 'user';
-    const email = typeof body?.email === 'string' ? body.email.trim() : null;
+    const email = typeof body?.email === 'string' && body.email.trim() ? body.email.trim() : null;
     const locations = Array.isArray(body?.locations) ? body.locations.filter(Boolean) : [];
 
     if (!username || !password) {
@@ -212,6 +212,38 @@ class AuthService {
     return { success: true, message: `User status updated to ${status}` };
   }
 
+  async resetUserPassword(id, body, currentUser) {
+    const rawPassword = typeof body?.newPassword === 'string'
+      ? body.newPassword
+      : typeof body?.password === 'string'
+        ? body.password
+        : '';
+    const nextPassword = rawPassword.trim();
+
+    if (!nextPassword || nextPassword.length < 12) {
+      throw new BadRequestException('New password must be at least 12 characters long');
+    }
+
+    const user = await User.findByPk(id);
+    if (!user) throw new NotFoundException('User not found');
+    if (user.id === currentUser.id) {
+      throw new BadRequestException('Use Change Password to update your own account password');
+    }
+    if (user.role === 'admin') {
+      throw new ForbiddenException('Admin account passwords cannot be reset from user management');
+    }
+
+    user.password = hashPassword(nextPassword);
+    user.mustChangePassword = body?.mustChangePassword === true;
+    await user.save();
+
+    return {
+      success: true,
+      message: 'User password updated successfully',
+      user: serializeUser(user),
+    };
+  }
+
   async updateUser(id, body, currentUser) {
     const user = await User.findByPk(id);
     if (!user) throw new NotFoundException('User not found');
@@ -222,7 +254,31 @@ class AuthService {
     if (body.role === 'admin' && user.role !== 'admin') {
       throw new ForbiddenException('Admin accounts must be created through the controlled seed script');
     }
-    if (body.email !== undefined) user.email = body.email;
+
+    const rawPassword = typeof body?.newPassword === 'string'
+      ? body.newPassword
+      : typeof body?.password === 'string'
+        ? body.password
+        : '';
+    const nextPassword = rawPassword.trim();
+    if (nextPassword) {
+      if (user.id === currentUser.id) {
+        throw new BadRequestException('Use Change Password to update your own account password');
+      }
+      if (user.role === 'admin') {
+        throw new ForbiddenException('Admin account passwords cannot be reset from user management');
+      }
+      if (nextPassword.length < 12) {
+        throw new BadRequestException('New password must be at least 12 characters long');
+      }
+      user.password = hashPassword(nextPassword);
+      user.mustChangePassword = body?.mustChangePassword === true;
+    }
+
+    if (body.email !== undefined) {
+      const cleanedEmail = typeof body.email === 'string' ? body.email.trim() : '';
+      user.email = cleanedEmail || null;
+    }
     if (body.role && VALID_ROLES.includes(body.role)) user.role = body.role;
     if (Array.isArray(body.locations)) user.locations = body.locations;
     if (body.status && VALID_STATUSES.includes(body.status)) user.status = body.status;
@@ -239,14 +295,39 @@ class AuthService {
     if (user.role === 'admin') {
       throw new ForbiddenException('Admin accounts cannot be deleted');
     }
-    await user.destroy();
+
+    const [paymentCount, refundCount, reconciliationCount] = await Promise.all([
+      SalePayment.count({ where: { confirmedByUserId: user.id } }),
+      SaleRefund.count({ where: { processedByUserId: user.id } }),
+      CashDrawerReconciliation.count({ where: { closedByUserId: user.id } }),
+    ]);
+    if (paymentCount > 0 || refundCount > 0 || reconciliationCount > 0) {
+      throw new ConflictException(
+        'This user has financial audit records (confirmed payments, refunds, or cash drawer closes) and cannot be permanently deleted. Suspend the account instead.'
+      );
+    }
+
+    await sequelize.transaction(async (transaction) => {
+      await Sales.update({ soldByUserId: null }, { where: { soldByUserId: user.id }, transaction });
+      await Sales.update({ reversedByUserId: null }, { where: { reversedByUserId: user.id }, transaction });
+      await Order.update({ userId: null }, { where: { userId: user.id }, transaction });
+      await Order.update({ cancelledByUserId: null }, { where: { cancelledByUserId: user.id }, transaction });
+      await Customer.update({ userId: null }, { where: { userId: user.id }, transaction });
+      await Expense.update({ createdByUserId: null }, { where: { createdByUserId: user.id }, transaction });
+      await Expense.update({ voidedByUserId: null }, { where: { voidedByUserId: user.id }, transaction });
+      await Expense.update({ correctedByUserId: null }, { where: { correctedByUserId: user.id }, transaction });
+      await AuthAuditLog.update({ userId: null }, { where: { userId: user.id }, transaction });
+      await AuditLog.update({ userId: null }, { where: { userId: user.id }, transaction });
+      await user.destroy({ transaction });
+    });
+
     return { success: true, message: 'User deleted successfully' };
   }
 
   async registerCustomer(body) {
     const username = normalizeUsernameInput(body?.username || body?.email || body?.phone);
     const password = typeof body?.password === 'string' ? body.password.trim() : '';
-    const email = typeof body?.email === 'string' ? body.email.trim() : null;
+    const email = typeof body?.email === 'string' && body.email.trim() ? body.email.trim() : null;
     const name = typeof body?.name === 'string' ? body.name.trim() : username;
     const phone = typeof body?.phone === 'string' ? body.phone.trim() : null;
     const address = typeof body?.address === 'string' ? body.address.trim() : null;
@@ -357,7 +438,18 @@ class AuthService {
   }
 }
 
-const Customer = require('../../models/Customer');
+const {
+  sequelize,
+  AuditLog,
+  AuthAuditLog,
+  CashDrawerReconciliation,
+  Customer,
+  Expense,
+  Order,
+  SalePayment,
+  SaleRefund,
+  Sales,
+} = require('../../models');
 
 const { ConflictException, NotFoundException } = require('@nestjs/common');
 Injectable()(AuthService);

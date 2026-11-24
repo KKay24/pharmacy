@@ -26,6 +26,8 @@ import {
   XCircle,
   UserPlus,
   Edit,
+  KeyRound,
+  Trash2,
 } from 'lucide-react-native';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
@@ -64,7 +66,7 @@ const PERMISSIONS = [
 
 export default function TeamScreen() {
   const { colors } = useTheme();
-  const { token } = useAuth();
+  const { token, user: currentUser } = useAuth();
 
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +82,13 @@ export default function TeamScreen() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'manager' | 'user'>('user');
   const [saving, setSaving] = useState(false);
+
+  // Password reset modal
+  const [passwordTarget, setPasswordTarget] = useState<StaffUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | number | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -137,26 +146,113 @@ export default function TeamScreen() {
     setModalVisible(true);
   };
 
+  const canManageCredentialsOrDelete = (u: StaffUser) => {
+    const isSelf =
+      Boolean(currentUser?.username) &&
+      u.username.trim().toLowerCase() === currentUser!.username.trim().toLowerCase();
+    return u.role !== 'admin' && !isSelf;
+  };
+
+  const openPasswordModal = (u: StaffUser) => {
+    setPasswordTarget(u);
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const handleResetPassword = async () => {
+    if (!passwordTarget || savingPassword) return;
+    const trimmed = newPassword.trim();
+    if (trimmed.length < 12) {
+      Alert.alert('Invalid Password', 'New password must be at least 12 characters long.');
+      return;
+    }
+    if (trimmed !== confirmPassword.trim()) {
+      Alert.alert('Password Mismatch', 'New password and confirmation do not match.');
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      await apiClient.patch(`/api/auth/users/${passwordTarget.id}/password`, {
+        newPassword: trimmed,
+      });
+      Alert.alert('Success', `Password updated for @${passwordTarget.username}.`);
+      setPasswordTarget(null);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string };
+      Alert.alert(
+        'Error',
+        err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to update password.'
+      );
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const handleDeleteUser = (u: StaffUser) => {
+    if (!canManageCredentialsOrDelete(u) || deletingUserId !== null) return;
+    Alert.alert(
+      'Delete User Account',
+      `Permanently delete @${u.username}? Historical sales and orders will be preserved, but this user will lose access immediately.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingUserId(u.id);
+            try {
+              await apiClient.delete(`/api/auth/users/${u.id}`);
+              Alert.alert('Deleted', `User @${u.username} has been deleted.`);
+              fetchUsers();
+            } catch (e: unknown) {
+              const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string };
+              Alert.alert(
+                'Cannot Delete User',
+                err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to delete user.'
+              );
+            } finally {
+              setDeletingUserId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSave = async () => {
     if (!username.trim()) {
       Alert.alert('Required Field', 'Please enter a valid staff username.');
       return;
     }
-    if (!editingUser && !password.trim()) {
-      Alert.alert('Required Field', 'Please specify an initial password.');
+    const trimmedPassword = password.trim();
+    if (!editingUser && trimmedPassword.length < 12) {
+      Alert.alert('Invalid Password', 'Initial password must be at least 12 characters long.');
+      return;
+    }
+    if (editingUser && trimmedPassword && trimmedPassword.length < 12) {
+      Alert.alert('Invalid Password', 'New password must be at least 12 characters long.');
       return;
     }
 
     setSaving(true);
     try {
-      const payload: any = {
+      const payload: {
+        username: string;
+        email: string | null;
+        role: 'admin' | 'manager' | 'user';
+        locations: string[];
+        password?: string;
+      } = {
         username: username.trim(),
-        email: email.trim() || undefined,
+        email: email.trim() || null,
         role,
-        locations: ['Main Pharmacy'],
+        locations: editingUser?.locations?.length ? editingUser.locations : ['Main Pharmacy'],
       };
-      if (password.trim()) {
-        payload.password = password.trim();
+      if (trimmedPassword) {
+        payload.password = trimmedPassword;
       }
 
       if (editingUser) {
@@ -171,8 +267,12 @@ export default function TeamScreen() {
       );
       setModalVisible(false);
       fetchUsers();
-    } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.error || e.message || 'Failed to save staff account.');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string };
+      Alert.alert(
+        'Error',
+        err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to save staff account.'
+      );
     } finally {
       setSaving(false);
     }
@@ -288,13 +388,34 @@ export default function TeamScreen() {
   
                   <View style={styles.cardActions}>
                     <Button
-                      title="Edit Credentials"
+                      title="Edit"
                       variant="outline"
                       size="sm"
                       leftIcon={<Edit size={14} color={colors.primary} />}
                       onPress={() => openEditModal(item)}
                       style={styles.editBtn}
                     />
+                    {canManageCredentialsOrDelete(item) && (
+                      <>
+                        <Button
+                          title="Password"
+                          variant="outline"
+                          size="sm"
+                          leftIcon={<KeyRound size={14} color={colors.primary} />}
+                          onPress={() => openPasswordModal(item)}
+                          style={styles.editBtn}
+                        />
+                        <Button
+                          title="Delete"
+                          variant="danger"
+                          size="sm"
+                          loading={deletingUserId === item.id}
+                          leftIcon={<Trash2 size={14} color="#ffffff" />}
+                          onPress={() => handleDeleteUser(item)}
+                          style={styles.editBtn}
+                        />
+                      </>
+                    )}
                   </View>
                 </Card>
               );
@@ -374,7 +495,7 @@ export default function TeamScreen() {
                       color: colors.text,
                     },
                   ]}
-                  placeholder={editingUser ? '••••••••' : 'Minimum 6 characters'}
+                  placeholder={editingUser ? 'Minimum 12 characters (optional)' : 'Minimum 12 characters'}
                   placeholderTextColor={colors.textMuted}
                   value={password}
                   onChangeText={setPassword}
@@ -443,6 +564,90 @@ export default function TeamScreen() {
           </KeyboardAvoidingView>
         </Modal>
   
+        {/* Reset User Password Modal */}
+        <Modal visible={Boolean(passwordTarget)} animationType="slide" transparent>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalOverlay}
+          >
+            <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+                <View>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>Change User Password</Text>
+                  <Text style={[styles.modalSub, { color: colors.textMuted }]}>
+                    Set a new password for @{passwordTarget?.username}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => !savingPassword && setPasswordTarget(null)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <X size={22} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.modalBody}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>New Password *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.surfaceMuted,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    },
+                  ]}
+                  placeholder="Minimum 12 characters"
+                  placeholderTextColor={colors.textMuted}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                />
+
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Confirm New Password *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.surfaceMuted,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    },
+                  ]}
+                  placeholder="Re-enter new password"
+                  placeholderTextColor={colors.textMuted}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                />
+
+                <View style={[styles.advisoryBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+                  <Lock size={18} color={colors.primary} />
+                  <Text style={[styles.advisoryText, { color: colors.text }]}>
+                    Passwords must be at least 12 characters. Share the updated password securely with the user.
+                  </Text>
+                </View>
+              </ScrollView>
+
+              <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
+                <Button
+                  title="Cancel"
+                  variant="ghost"
+                  onPress={() => setPasswordTarget(null)}
+                  style={styles.modalCancelBtn}
+                />
+                <Button
+                  title="Update Password"
+                  variant="primary"
+                  onPress={handleResetPassword}
+                  loading={savingPassword}
+                  style={styles.modalSaveBtn}
+                />
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
         {/* Permissions Matrix Modal */}
         <Modal visible={showMatrixModal} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
@@ -634,7 +839,9 @@ const styles = StyleSheet.create({
   },
   cardActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-end',
+    gap: 8,
     marginTop: 4,
   },
   editBtn: {

@@ -32,6 +32,7 @@ class AuthController {
   listUsers() { return this.authService.listUsers(); }
   createUser(body) { return this.authService.createUser(body); }
   updateStatus(params, body, request) { return this.authService.updateStatus(params.id, body?.status, request.user); }
+  resetUserPassword(params, body, request) { return this.authService.resetUserPassword(params.id, body, request.user); }
   updateUser(params, body, request) { return this.authService.updateUser(params.id, body, request.user); }
   deleteUser(params, request) { return this.authService.deleteUser(params.id, request.user); }
 
@@ -51,6 +52,7 @@ Get('me')(AuthController.prototype, 'me', Object.getOwnPropertyDescriptor(AuthCo
 Get('users')(AuthController.prototype, 'listUsers', Object.getOwnPropertyDescriptor(AuthController.prototype, 'listUsers'));
 Post('users')(AuthController.prototype, 'createUser', Object.getOwnPropertyDescriptor(AuthController.prototype, 'createUser'));
 Patch('users/:id/status')(AuthController.prototype, 'updateStatus', Object.getOwnPropertyDescriptor(AuthController.prototype, 'updateStatus'));
+Patch('users/:id/password')(AuthController.prototype, 'resetUserPassword', Object.getOwnPropertyDescriptor(AuthController.prototype, 'resetUserPassword'));
 Put('users/:id')(AuthController.prototype, 'updateUser', Object.getOwnPropertyDescriptor(AuthController.prototype, 'updateUser'));
 Delete('users/:id')(AuthController.prototype, 'deleteUser', Object.getOwnPropertyDescriptor(AuthController.prototype, 'deleteUser'));
 
@@ -63,6 +65,9 @@ Body()(AuthController.prototype, 'createUser', 0);
 Param()(AuthController.prototype, 'updateStatus', 0);
 Body()(AuthController.prototype, 'updateStatus', 1);
 Req()(AuthController.prototype, 'updateStatus', 2);
+Param()(AuthController.prototype, 'resetUserPassword', 0);
+Body()(AuthController.prototype, 'resetUserPassword', 1);
+Req()(AuthController.prototype, 'resetUserPassword', 2);
 Param()(AuthController.prototype, 'updateUser', 0);
 Body()(AuthController.prototype, 'updateUser', 1);
 Req()(AuthController.prototype, 'updateUser', 2);
@@ -71,15 +76,16 @@ Req()(AuthController.prototype, 'deleteUser', 1);
 
 UseGuards(AuthGuard)(AuthController.prototype, 'changePassword', Object.getOwnPropertyDescriptor(AuthController.prototype, 'changePassword'));
 UseGuards(AuthGuard)(AuthController.prototype, 'me', Object.getOwnPropertyDescriptor(AuthController.prototype, 'me'));
-for (const method of ['listUsers', 'createUser', 'updateStatus', 'updateUser', 'deleteUser']) UseGuards(AuthGuard, RolesGuard, PermissionsGuard)(AuthController.prototype, method, Object.getOwnPropertyDescriptor(AuthController.prototype, method));
+for (const method of ['listUsers', 'createUser', 'updateStatus', 'resetUserPassword', 'updateUser', 'deleteUser']) UseGuards(AuthGuard, RolesGuard, PermissionsGuard)(AuthController.prototype, method, Object.getOwnPropertyDescriptor(AuthController.prototype, method));
 
 Roles('admin')(AuthController.prototype, 'listUsers');
 Roles('admin')(AuthController.prototype, 'createUser');
 Roles('admin')(AuthController.prototype, 'updateStatus');
+Roles('admin')(AuthController.prototype, 'resetUserPassword');
 Roles('admin')(AuthController.prototype, 'updateUser');
 Roles('admin')(AuthController.prototype, 'deleteUser');
 RequirePermissions(Permissions.USERS_READ)(AuthController.prototype, 'listUsers');
-for (const method of ['createUser', 'updateStatus', 'updateUser', 'deleteUser']) RequirePermissions(Permissions.USERS_WRITE)(AuthController.prototype, method);
+for (const method of ['createUser', 'updateStatus', 'resetUserPassword', 'updateUser', 'deleteUser']) RequirePermissions(Permissions.USERS_WRITE)(AuthController.prototype, method);
 
 // Customer-facing route wiring
 Post('register')(AuthController.prototype, 'registerCustomer', Object.getOwnPropertyDescriptor(AuthController.prototype, 'registerCustomer'));
