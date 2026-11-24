@@ -99,6 +99,7 @@ export default function AddStockPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           items: validItems,
+          supplierId: selectedSupplier ? selectedSupplier.id : null,
           supplier: selectedSupplier ? selectedSupplier.name : "Unknown",
           warehouse: metadata.warehouse,
           invoiceNumber: metadata.invoiceNumber,

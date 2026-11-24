@@ -511,7 +511,7 @@ export default function AddStock({
                                           categories.flatMap(category => category.subcategories).find(subcategory => String(subcategory.id) === String(item.subcategoryId))?.name,
                                           categories.flatMap(category => category.subcategories).flatMap(subcategory => subcategory.forms).find(form => String(form.id) === String(item.productFormId))?.name].filter(Boolean).join(' › ')}
                                     </div>
-                                    <div style={{fontSize:'0.8rem', color:'#64748b'}}>Qty: {item.quantity} | Batch: {item.batchNumber}</div>
+                                    <div style={{fontSize:'0.8rem', color:'#64748b'}}>Qty: {item.quantity} | Batch: {item.batchNumber || 'Auto-generated (MQ-...)'}</div>
                                 </div>
                                 <div style={{fontWeight:700}}>K{(parseFloat(item.costPrice || 0) * parseInt(item.quantity || 0)).toLocaleString()}</div>
                             </div>

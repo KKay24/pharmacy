@@ -55,6 +55,62 @@ const Batch = sequelize.define('Batch', {
   receivedDate: {
     type: DataTypes.DATEONLY,
     defaultValue: DataTypes.NOW
+  },
+  quantityReceived: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  status: {
+    type: DataTypes.STRING(24),
+    allowNull: false,
+    defaultValue: 'active',
+    validate: {
+      isIn: [['active', 'depleted', 'archived', 'deleted']]
+    }
+  },
+  supplier: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  manufacturingDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: true
+  },
+  supplierBatchNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  createdByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  createdByUsername: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  deletedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  deletedByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  deletedByUsername: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  deletionReason: {
+    type: DataTypes.TEXT,
+    allowNull: true
   }
 });
 

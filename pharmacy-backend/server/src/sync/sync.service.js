@@ -7,6 +7,11 @@ const {
 const { Batch, InventoryMovement, Medicine, SalePayment, Sales, sequelize } = require('../../models');
 const SalesService = require('../sales/sales.service');
 const InventoryService = require('../inventory/inventory.service');
+const {
+  activeBatchWhere,
+  reserveUniqueBatchNumberCandidate,
+  resolveBatchStatus,
+} = require('../inventory/batch-utils');
 const { ROLE_PERMISSIONS, Permissions } = require('../auth/permissions');
 
 class SyncService {
@@ -67,10 +72,10 @@ class SyncService {
           const result = await this.syncSale(op, clientTransactionId, user);
           results.push(result);
         } else if (type === 'RESTOCK' || type === 'ADD_BATCH') {
-          const result = await this.syncRestock(op, clientTransactionId);
+          const result = await this.syncRestock(op, clientTransactionId, user);
           results.push(result);
         } else if (type === 'ADJUSTMENT' || type === 'STOCK_ADJUSTMENT') {
-          const result = await this.syncAdjustment(op, clientTransactionId);
+          const result = await this.syncAdjustment(op, clientTransactionId, user);
           results.push(result);
         } else {
           results.push({
@@ -169,7 +174,7 @@ class SyncService {
         }
 
         const batches = await Batch.findAll({
-          where: { medicineId: medicine.id },
+          where: activeBatchWhere({ medicineId: medicine.id }),
           transaction,
           lock: transaction.LOCK.UPDATE,
         });
@@ -210,7 +215,7 @@ class SyncService {
     };
   }
 
-  async syncRestock(op, clientTransactionId) {
+  async syncRestock(op, clientTransactionId, user = null) {
     // Check if movement with this clientTransactionId already exists
     const existingMovement = await InventoryMovement.findOne({
       where: { clientTransactionId },
@@ -231,7 +236,7 @@ class SyncService {
         ...(payload.metadata || {}),
         reason: `Offline restock sync (${clientTransactionId})`,
       },
-    });
+    }, user);
 
     // Tag created movements with clientTransactionId
     if (result?.items && Array.isArray(result.items)) {
@@ -251,7 +256,7 @@ class SyncService {
     };
   }
 
-  async syncAdjustment(op, clientTransactionId) {
+  async syncAdjustment(op, clientTransactionId, user = null) {
     const existingMovement = await InventoryMovement.findOne({
       where: { clientTransactionId },
     });
@@ -294,7 +299,7 @@ class SyncService {
       }
 
       const batches = await Batch.findAll({
-        where: { medicineId },
+        where: activeBatchWhere({ medicineId }),
         order: [['expiryDate', 'ASC'], ['id', 'ASC']],
         transaction,
         lock: transaction.LOCK.UPDATE,
@@ -314,13 +319,40 @@ class SyncService {
 
       // Apply adjustment to batches
       if (quantityChange > 0) {
+        let batchNumber = null;
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          const candidate = reserveUniqueBatchNumberCandidate({
+            medicineId,
+            actor: user,
+            attempt,
+          });
+          const exists = await Batch.findOne({
+            where: { medicineId, batchNumber: candidate },
+            attributes: ['id'],
+            transaction,
+          });
+          if (!exists) {
+            batchNumber = candidate;
+            break;
+          }
+        }
+        if (!batchNumber) {
+          throw new InternalServerErrorException('Unable to generate a unique batch number');
+        }
         const batch = await Batch.create({
           medicineId,
-          batchNumber: `ADJ-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+          batchNumber,
           quantity: quantityChange,
-          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          costPrice: 0,
-          sellingPrice: batches[0]?.sellingPrice || 0,
+          quantityReceived: quantityChange,
+          status: 'active',
+          expiryDate: payload.expiryDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          manufacturingDate: payload.manufacturingDate || null,
+          supplier: payload.supplier || medicine.supplier || null,
+          supplierBatchNumber: payload.supplierBatchNumber || null,
+          costPrice: Number(payload.costPrice ?? batches[0]?.costPrice ?? 0),
+          sellingPrice: Number(payload.sellingPrice ?? batches[0]?.sellingPrice ?? medicine.basePrice ?? 0),
+          createdByUserId: user?.id ? Number(user.id) : null,
+          createdByUsername: user?.username || null,
         }, { transaction });
 
         await InventoryMovement.create({
@@ -339,7 +371,11 @@ class SyncService {
           if (remaining <= 0) break;
           const deduction = Math.min(Number(batch.quantity || 0), remaining);
           if (deduction === 0) continue;
-          await batch.update({ quantity: Number(batch.quantity) - deduction }, { transaction });
+          const nextQty = Number(batch.quantity) - deduction;
+          await batch.update({
+            quantity: nextQty,
+            status: resolveBatchStatus(nextQty, batch.status),
+          }, { transaction });
           await InventoryMovement.create({
             medicineId,
             batchId: batch.id,

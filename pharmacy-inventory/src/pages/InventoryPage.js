@@ -14,7 +14,7 @@ import StockCardSidebar from "../components/StockCardSidebar";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import "../styles/inventory-modern.css";
-import { getInventoryStockValue } from "../utils/inventoryValuation";
+import { getActiveBatches, getInventoryStockValue } from "../utils/inventoryValuation";
 import { apiFetch, getApiErrorMessage } from "../utils/api";
 
 export default function InventoryPage() {
@@ -76,17 +76,17 @@ export default function InventoryPage() {
     let stockValue = 0;
 
     inventory.forEach(med => {
-      const total = med.Batches ? med.Batches.reduce((acc, b) => acc + b.quantity, 0) : 0;
+      const batches = getActiveBatches(med);
+      const total = batches.reduce((acc, b) => acc + Number(b.quantity || 0), 0);
       if (total === 0) outOfStock++;
       else if (total <= (med.lowStockThreshold || LOW_STOCK_THRESHOLD)) lowStock++;
-      const batches = med.Batches || [];
       stockValue += getInventoryStockValue(med);
 
       if (batches.some(batch => Number(batch.quantity) > 0 && batch.expiryDate && new Date(batch.expiryDate) < now)) expired++;
       if (batches.some(batch => Number(batch.quantity) > 0 && batch.expiryDate && new Date(batch.expiryDate) >= now && new Date(batch.expiryDate) <= thirtyDays)) expiringSoon++;
     });
 
-    const totalBatches = inventory.reduce((sum, medicine) => sum + (medicine.Batches?.length || 0), 0);
+    const totalBatches = inventory.reduce((sum, medicine) => sum + getActiveBatches(medicine).length, 0);
     return { total: inventory.length, totalBatches, outOfStock, expiringSoon, expired, lowStock, stockValue };
   }, [inventory]);
 
@@ -176,18 +176,58 @@ export default function InventoryPage() {
     }
   };
 
-  const removeBatchFromMedicine = async (medicineId, batchId) => {
+  const removeBatchFromMedicine = async (medicineId, batchId, reason = "") => {
     try {
+      const trimmedReason = typeof reason === "string" ? reason.trim() : "";
       const response = await apiFetch(`/api/inventory/${medicineId}/batches/${batchId}`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(trimmedReason ? { reason: trimmedReason } : {}),
       });
-      if (!response.ok) return { success: false, error: await getApiErrorMessage(response, "Failed to remove stock batch") };
+      if (!response.ok) {
+        return {
+          success: false,
+          status: response.status,
+          error: await getApiErrorMessage(response, "Failed to delete stock batch"),
+        };
+      }
 
       const medicine = await response.json();
       const refresh = await fetchInventory();
-      setSelectedMedicine(medicine);
+      if (selectedMedicine && Number(selectedMedicine.id) === Number(medicineId)) {
+        setSelectedMedicine(medicine);
+      }
       return refresh?.success === false
-        ? { success: false, error: `Batch was removed, but ${refresh.error.toLowerCase()}` }
+        ? { success: false, error: `Batch was deleted, but ${refresh.error.toLowerCase()}` }
+        : { success: true, medicine };
+    } catch (error) {
+      return { success: false, error: "Unable to reach the inventory service" };
+    }
+  };
+
+  const archiveBatchFromMedicine = async (medicineId, batchId, reason = "") => {
+    try {
+      const trimmedReason = typeof reason === "string" ? reason.trim() : "";
+      const response = await apiFetch(`/api/inventory/${medicineId}/batches/${batchId}/archive`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(trimmedReason ? { reason: trimmedReason } : {}),
+      });
+      if (!response.ok) {
+        return {
+          success: false,
+          status: response.status,
+          error: await getApiErrorMessage(response, "Failed to archive stock batch"),
+        };
+      }
+
+      const medicine = await response.json();
+      const refresh = await fetchInventory();
+      if (selectedMedicine && Number(selectedMedicine.id) === Number(medicineId)) {
+        setSelectedMedicine(medicine);
+      }
+      return refresh?.success === false
+        ? { success: false, error: `Batch was archived, but ${refresh.error.toLowerCase()}` }
         : { success: true, medicine };
     } catch (error) {
       return { success: false, error: "Unable to reach the inventory service" };
@@ -331,16 +371,20 @@ export default function InventoryPage() {
             } 
           }}
           onOpenCard={setSelectedMedicine}
+          onRemoveBatch={removeBatchFromMedicine}
+          onArchiveBatch={archiveBatchFromMedicine}
         />
       </div>
 
       {/* Product Stock Card Sidebar */}
       <StockCardSidebar 
         medicine={selectedMedicine}
+        userRole={userRole}
         onClose={() => setSelectedMedicine(null)}
         onUpdate={updateInventoryItem}
         onAddBatch={addBatchToMedicine}
         onRemoveBatch={removeBatchFromMedicine}
+        onArchiveBatch={archiveBatchFromMedicine}
         categories={inventoryCategories}
       />
     </div>

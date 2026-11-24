@@ -29,6 +29,7 @@ const {
   validateAndNormalizeOptionalEmail,
 } = require('./contact-validation');
 const searchService = require('./search.service');
+const { activeBatchWhere, isBatchInactive, resolveBatchStatus } = require('../inventory/batch-utils');
 
 function validatePrescriptionFile(fileData) {
   if (!fileData) return null;
@@ -47,15 +48,18 @@ function validatePrescriptionFile(fileData) {
 }
 
 function calculateProductPrice(medicine) {
-  if (Array.isArray(medicine.Batches) && medicine.Batches.length > 0) {
+  const activeBatches = Array.isArray(medicine.Batches)
+    ? medicine.Batches.filter((batch) => !isBatchInactive(batch))
+    : [];
+  if (activeBatches.length > 0) {
     const today = new Date().toISOString().slice(0, 10);
-    const validBatches = medicine.Batches
+    const validBatches = activeBatches
       .filter((batch) => Number(batch.quantity) > 0 && batch.expiryDate >= today && Number(batch.sellingPrice) > 0)
       .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)));
     if (validBatches.length > 0) {
       return Number(validBatches[0].sellingPrice);
     }
-    const configuredBatch = medicine.Batches
+    const configuredBatch = activeBatches
       .filter((batch) => Number(batch.sellingPrice) > 0)
       .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)))[0];
     if (configuredBatch) {
@@ -259,7 +263,7 @@ class StoreService {
     const { count, rows } = await Medicine.findAndCountAll({
       where,
       include: [
-        { model: Batch },
+        { model: Batch, where: activeBatchWhere(), required: false },
         { model: InventoryCategory, as: 'MainCategory', attributes: ['id', 'name', 'slug'] },
         { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug'] },
         { model: InventoryCategory, as: 'ProductForm', attributes: ['id', 'name', 'slug'] },
@@ -301,7 +305,9 @@ class StoreService {
         attributes: ['id', 'name', 'basePrice'],
         include: [{
           model: Batch,
-          attributes: ['quantity', 'expiryDate', 'sellingPrice'],
+          attributes: ['quantity', 'expiryDate', 'sellingPrice', 'status'],
+          where: activeBatchWhere(),
+          required: false,
         }],
         order: [['name', 'ASC'], ['id', 'ASC']],
         limit: chunkSize,
@@ -341,7 +347,7 @@ class StoreService {
     const selectedMedicines = await Medicine.findAll({
       where: { id: { [Op.in]: ids } },
       include: [
-        { model: Batch },
+        { model: Batch, where: activeBatchWhere(), required: false },
         { model: InventoryCategory, as: 'MainCategory', attributes: ['id', 'name', 'slug'] },
         { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug'] },
         { model: InventoryCategory, as: 'ProductForm', attributes: ['id', 'name', 'slug'] },
@@ -358,7 +364,7 @@ class StoreService {
   async getProduct(id) {
     const medicine = await Medicine.findByPk(id, {
       include: [
-        { model: Batch },
+        { model: Batch, where: activeBatchWhere(), required: false },
         { model: InventoryCategory, as: 'MainCategory' },
         { model: InventoryCategory, as: 'Subcategory' },
         { model: InventoryCategory, as: 'ProductForm' },
@@ -375,7 +381,7 @@ class StoreService {
     const safeLimit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 50) : 8;
     const medicines = await Medicine.findAll({
       where: { isCustomerVisible: true },
-      include: [{ model: Batch }],
+      include: [{ model: Batch, where: activeBatchWhere(), required: false }],
       limit: safeLimit,
     });
     const formatted = medicines.map(formatProduct);
@@ -409,7 +415,7 @@ class StoreService {
   async getSuggestedProductsForEmptySearch(categorySuggestions = []) {
     try {
       const includes = [
-        { model: Batch },
+        { model: Batch, where: activeBatchWhere(), required: false },
         { model: InventoryCategory, as: 'MainCategory', attributes: ['id', 'name', 'slug'] },
         { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug'] },
       ];
@@ -532,7 +538,7 @@ class StoreService {
         }
 
         const batches = await Batch.findAll({
-          where: { medicineId: medicine.id },
+          where: activeBatchWhere({ medicineId: medicine.id }),
           order: [['expiryDate', 'ASC'], ['id', 'ASC']],
           transaction,
           lock: transaction.LOCK.UPDATE,
@@ -580,7 +586,11 @@ class StoreService {
         }
 
         for (const { batch, deduct } of deductions) {
-          await batch.update({ quantity: Number(batch.quantity) - deduct }, { transaction });
+          const nextQty = Number(batch.quantity) - deduct;
+          await batch.update({
+            quantity: nextQty,
+            status: resolveBatchStatus(nextQty, batch.status),
+          }, { transaction });
           await InventoryMovement.create({
             medicineId: medicine.id,
             batchId: batch.id,
@@ -809,7 +819,7 @@ class StoreService {
           }
 
           const batches = await Batch.findAll({
-            where: { medicineId },
+            where: activeBatchWhere({ medicineId }),
             order: [['expiryDate', 'ASC'], ['id', 'ASC']],
             transaction,
             lock: transaction.LOCK.UPDATE,
@@ -848,7 +858,11 @@ class StoreService {
               if (remainingToAllocate <= 0) break;
               const deduction = Math.min(Number(batch.quantity || 0), remainingToAllocate);
               if (deduction <= 0) continue;
-              await batch.update({ quantity: Number(batch.quantity) - deduction }, { transaction });
+              const nextQty = Number(batch.quantity) - deduction;
+              await batch.update({
+                quantity: nextQty,
+                status: resolveBatchStatus(nextQty, batch.status),
+              }, { transaction });
               await InventoryMovement.create({
                 medicineId,
                 batchId: batch.id,
@@ -860,7 +874,7 @@ class StoreService {
               remainingToAllocate -= deduction;
             }
             const updatedBatches = await Batch.findAll({
-              where: { medicineId },
+              where: activeBatchWhere({ medicineId }),
               transaction,
             });
             await medicine.update({
@@ -919,8 +933,13 @@ class StoreService {
             if (!batch || Number(batch.medicineId) !== Number(medicine.id)) {
               throw new ConflictException('An original inventory batch is missing; inventory was not restored');
             }
+            const restoredQuantity = Number(batch.quantity || 0) + quantityToRestore;
+            const nextStatus = batch.status === 'archived' || batch.status === 'deleted'
+              ? 'active'
+              : resolveBatchStatus(restoredQuantity, batch.status);
             await batch.update({
-              quantity: Number(batch.quantity || 0) + quantityToRestore,
+              quantity: restoredQuantity,
+              status: nextStatus,
             }, { transaction });
           } else {
             restoredTotals.set(
@@ -962,7 +981,7 @@ class StoreService {
             transaction,
             lock: transaction.LOCK.UPDATE,
           });
-          const batches = await Batch.findAll({ where: { medicineId }, transaction });
+          const batches = await Batch.findAll({ where: activeBatchWhere({ medicineId }), transaction });
           await medicine.update({
             totalQuantity: batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
               + (restoredTotals.get(medicineId) || 0),

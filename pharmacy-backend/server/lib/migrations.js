@@ -21,6 +21,7 @@ const migrationDefinitions = [
   require('../migrations/018-expense-accounting-controls'),
   require('../migrations/019-search-enhancements-and-analytics'),
   require('../migrations/020-add-auth-audit-logs'),
+  require('../migrations/021-batch-lifecycle-and-traceability'),
 ];
 
 function normalizeTableName(table) {

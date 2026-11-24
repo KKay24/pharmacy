@@ -10,6 +10,7 @@ const { Batch, Customer, InventoryMovement, Medicine, SalePayment, SaleRefund, S
 const { Op } = require('sequelize');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
 const { normalizeIdentityValue } = require('../inventory/product-identity');
+const { activeBatchWhere, resolveBatchStatus } = require('../inventory/batch-utils');
 const { buildReceiptEmailHtml, sendReceiptEmail } = require('./receipt-email');
 const { InsufficientStockException } = require('../common/errors');
 
@@ -292,7 +293,11 @@ class SalesService {
         const batchId = Number(batchIdValue);
         const batch = await Batch.findByPk(batchId, { transaction, lock: transaction.LOCK.UPDATE });
         if (!batch) throw new ConflictException(`Original batch ${batchId} no longer exists`);
-        await batch.update({ quantity: Number(batch.quantity) + quantity }, { transaction });
+        const restoredQuantity = Number(batch.quantity) + quantity;
+        const nextStatus = batch.status === 'archived' || batch.status === 'deleted'
+          ? 'active'
+          : resolveBatchStatus(restoredQuantity, batch.status);
+        await batch.update({ quantity: restoredQuantity, status: nextStatus }, { transaction });
       }
 
       for (const { sale, batchId, quantity } of movementPlans) {
@@ -309,7 +314,10 @@ class SalesService {
 
       const medicineIds = [...new Set(rows.map((sale) => sale.medicineId).filter(Boolean))];
       for (const medicineId of medicineIds) {
-        const totalQuantity = await Batch.sum('quantity', { where: { medicineId }, transaction });
+        const totalQuantity = await Batch.sum('quantity', {
+          where: activeBatchWhere({ medicineId }),
+          transaction,
+        });
         await Medicine.update({ totalQuantity: Number(totalQuantity || 0) }, { where: { id: medicineId }, transaction });
       }
 
@@ -494,7 +502,7 @@ class SalesService {
         if (!medicine) throw new NotFoundException(`Product not found: ${item.name || item.medicineId}`);
 
         const batches = await Batch.findAll({
-          where: { medicineId: medicine.id },
+          where: activeBatchWhere({ medicineId: medicine.id }),
           order: [['expiryDate', 'ASC'], ['id', 'ASC']],
           transaction,
           lock: transaction.LOCK.UPDATE,
@@ -540,7 +548,11 @@ class SalesService {
         }, { transaction });
 
         for (const { batch, deduction } of deductions) {
-          await batch.update({ quantity: Number(batch.quantity) - deduction }, { transaction });
+          const nextQty = Number(batch.quantity) - deduction;
+          await batch.update({
+            quantity: nextQty,
+            status: resolveBatchStatus(nextQty, batch.status),
+          }, { transaction });
           await InventoryMovement.create({
             medicineId: medicine.id,
             batchId: batch.id,

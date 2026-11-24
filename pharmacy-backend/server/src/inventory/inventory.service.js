@@ -7,7 +7,7 @@ const {
   NotFoundException,
 } = require('@nestjs/common');
 const { Op, UniqueConstraintError } = require('sequelize');
-const { Batch, InventoryCategory, InventoryMovement, Medicine, sequelize } = require('../../models');
+const { Batch, InventoryCategory, InventoryMovement, Medicine, Sales, sequelize } = require('../../models');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
 const { taxonomySlug } = require('../../lib/inventory-taxonomy');
 const {
@@ -16,6 +16,12 @@ const {
   normalizeIdentityValue,
   sameProductIdentity,
 } = require('./product-identity');
+const {
+  activeBatchWhere,
+  isBatchInactive,
+  reserveUniqueBatchNumberCandidate,
+  resolveBatchStatus,
+} = require('./batch-utils');
 const { DuplicateResourceException } = require('../common/errors');
 
 const MEDICINE_UPDATE_FIELDS = [
@@ -124,12 +130,33 @@ function updateAttributes(body = {}, existing) {
   return { ...existing.get({ plain: true }), ...attributes };
 }
 
-function generatedBatchNumber(prefix = 'BATCH') {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
-
 function isUniqueConstraintError(error) {
   return error instanceof UniqueConstraintError || error?.name === 'SequelizeUniqueConstraintError';
+}
+
+function isRetryableTransactionError(error) {
+  const code = error?.parent?.code || error?.original?.code || '';
+  const message = String(error?.message || '');
+  return (
+    code === 'SQLITE_BUSY'
+    || code === '40001'
+    || code === '40P01'
+    || /SQLITE_BUSY/i.test(message)
+  );
+}
+
+async function runWithTransactionRetry(operation, maxAttempts = 6) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (attempt === maxAttempts - 1 || !isRetryableTransactionError(error)) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1) + Math.floor(Math.random() * 25)));
+    }
+  }
+  return undefined;
 }
 
 function rethrowPersistenceError(error, fallbackMessage) {
@@ -327,7 +354,7 @@ class InventoryService {
       if (query.stockStatus) {
         const quantities = await Batch.findAll({
           attributes: ['medicineId', [sequelize.fn('SUM', sequelize.col('quantity')), 'quantity']],
-          where: { medicineId: [...filterIds] },
+          where: activeBatchWhere({ medicineId: [...filterIds] }),
           group: ['medicineId'],
           raw: true,
         });
@@ -353,7 +380,7 @@ class InventoryService {
         const today = getTodayDate();
         const warningDate = new Date();
         warningDate.setDate(warningDate.getDate() + 30);
-        const expiryWhere = { quantity: { [Op.gt]: 0 } };
+        const expiryWhere = activeBatchWhere({ quantity: { [Op.gt]: 0 } });
         if (status === 'expired') expiryWhere.expiryDate = { [Op.lt]: today };
         else if (status === 'near-expiry') {
           expiryWhere.expiryDate = { [Op.gte]: today, [Op.lte]: warningDate.toISOString().slice(0, 10) };
@@ -372,11 +399,14 @@ class InventoryService {
       where.id = { [Op.in]: [...filterIds] };
     }
 
+    const includeArchived = String(query.includeArchived || '').toLowerCase() === 'true';
     const result = await Medicine.findAndCountAll({
       where,
       order: [['name', 'ASC']],
       include: [
-        { model: Batch },
+        includeArchived
+          ? { model: Batch, required: false }
+          : { model: Batch, where: activeBatchWhere(), required: false },
         { model: InventoryCategory, as: 'MainCategory', attributes: ['id', 'name', 'slug', 'path'] },
         { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug', 'path'] },
         { model: InventoryCategory, as: 'ProductForm', attributes: ['id', 'name', 'slug', 'path'] },
@@ -405,7 +435,7 @@ class InventoryService {
       lastId = Number(candidates[candidates.length - 1].id);
 
       const quantities = await Batch.findAll({
-        where: { medicineId: candidates.map((medicine) => medicine.id) },
+        where: activeBatchWhere({ medicineId: candidates.map((medicine) => medicine.id) }),
         attributes: ['medicineId', [sequelize.fn('SUM', sequelize.col('quantity')), 'quantity']],
         group: ['medicineId'],
         raw: true,
@@ -422,7 +452,7 @@ class InventoryService {
       if (lowStockIds.length > 0) {
         const rows = await Medicine.findAll({
           where: { id: { [Op.in]: lowStockIds } },
-          include: [Batch],
+          include: [{ model: Batch, where: activeBatchWhere(), required: false }],
           order: [['id', 'ASC']],
         });
         lowStockMedicines.push(...rows);
@@ -444,6 +474,37 @@ class InventoryService {
       offset: pagination.offset,
     });
     return paginatedResponse(result.rows, result.count, pagination);
+  }
+
+  async batchHistory(id, query = {}) {
+    const medicine = await Medicine.findByPk(id, { attributes: ['id', 'name', 'totalQuantity'] });
+    if (!medicine) throw new NotFoundException('Medicine not found');
+
+    const statusFilter = cleanText(query.status)?.toLowerCase();
+    const batchWhere = { medicineId: id };
+    if (statusFilter && ['active', 'depleted', 'archived', 'deleted'].includes(statusFilter)) {
+      batchWhere.status = statusFilter;
+    }
+
+    const [batches, movements] = await Promise.all([
+      Batch.findAll({
+        where: batchWhere,
+        order: [['createdAt', 'DESC'], ['id', 'DESC']],
+      }),
+      InventoryMovement.findAll({
+        where: { medicineId: id },
+        order: [['createdAt', 'DESC'], ['id', 'DESC']],
+        limit: Math.min(Math.max(Number(query.limit) || 50, 1), 200),
+      }),
+    ]);
+
+    return {
+      medicineId: medicine.id,
+      medicineName: medicine.name,
+      totalQuantity: Number(medicine.totalQuantity || 0),
+      batches,
+      movements,
+    };
   }
 
   async findMedicineByIdentity(input, transaction, excludeId = null) {
@@ -491,34 +552,131 @@ class InventoryService {
     return null;
   }
 
-  async createBatchForMedicine(medicine, item, shared, transaction, movementType = 'PURCHASE') {
+  async recalculateMedicineTotal(medicine, transaction) {
+    const activeSum = await Batch.sum('quantity', {
+      where: activeBatchWhere({ medicineId: medicine.id }),
+      transaction,
+    });
+    const total = Number(activeSum || 0);
+    await medicine.update({ totalQuantity: total }, { transaction });
+    return total;
+  }
+
+  async hasCompletedSalesForBatch(batchId, transaction) {
+    const directSales = await Sales.count({
+      where: {
+        batchId,
+        saleStatus: { [Op.ne]: 'REVERSED' },
+      },
+      transaction,
+    });
+    if (directSales > 0) return true;
+
+    const saleMovements = await InventoryMovement.findAll({
+      where: {
+        batchId,
+        movementType: 'SALE',
+      },
+      attributes: ['referenceType', 'referenceId'],
+      transaction,
+    });
+    if (saleMovements.length === 0) return false;
+
+    const saleIds = saleMovements
+      .filter((m) => m.referenceType === 'SALE' && m.referenceId)
+      .map((m) => Number(m.referenceId));
+    if (saleIds.length > 0) {
+      const completedViaMovement = await Sales.count({
+        where: {
+          id: { [Op.in]: saleIds },
+          saleStatus: { [Op.ne]: 'REVERSED' },
+        },
+        transaction,
+      });
+      if (completedViaMovement > 0) return true;
+    }
+
+    const hasOnlineOrderSale = saleMovements.some((m) => m.referenceType === 'ONLINE_ORDER');
+    if (hasOnlineOrderSale) {
+      const returnMovements = await InventoryMovement.count({
+        where: {
+          batchId,
+          movementType: 'RETURN',
+          referenceType: 'ONLINE_ORDER_CANCELLATION',
+        },
+        transaction,
+      });
+      const onlineSalesCount = saleMovements.filter((m) => m.referenceType === 'ONLINE_ORDER').length;
+      if (onlineSalesCount > returnMovements) return true;
+    }
+
+    return false;
+  }
+
+  async resolveUniqueBatchNumber(medicineId, explicitBatchNumber, actor, transaction) {
+    if (explicitBatchNumber) {
+      const existingBatch = await Batch.findOne({
+        where: { medicineId, batchNumber: explicitBatchNumber },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (existingBatch) throw new DuplicateResourceException('This batch already exists for this medicine.');
+      return explicitBatchNumber;
+    }
+
+    const now = new Date();
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidate = reserveUniqueBatchNumberCandidate({ medicineId, actor, now, attempt });
+      const collision = await Batch.findOne({
+        where: { medicineId, batchNumber: candidate },
+        attributes: ['id'],
+        transaction,
+      });
+      if (!collision) return candidate;
+    }
+
+    throw new ConflictException('Could not generate a unique batch number. Please retry.');
+  }
+
+  async createBatchForMedicine(medicine, item, shared = {}, transaction, movementType = 'PURCHASE', actor = null) {
     const quantity = parsePositiveQuantity(item.quantity);
     const costPrice = parseNonNegativeNumber(item.costPrice ?? 0, 'Cost price');
     const sellingPrice = parseNonNegativeNumber(item.sellingPrice ?? 0, 'Selling price');
     const explicitBatchNumber = cleanText(item.batchNumber);
-    const batchNumber = explicitBatchNumber || generatedBatchNumber();
+    const batchNumber = await this.resolveUniqueBatchNumber(medicine.id, explicitBatchNumber, actor, transaction);
     const expiryDate = sanitizeDate(item.expiryDate, getDefaultExpiryDate());
-
-    const existingBatch = await Batch.findOne({
-      where: { medicineId: medicine.id, batchNumber },
-      transaction,
-      lock: transaction.LOCK.UPDATE,
-    });
-    if (existingBatch) throw new DuplicateResourceException('This batch already exists for this medicine.');
+    const manufacturingDate = item.manufacturingDate
+      ? sanitizeDate(item.manufacturingDate, null)
+      : shared.manufacturingDate
+        ? sanitizeDate(shared.manufacturingDate, null)
+        : null;
+    const supplier = cleanText(item.supplier) || cleanText(shared.supplier) || cleanText(medicine.supplier);
+    const supplierBatchNumber = cleanText(item.supplierBatchNumber) || cleanText(shared.supplierBatchNumber) || null;
+    const supplierId = Number.isInteger(Number(item.supplierId ?? shared.supplierId)) && Number(item.supplierId ?? shared.supplierId) > 0
+      ? Number(item.supplierId ?? shared.supplierId)
+      : null;
 
     const batch = await Batch.create({
       medicineId: medicine.id,
+      supplierId,
+      supplier,
       batchNumber,
+      supplierBatchNumber,
       quantity,
+      quantityReceived: quantity,
+      status: 'active',
       expiryDate,
+      manufacturingDate,
       costPrice,
       sellingPrice,
       warehouse: cleanText(shared.warehouse) || cleanText(item.warehouse),
       invoiceNumber: cleanText(shared.invoiceNumber) || cleanText(item.invoiceNumber),
       receivedDate: sanitizeDate(shared.receivedDate || item.receivedDate, getTodayDate()),
+      createdByUserId: actor?.id || null,
+      createdByUsername: actor?.username || null,
     }, { transaction });
 
-    await medicine.increment('totalQuantity', { by: quantity, transaction });
+    await this.recalculateMedicineTotal(medicine, transaction);
     await InventoryMovement.create({
       medicineId: medicine.id,
       batchId: batch.id,
@@ -526,13 +684,13 @@ class InventoryService {
       quantityChange: quantity,
       referenceType: shared.referenceType || 'INVENTORY_RECEIPT',
       referenceId: shared.referenceId || null,
-      reason: cleanText(shared.reason),
+      reason: cleanText(shared.reason) || (actor?.username ? `Stock added by ${actor.username}` : null),
     }, { transaction });
 
     return batch;
   }
 
-  async addBatch(body) {
+  async addBatch(body, actor = null) {
     const transaction = await sequelize.transaction();
     try {
       const metadata = body.metadata || {};
@@ -541,9 +699,11 @@ class InventoryService {
 
       const shared = {
         supplier: body.supplier || metadata.supplier || null,
+        supplierId: body.supplierId || metadata.supplierId || null,
         warehouse: body.warehouse || metadata.warehouse || null,
         invoiceNumber: body.invoiceNumber || metadata.invoiceNumber || null,
         receivedDate: body.receivedDate || metadata.orderDate || metadata.receivedDate,
+        reason: body.reason || metadata.reason || null,
       };
       const createdItems = [];
 
@@ -570,8 +730,8 @@ class InventoryService {
           if (!medicine.mainCategoryId) await medicine.update(classification, { transaction });
         }
 
-        const batch = await this.createBatchForMedicine(medicine, item, shared, transaction);
-        createdItems.push({ medicineId: medicine.id, batchId: batch.id });
+        const batch = await this.createBatchForMedicine(medicine, item, shared, transaction, 'PURCHASE', actor);
+        createdItems.push({ medicineId: medicine.id, batchId: batch.id, batchNumber: batch.batchNumber });
       }
 
       await transaction.commit();
@@ -582,24 +742,32 @@ class InventoryService {
     }
   }
 
-  async addBatchToMedicine(id, body) {
-    const transaction = await sequelize.transaction();
+  async addBatchToMedicine(id, body, actor = null) {
     try {
-      const medicine = await Medicine.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!medicine) throw new NotFoundException('Medicine not found');
+      return await runWithTransactionRetry(async () => {
+        const transaction = await sequelize.transaction();
+        try {
+          const medicine = await Medicine.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+          if (!medicine) throw new NotFoundException('Medicine not found');
 
-      await this.createBatchForMedicine(medicine, body, body, transaction);
-      await transaction.commit();
-      return Medicine.findByPk(id, {
-        include: [{ model: Batch, where: { quantity: { [Op.gt]: 0 } }, required: false }],
+          await this.createBatchForMedicine(medicine, body, body, transaction, 'PURCHASE', actor);
+          await transaction.commit();
+          return Medicine.findByPk(id, {
+            include: [{ model: Batch, where: activeBatchWhere(), required: false }],
+          });
+        } catch (error) {
+          if (!transaction.finished) {
+            await transaction.rollback().catch(() => {});
+          }
+          throw error;
+        }
       });
     } catch (error) {
-      await transaction.rollback();
       rethrowPersistenceError(error, 'Failed to add stock batch');
     }
   }
 
-  async removeBatch(id, batchId) {
+  async removeBatch(id, batchId, body = {}, actor = null) {
     const transaction = await sequelize.transaction();
     try {
       const medicine = await Medicine.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
@@ -611,37 +779,112 @@ class InventoryService {
         lock: transaction.LOCK.UPDATE,
       });
       if (!batch) throw new NotFoundException('Batch not found for this medicine');
+      if (isBatchInactive(batch)) {
+        throw new ConflictException('This batch has already been deleted or archived.');
+      }
 
-      const quantity = Number(batch.quantity || 0);
-      if (quantity <= 0) throw new BadRequestException('This batch has no remaining stock to remove');
+      const hasCompletedSales = await this.hasCompletedSalesForBatch(batch.id, transaction);
+      if (hasCompletedSales) {
+        throw new ConflictException(
+          'This batch has been used in completed sales and cannot be deleted. Reverse the associated sale(s) first, or archive the batch once depleted.'
+        );
+      }
 
-      await batch.update({ quantity: 0 }, { transaction });
+      const previousQuantity = Number(batch.quantity || 0);
+      const customReason = cleanText(body?.reason);
+      const reason = customReason || 'Removed from active inventory';
+      const deletedAt = new Date();
+
+      await batch.update({
+        quantity: 0,
+        status: 'deleted',
+        deletedAt,
+        deletedByUserId: actor?.id || null,
+        deletedByUsername: actor?.username || null,
+        deletionReason: reason,
+      }, { transaction });
+
       await InventoryMovement.create({
         medicineId: medicine.id,
         batchId: batch.id,
         movementType: 'ADJUSTMENT',
-        quantityChange: -quantity,
-        referenceType: 'MEDICINE',
-        referenceId: Number(id),
-        reason: `Batch ${batch.batchNumber} removed from active inventory`,
+        quantityChange: -previousQuantity,
+        referenceType: 'BATCH_DELETE',
+        referenceId: Number(batch.id),
+        reason: customReason
+          ? `Batch ${batch.batchNumber} removed from active inventory: ${customReason}`
+          : `Batch ${batch.batchNumber} removed from active inventory`,
       }, { transaction });
-      const remainingQuantity = await Batch.sum('quantity', {
-        where: { medicineId: id },
-        transaction,
-      });
-      await medicine.update({ totalQuantity: Number(remainingQuantity || 0) }, { transaction });
+
+      await this.recalculateMedicineTotal(medicine, transaction);
 
       await transaction.commit();
       return Medicine.findByPk(id, {
-        include: [{ model: Batch, where: { quantity: { [Op.gt]: 0 } }, required: false }],
+        include: [{ model: Batch, where: activeBatchWhere(), required: false }],
       });
     } catch (error) {
       await transaction.rollback();
-      rethrowPersistenceError(error, 'Failed to remove stock batch');
+      rethrowPersistenceError(error, 'Failed to delete stock batch');
     }
   }
 
-  async add(body) {
+  async archiveBatch(id, batchId, body = {}, actor = null) {
+    const transaction = await sequelize.transaction();
+    try {
+      const medicine = await Medicine.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!medicine) throw new NotFoundException('Medicine not found');
+
+      const batch = await Batch.findOne({
+        where: { id: batchId, medicineId: id },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!batch) throw new NotFoundException('Batch not found for this medicine');
+      if (isBatchInactive(batch)) {
+        throw new ConflictException('This batch has already been archived or deleted.');
+      }
+
+      const previousQuantity = Number(batch.quantity || 0);
+      const hasCompletedSales = await this.hasCompletedSalesForBatch(batch.id, transaction);
+      if (hasCompletedSales && previousQuantity > 0) {
+        throw new ConflictException(
+          'Batches with completed sales and remaining stock cannot be archived until stock is depleted or sales are reversed.'
+        );
+      }
+
+      const reason = cleanText(body?.reason) || 'Archived by authorized user';
+      await batch.update({
+        quantity: 0,
+        status: 'archived',
+        deletedAt: new Date(),
+        deletedByUserId: actor?.id || null,
+        deletedByUsername: actor?.username || null,
+        deletionReason: reason,
+      }, { transaction });
+
+      await InventoryMovement.create({
+        medicineId: medicine.id,
+        batchId: batch.id,
+        movementType: 'ADJUSTMENT',
+        quantityChange: -previousQuantity,
+        referenceType: 'BATCH_ARCHIVE',
+        referenceId: Number(batch.id),
+        reason: `Batch ${batch.batchNumber} archived by ${actor?.username || 'authorized user'}: ${reason}`,
+      }, { transaction });
+
+      await this.recalculateMedicineTotal(medicine, transaction);
+
+      await transaction.commit();
+      return Medicine.findByPk(id, {
+        include: [{ model: Batch, where: activeBatchWhere(), required: false }],
+      });
+    } catch (error) {
+      await transaction.rollback();
+      rethrowPersistenceError(error, 'Failed to archive stock batch');
+    }
+  }
+
+  async add(body, actor = null) {
     const transaction = await sequelize.transaction();
     try {
       const attributes = medicineAttributes(body);
@@ -661,17 +904,19 @@ class InventoryService {
       } else if (classification.mainCategoryId && !medicine.mainCategoryId) {
         await medicine.update(classification, { transaction });
       }
-      if (receivedWithBatch) await this.createBatchForMedicine(medicine, body, body, transaction);
+      if (receivedWithBatch) await this.createBatchForMedicine(medicine, body, body, transaction, 'PURCHASE', actor);
 
       await transaction.commit();
-      return Medicine.findByPk(medicine.id, { include: [Batch] });
+      return Medicine.findByPk(medicine.id, {
+        include: [{ model: Batch, where: activeBatchWhere(), required: false }],
+      });
     } catch (error) {
       await transaction.rollback();
       rethrowPersistenceError(error, 'Failed to add inventory item');
     }
   }
 
-  async update(id, body) {
+  async update(id, body, actor = null) {
     const transaction = await sequelize.transaction();
     try {
       const medicine = await Medicine.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
@@ -719,22 +964,42 @@ class InventoryService {
         await medicine.update(changes, { transaction });
       }
 
-      if (body.sellingPrice !== undefined) {
+      const existingActiveBatches = await Batch.findAll({
+        where: activeBatchWhere({ medicineId: id }),
+        order: [['expiryDate', 'ASC'], ['id', 'ASC']],
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      const currentTotalBeforeUpdate = existingActiveBatches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+      const requestedTotal = body.totalQuantity !== undefined
+        ? parseNonNegativeWholeNumber(body.totalQuantity, 'Total quantity')
+        : null;
+      const isStockIncrease = requestedTotal !== null && requestedTotal > currentTotalBeforeUpdate;
+
+      if (body.sellingPrice !== undefined && !isStockIncrease) {
         await Batch.update(
           { sellingPrice: parseNonNegativeNumber(body.sellingPrice, 'Selling price') },
-          { where: { medicineId: id }, transaction }
+          { where: activeBatchWhere({ medicineId: id, quantity: { [Op.gt]: 0 } }), transaction }
         );
       }
-      if (body.costPrice !== undefined) {
+      if (body.costPrice !== undefined && !isStockIncrease) {
         await Batch.update(
           { costPrice: parseNonNegativeNumber(body.costPrice, 'Cost price') },
-          { where: { medicineId: id }, transaction }
+          { where: activeBatchWhere({ medicineId: id, quantity: { [Op.gt]: 0 } }), transaction }
         );
       }
 
       if (Array.isArray(body.Batches)) {
         for (const submittedBatch of body.Batches) {
           if (!submittedBatch.id) continue;
+          const existingBatch = await Batch.findOne({
+            where: { id: submittedBatch.id, medicineId: id },
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          if (!existingBatch) throw new NotFoundException('Batch not found for this medicine');
+          if (isBatchInactive(existingBatch)) continue;
+
           const batchChanges = {};
           if (submittedBatch.batchNumber !== undefined) {
             const batchNumber = cleanText(submittedBatch.batchNumber);
@@ -745,52 +1010,67 @@ class InventoryService {
           if (submittedBatch.expiryDate !== undefined) {
             batchChanges.expiryDate = sanitizeDate(submittedBatch.expiryDate, getDefaultExpiryDate());
           }
+          if (submittedBatch.supplierBatchNumber !== undefined) {
+            batchChanges.supplierBatchNumber = cleanText(submittedBatch.supplierBatchNumber);
+          }
+          if (submittedBatch.manufacturingDate !== undefined) {
+            batchChanges.manufacturingDate = submittedBatch.manufacturingDate
+              ? sanitizeDate(submittedBatch.manufacturingDate, null)
+              : null;
+          }
           if (Object.keys(batchChanges).length > 0) {
-            const [updated] = await Batch.update(batchChanges, {
-              where: { id: submittedBatch.id, medicineId: id },
-              transaction,
-            });
-            if (updated === 0) throw new NotFoundException('Batch not found for this medicine');
+            await existingBatch.update(batchChanges, { transaction });
           }
         }
       }
 
-      if (body.totalQuantity !== undefined) {
-        const requestedTotal = parseNonNegativeWholeNumber(body.totalQuantity, 'Total quantity');
-        const batches = await Batch.findAll({
-          where: { medicineId: id },
-          order: [['expiryDate', 'ASC'], ['id', 'ASC']],
-          transaction,
-          lock: transaction.LOCK.UPDATE,
-        });
-        const currentTotal = batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+      if (requestedTotal !== null) {
+        const batches = existingActiveBatches;
+        const currentTotal = currentTotalBeforeUpdate;
         const difference = requestedTotal - currentTotal;
 
         if (difference > 0) {
-          const batch = await Batch.create({
-            medicineId: id,
-            batchNumber: generatedBatchNumber('ADJ'),
-            quantity: difference,
-            expiryDate: getDefaultExpiryDate(),
-            costPrice: body.costPrice === undefined ? 0 : parseNonNegativeNumber(body.costPrice, 'Cost price'),
-            sellingPrice: body.sellingPrice === undefined ? 0 : parseNonNegativeNumber(body.sellingPrice, 'Selling price'),
-          }, { transaction });
-          await InventoryMovement.create({
-            medicineId: id,
-            batchId: batch.id,
-            movementType: 'ADJUSTMENT',
-            quantityChange: difference,
-            referenceType: 'MEDICINE',
-            referenceId: Number(id),
-            reason: 'Manual inventory quantity adjustment',
-          }, { transaction });
+          const referenceBatch = batches.find((b) => Number(b.quantity || 0) > 0) || batches[0] || null;
+          const costPrice = body.costPrice !== undefined
+            ? parseNonNegativeNumber(body.costPrice, 'Cost price')
+            : Number(referenceBatch?.costPrice || 0);
+          const sellingPrice = body.sellingPrice !== undefined
+            ? parseNonNegativeNumber(body.sellingPrice, 'Selling price')
+            : Number(referenceBatch?.sellingPrice || medicine.basePrice || 0);
+
+          await this.createBatchForMedicine(
+            medicine,
+            {
+              quantity: difference,
+              costPrice,
+              sellingPrice,
+              expiryDate: body.expiryDate || getDefaultExpiryDate(),
+              manufacturingDate: body.manufacturingDate || null,
+              supplier: body.supplier || medicine.supplier || null,
+              supplierId: body.supplierId || null,
+              supplierBatchNumber: body.supplierBatchNumber || null,
+              warehouse: body.warehouse || referenceBatch?.warehouse || null,
+            },
+            {
+              referenceType: 'MEDICINE',
+              referenceId: Number(id),
+              reason: cleanText(body.reason) || `Manual stock addition by ${actor?.username || 'authorized user'}`,
+            },
+            transaction,
+            'ADJUSTMENT',
+            actor
+          );
         } else if (difference < 0) {
           let remaining = Math.abs(difference);
           for (const batch of batches) {
             if (remaining <= 0) break;
             const deduction = Math.min(Number(batch.quantity || 0), remaining);
             if (deduction === 0) continue;
-            await batch.update({ quantity: Number(batch.quantity) - deduction }, { transaction });
+            const nextQty = Number(batch.quantity) - deduction;
+            await batch.update({
+              quantity: nextQty,
+              status: resolveBatchStatus(nextQty, batch.status),
+            }, { transaction });
             await InventoryMovement.create({
               medicineId: id,
               batchId: batch.id,
@@ -798,16 +1078,18 @@ class InventoryService {
               quantityChange: -deduction,
               referenceType: 'MEDICINE',
               referenceId: Number(id),
-              reason: 'Manual inventory quantity adjustment',
+              reason: cleanText(body.reason) || 'Manual inventory quantity adjustment',
             }, { transaction });
             remaining -= deduction;
           }
+          await this.recalculateMedicineTotal(medicine, transaction);
         }
-        await medicine.update({ totalQuantity: requestedTotal }, { transaction });
       }
 
       await transaction.commit();
-      return Medicine.findByPk(id, { include: [Batch] });
+      return Medicine.findByPk(id, {
+        include: [{ model: Batch, where: activeBatchWhere(), required: false }],
+      });
     } catch (error) {
       await transaction.rollback();
       rethrowPersistenceError(error, 'Failed to update inventory item');

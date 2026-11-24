@@ -7,6 +7,7 @@ const {
   SearchSynonym,
   sequelize,
 } = require('../../models');
+const { activeBatchWhere, isBatchInactive } = require('../inventory/batch-utils');
 
 // Damerau-Levenshtein distance for typo tolerance (handles insertions, deletions, substitutions, transpositions)
 function editDistance(a, b) {
@@ -71,15 +72,18 @@ function stringSimilarity(a, b) {
 
 function calculateProductPrice(medicine) {
   const plain = typeof medicine.get === 'function' ? medicine.get({ plain: true }) : medicine;
-  if (Array.isArray(plain.Batches) && plain.Batches.length > 0) {
+  const activeBatches = Array.isArray(plain.Batches)
+    ? plain.Batches.filter((batch) => !isBatchInactive(batch))
+    : [];
+  if (activeBatches.length > 0) {
     const today = new Date().toISOString().slice(0, 10);
-    const validBatches = plain.Batches
+    const validBatches = activeBatches
       .filter((batch) => Number(batch.quantity) > 0 && String(batch.expiryDate) >= today && Number(batch.sellingPrice) > 0)
       .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)));
     if (validBatches.length > 0) {
       return Number(validBatches[0].sellingPrice);
     }
-    const configuredBatch = plain.Batches
+    const configuredBatch = activeBatches
       .filter((batch) => Number(batch.sellingPrice) > 0)
       .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)))[0];
     if (configuredBatch) {
@@ -91,9 +95,12 @@ function calculateProductPrice(medicine) {
 
 function calculateAvailableStock(medicine) {
   const plain = typeof medicine.get === 'function' ? medicine.get({ plain: true }) : medicine;
-  if (Array.isArray(plain.Batches) && plain.Batches.length > 0) {
+  const activeBatches = Array.isArray(plain.Batches)
+    ? plain.Batches.filter((batch) => !isBatchInactive(batch))
+    : [];
+  if (activeBatches.length > 0) {
     const today = new Date().toISOString().slice(0, 10);
-    return plain.Batches
+    return activeBatches
       .filter((batch) => String(batch.expiryDate) >= today && Number(batch.quantity || 0) > 0)
       .reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
   }
@@ -510,7 +517,7 @@ class SearchService {
   //          hydrating only matched IDs with full associations.
   async fetchCandidateMedicines(normalizedQuery, expandedSynonyms, baseWhere) {
     const includes = [
-      { model: Batch },
+      { model: Batch, where: activeBatchWhere(), required: false },
       { model: InventoryCategory, as: 'MainCategory', attributes: ['id', 'name', 'slug'] },
       { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug'] },
       { model: InventoryCategory, as: 'ProductForm', attributes: ['id', 'name', 'slug'] },
@@ -779,7 +786,7 @@ class SearchService {
   async getProductAlternatives(productId) {
     const target = await Medicine.findByPk(productId, {
       include: [
-        { model: Batch },
+        { model: Batch, where: activeBatchWhere(), required: false },
         { model: InventoryCategory, as: 'MainCategory' },
         { model: InventoryCategory, as: 'Subcategory' },
         { model: InventoryCategory, as: 'ProductForm' },
@@ -832,7 +839,7 @@ class SearchService {
         [Op.or]: matchClauses,
       },
       include: [
-        { model: Batch },
+        { model: Batch, where: activeBatchWhere(), required: false },
         { model: InventoryCategory, as: 'MainCategory' },
         { model: InventoryCategory, as: 'Subcategory' },
         { model: InventoryCategory, as: 'ProductForm' },

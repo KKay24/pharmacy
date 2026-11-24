@@ -54,13 +54,17 @@ test('taxonomy migration maps recognized legacy records and preserves unclassifi
       expiryDate: '2028-12-31',
       costPrice: 2,
       sellingPrice: 4,
+    }, {
+      fields: ['medicineId', 'batchNumber', 'quantity', 'expiryDate', 'costPrice', 'sellingPrice', 'receivedDate', 'createdAt', 'updatedAt'],
     });
 
     await taxonomyMigration.up({ queryInterface, sequelize, DataTypes });
 
     const mapped = await Medicine.findByPk(recognizedProduct.id);
     const retained = await Medicine.findByPk(unclassifiedProduct.id);
-    const retainedBatch = await Batch.findByPk(preservedBatch.id);
+    const retainedBatch = await Batch.findByPk(preservedBatch.id, {
+      attributes: ['id', 'medicineId', 'batchNumber', 'quantity', 'expiryDate', 'costPrice', 'sellingPrice'],
+    });
     const categories = await InventoryCategory.findAll();
     const antibiotics = categories.find((category) => category.path === 'medicines/antibiotics');
     const syrup = categories.find((category) => category.path === 'medicines/antibiotics/syrup');

@@ -1,5 +1,6 @@
 const { Batch, Medicine, Sales } = require('../../models');
 const { Op } = require('sequelize');
+const { activeBatchWhere, isBatchInactive } = require('../../src/inventory/batch-utils');
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -313,6 +314,7 @@ function parseAnalyticsOptions(query = {}) {
 
 function normalizeBatches(rawBatches = []) {
   return [...rawBatches]
+    .filter((batch) => !isBatchInactive(batch))
     .map((batch) => ({
       id: batch.id,
       batchNumber: batch.batchNumber,
@@ -323,6 +325,7 @@ function normalizeBatches(rawBatches = []) {
       receivedDate: batch.receivedDate || batch.createdAt || null,
       supplierId: batch.supplierId || null,
       warehouse: batch.warehouse || null,
+      status: batch.status || 'active',
     }))
     .sort((left, right) => {
       const leftTime = left.receivedDate ? new Date(left.receivedDate).getTime() : 0;
@@ -346,7 +349,9 @@ async function buildForecastDataset(options = DEFAULT_ANALYTICS_OPTIONS) {
       order: [['name', 'ASC']],
       include: [{
         model: Batch,
-        attributes: ['id', 'batchNumber', 'quantity', 'expiryDate', 'costPrice', 'sellingPrice', 'receivedDate', 'createdAt', 'supplierId', 'warehouse'],
+        attributes: ['id', 'batchNumber', 'quantity', 'expiryDate', 'costPrice', 'sellingPrice', 'receivedDate', 'createdAt', 'supplierId', 'warehouse', 'status'],
+        where: activeBatchWhere(),
+        required: false,
       }],
     }),
     Sales.findAll({

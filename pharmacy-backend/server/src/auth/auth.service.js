@@ -308,6 +308,8 @@ class AuthService {
     }
 
     await sequelize.transaction(async (transaction) => {
+      await Batch.update({ createdByUserId: null }, { where: { createdByUserId: user.id }, transaction });
+      await Batch.update({ deletedByUserId: null }, { where: { deletedByUserId: user.id }, transaction });
       await Sales.update({ soldByUserId: null }, { where: { soldByUserId: user.id }, transaction });
       await Sales.update({ reversedByUserId: null }, { where: { reversedByUserId: user.id }, transaction });
       await Order.update({ userId: null }, { where: { userId: user.id }, transaction });
@@ -442,6 +444,7 @@ const {
   sequelize,
   AuditLog,
   AuthAuditLog,
+  Batch,
   CashDrawerReconciliation,
   Customer,
   Expense,
