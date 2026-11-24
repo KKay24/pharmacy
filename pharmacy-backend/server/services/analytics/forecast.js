@@ -342,15 +342,21 @@ async function buildForecastDataset(options = DEFAULT_ANALYTICS_OPTIONS) {
   const dayAfterToday = toDayKey(addDays(today, 1));
   const [medicines, sales] = await Promise.all([
     Medicine.findAll({
+      attributes: ['id', 'name', 'genericName', 'category', 'lowStockThreshold'],
       order: [['name', 'ASC']],
-      include: [{ model: Batch }],
+      include: [{
+        model: Batch,
+        attributes: ['id', 'batchNumber', 'quantity', 'expiryDate', 'costPrice', 'sellingPrice', 'receivedDate', 'createdAt', 'supplierId', 'warehouse'],
+      }],
     }),
     Sales.findAll({
+      attributes: ['medicineId', 'name', 'date', 'quantity'],
       where: {
         saleStatus: { [Op.ne]: 'REVERSED' },
         date: { [Op.gte]: earliestSalesDate, [Op.lt]: dayAfterToday },
       },
       order: [['date', 'ASC']],
+      raw: true,
     }),
   ]);
 

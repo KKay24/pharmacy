@@ -144,6 +144,48 @@ test("stock value uses batch costs with first-batch fallback consistently", () =
   expect(classificationTable.querySelector("tbody")).toHaveTextContent("K190");
 });
 
+test.each(["manager", "user"])("hides the Stock Value card and breakdown column from %s users", (role) => {
+  const inventory = [
+    {
+      id: 1,
+      name: "Amoxicillin",
+      mainCategoryId: 1,
+      subcategoryId: 11,
+      productFormId: 111,
+      MainCategory: { name: "Medicines" },
+      Subcategory: { name: "Antibiotics" },
+      ProductForm: { name: "Syrup" },
+      Batches: [
+        { id: 1, quantity: 5, costPrice: 10, expiryDate: "2030-12-31" },
+      ],
+    },
+  ];
+  const context = {
+    inventory,
+    inventoryCategories: categories,
+    updateInventoryItem: jest.fn(),
+    deleteInventoryItem: jest.fn(),
+    userRole: role,
+  };
+
+  const { unmount } = render(
+    <DataContext.Provider value={context}>
+      <InventoryPage />
+    </DataContext.Provider>
+  );
+  expect(screen.queryByText("Stock Value")).not.toBeInTheDocument();
+  unmount();
+
+  render(
+    <DataContext.Provider value={context}>
+      <DashboardPage />
+    </DataContext.Provider>
+  );
+  expect(screen.queryByText("Stock Value")).not.toBeInTheDocument();
+  expect(screen.queryByText("Inventory Classification & Value")).not.toBeInTheDocument();
+  expect(screen.getByText("Inventory Classification")).toBeInTheDocument();
+});
+
 test("dashboard Inventory Control card opens the inventory page", () => {
   render(
     <DataContext.Provider value={{ username: "Pharmacy Staff", inventory: [], sales: [], customers: [] }}>

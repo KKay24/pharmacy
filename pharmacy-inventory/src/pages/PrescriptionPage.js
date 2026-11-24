@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, 
     MoreHorizontal, 
-    ChevronLeft, 
     Clock, 
     CheckCircle2, 
     PauseCircle, 
@@ -45,6 +44,8 @@ const WORKLOAD_DATA = [
 export default function PrescriptionPage() {
     const [prescriptions, setPrescriptions] = useState([]);
     const [filteredScripts, setFilteredScripts] = useState([]);
+    const [pagination, setPagination] = useState(null);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState("");
     const [showForm, setShowForm] = useState(false);
@@ -58,17 +59,20 @@ export default function PrescriptionPage() {
         dueDate: new Date().toISOString().split('T')[0]
     });
 
-    const fetchPrescriptions = async () => {
+    const fetchPrescriptions = async (page = 1, append = false) => {
+        if (append) setLoadingMore(true);
         try {
-            const res = await apiFetch('/api/prescriptions');
+            const res = await apiFetch(`/api/prescriptions?page=${page}&limit=25`);
             if (res.ok) {
                 const data = await res.json();
                 const rows = Array.isArray(data) ? data : (data?.data || []);
-                setPrescriptions(rows);
-                setFilteredScripts(rows);
+                setPrescriptions(current => append ? [...current, ...rows] : rows);
+                setPagination(data?.pagination || null);
             }
         } catch (err) {
             console.error("Error fetching prescriptions");
+        } finally {
+            if (append) setLoadingMore(false);
         }
     };
 
@@ -297,12 +301,18 @@ export default function PrescriptionPage() {
                     </table>
                 </div>
                 <div className="pm-pagination">
-                    <div style={{fontSize: '0.85rem', color: '#64748b'}}><ChevronLeft size={16} /> 5 Items</div>
-                    <div style={{display:'flex', gap:'0.5rem'}}>
-                        <button className="pm-btn-primary active" style={{padding:'0.4rem 0.8rem'}}>1</button>
-                        <button className="pm-btn-primary" style={{padding:'0.4rem 0.8rem', background:'white', border:'1px solid #e2e8f0', color:'#64748b'}}>2</button>
+                    <div style={{fontSize: '0.85rem', color: '#64748b'}}>
+                        {pagination ? `${prescriptions.length} of ${pagination.total} prescriptions` : `${prescriptions.length} prescriptions`}
                     </div>
-                    <button className="pm-btn-primary" style={{background:'white', border:'1px solid #e2e8f0', color:'#64748b'}} onClick={() => toast('No more pages found.')}>Next</button>
+                    {pagination && pagination.page < pagination.totalPages && (
+                        <button
+                            className="pm-btn-primary"
+                            disabled={loadingMore}
+                            onClick={() => fetchPrescriptions(pagination.page + 1, true)}
+                        >
+                            {loadingMore ? 'Loading...' : 'Load more'}
+                        </button>
+                    )}
                 </div>
             </div>
 

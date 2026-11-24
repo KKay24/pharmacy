@@ -389,11 +389,47 @@ class InventoryService {
   }
 
   async lowStock() {
-    const medicines = await Medicine.findAll({ include: [Batch] });
-    return medicines.filter((medicine) => {
-      const total = medicine.Batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
-      return total <= medicine.lowStockThreshold;
-    });
+    const lowStockMedicines = [];
+    const chunkSize = 200;
+    let lastId = 0;
+
+    while (true) {
+      const candidates = await Medicine.findAll({
+        where: { id: { [Op.gt]: lastId } },
+        attributes: ['id', 'lowStockThreshold'],
+        order: [['id', 'ASC']],
+        limit: chunkSize,
+        raw: true,
+      });
+      if (candidates.length === 0) break;
+      lastId = Number(candidates[candidates.length - 1].id);
+
+      const quantities = await Batch.findAll({
+        where: { medicineId: candidates.map((medicine) => medicine.id) },
+        attributes: ['medicineId', [sequelize.fn('SUM', sequelize.col('quantity')), 'quantity']],
+        group: ['medicineId'],
+        raw: true,
+      });
+      const quantityByMedicineId = new Map(
+        quantities.map((row) => [Number(row.medicineId), Number(row.quantity || 0)])
+      );
+      const lowStockIds = candidates
+        .filter((medicine) => (
+          (quantityByMedicineId.get(Number(medicine.id)) || 0) <= Number(medicine.lowStockThreshold || 0)
+        ))
+        .map((medicine) => medicine.id);
+
+      if (lowStockIds.length > 0) {
+        const rows = await Medicine.findAll({
+          where: { id: { [Op.in]: lowStockIds } },
+          include: [Batch],
+          order: [['id', 'ASC']],
+        });
+        lowStockMedicines.push(...rows);
+      }
+    }
+
+    return lowStockMedicines;
   }
 
   async movements(id, query) {

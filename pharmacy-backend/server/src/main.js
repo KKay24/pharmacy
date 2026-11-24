@@ -11,6 +11,7 @@ const {
 } = require('./app.module');
 const { resolveTrustProxySetting } = require('./security/request-context');
 const { getAiProviderDiagnostics } = require('./ai/ai-provider.service');
+const { startMemoryMonitor } = require('./common/memory-monitor');
 
 function rejectDisallowedOrigin(req, res, next) {
   const origin = req.get('Origin');
@@ -75,6 +76,8 @@ async function handler(req, res) {
 async function bootstrap() {
   const app = await createApplication();
   await app.listen(Number(process.env.PORT || 5001));
+  const memoryMonitor = startMemoryMonitor();
+  app.getHttpServer().once('close', memoryMonitor.stop);
   console.log(`NestJS server running on http://localhost:${process.env.PORT || 5001}`);
   const aiDiagnostics = getAiProviderDiagnostics();
   const aiLog = JSON.stringify({

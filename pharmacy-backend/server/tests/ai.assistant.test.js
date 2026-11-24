@@ -711,4 +711,12 @@ describe('MediQuick Smart Assistant (Medical AI Backend)', () => {
       console.error = originalConsoleError;
     }
   });
+
+  test('caps high-cardinality in-memory rate-limit buckets', () => {
+    const service = new AiService();
+    for (let index = 0; index < 2100; index += 1) {
+      service.enforceRateLimit(`client:${index}`);
+    }
+    assert.equal(service.rateLimitBuckets.size, 2000);
+  });
 });

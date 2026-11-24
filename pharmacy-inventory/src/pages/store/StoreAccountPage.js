@@ -23,6 +23,7 @@ export default function StoreAccountPage() {
   const [authMode, setAuthMode] = useState("login");
   const [orders, setOrders] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
+  const [prescriptionPagination, setPrescriptionPagination] = useState(null);
   const [, setProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -42,13 +43,15 @@ export default function StoreAccountPage() {
     finally { setLoading(false); }
   }, [apiFetch]);
 
-  const fetchPrescriptions = useCallback(async () => {
+  const fetchPrescriptions = useCallback(async (page = 1, append = false) => {
     setLoading(true);
     try {
-      const data = await apiFetch("/api/prescriptions/my");
-      setPrescriptions(Array.isArray(data) ? data : data.data || []);
+      const data = await apiFetch(`/api/prescriptions/my?page=${page}&limit=25`);
+      const rows = Array.isArray(data) ? data : data.data || [];
+      setPrescriptions((current) => append ? [...current, ...rows] : rows);
+      setPrescriptionPagination(data.pagination || null);
     } catch (error) {
-      setPrescriptions([]);
+      if (!append) setPrescriptions([]);
       showToast(error.message || "Could not load your prescriptions", "error");
     }
     finally { setLoading(false); }
@@ -243,6 +246,15 @@ export default function StoreAccountPage() {
                         </div>
                       ))}
                     </div>
+                  )}
+                  {!loading && prescriptionPagination?.page < prescriptionPagination?.totalPages && (
+                    <button
+                      type="button"
+                      onClick={() => fetchPrescriptions(prescriptionPagination.page + 1, true)}
+                      style={{ marginTop: "1rem", padding: "0.65rem 1rem", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--bg-card)", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Load more prescriptions
+                    </button>
                   )}
               </div>
             )}

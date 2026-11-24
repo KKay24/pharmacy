@@ -409,3 +409,61 @@ test('5. Admin SecurityController filtering, IP investigation, and strict RBAC e
     ForbiddenException
   );
 });
+
+test('authentication runtime maps prune expired entries and cap high-cardinality keys', () => {
+  const security = new AuthSecurityService(new IpGeolocationService({
+    env: { IP_GEO_ENABLED: 'false' },
+  }), {
+    env: { AUTH_RATE_LIMIT_WINDOW_MS: '1000' },
+  });
+  const baseTime = 1_000_000;
+
+  for (let index = 0; index < 5100; index += 1) {
+    security.trackAttemptInMemory({
+      ipAddress: '2001:4860:4860::8888',
+      attemptedEmail: `memory-${index}@example.test`,
+      status: 'SUCCESS',
+      now: baseTime + index,
+    });
+  }
+  assert.equal(security.accountAttempts.size, 5000);
+
+  for (let index = 0; index < 150; index += 1) {
+    security.trackAttemptInMemory({
+      ipAddress: '2001:4860:4860::8888',
+      attemptedEmail: 'repeated@example.test',
+      status: 'SUCCESS',
+      now: baseTime + 5100 + index,
+    });
+  }
+  assert.ok(security.ipAttempts.get('2001:4860:4860::8888').length <= 100);
+  assert.ok(security.accountAttempts.size <= 5000);
+
+  security.sweepRuntimeState(baseTime + 120_000);
+  assert.equal(security.ipAttempts.size, 0);
+  assert.equal(security.accountAttempts.size, 0);
+});
+
+test('active lockouts are not evicted when the bounded lockout map reaches capacity', () => {
+  const security = new AuthSecurityService(new IpGeolocationService({
+    env: { IP_GEO_ENABLED: 'false' },
+  }));
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (line) => warnings.push(JSON.parse(line));
+
+  try {
+    for (let index = 0; index < 5000; index += 1) {
+      security.setBoundedMapValue(security.lockouts, `lockout-${index}`, Date.now() + 60_000);
+    }
+    security.setBoundedMapValue(security.lockouts, 'overflow-lockout', Date.now() + 60_000);
+
+    assert.equal(security.lockouts.size, 5000);
+    assert.ok(security.getActiveLockout('lockout-0', Date.now()) > 0);
+    assert.equal(security.lockouts.has('overflow-lockout'), false);
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0].event, 'auth_lockout_capacity_reached');
+  } finally {
+    console.warn = originalWarn;
+  }
+});

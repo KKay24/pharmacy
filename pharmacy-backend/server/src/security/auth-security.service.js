@@ -20,6 +20,10 @@ const SUSPICIOUS_FLAG_LABELS = Object.freeze({
 });
 
 const RETENTION_SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const RUNTIME_SWEEP_INTERVAL_MS = 60 * 1000;
+const MAX_RUNTIME_MAP_KEYS = 5000;
+const MAX_EVENTS_PER_KEY = 100;
+const MAX_PENDING_GEO_UPDATES = 100;
 const RATE_LIMITED_AUDIT_CAP_PER_MIN = 5;
 
 function parsePositiveInt(raw, fallback, min = 1, max = Number.MAX_SAFE_INTEGER) {
@@ -55,7 +59,10 @@ class AuthSecurityService {
     this.lockouts = new Map();
     this.rateLimitedAuditCounts = new Map();
     this.lastRetentionSweepAt = 0;
+    this.lastRuntimeSweepAt = 0;
     this.pendingGeoUpdates = new Set();
+    this.lockoutCapacityReached = false;
+    this.lockoutCapacityWarningLogged = false;
   }
 
   getConfig() {
@@ -78,6 +85,8 @@ class AuthSecurityService {
     this.pairFailures.clear();
     this.lockouts.clear();
     this.rateLimitedAuditCounts.clear();
+    this.lockoutCapacityReached = false;
+    this.lockoutCapacityWarningLogged = false;
   }
 
   pruneEvents(list, cutoffMs) {
@@ -85,11 +94,86 @@ class AuthSecurityService {
     return list.filter((entry) => entry.ts >= cutoffMs);
   }
 
+  warnLockoutCapacity() {
+    if (this.lockoutCapacityWarningLogged) return;
+    console.warn(JSON.stringify({
+      event: 'auth_lockout_capacity_reached',
+      capacity: MAX_RUNTIME_MAP_KEYS,
+    }));
+    this.lockoutCapacityWarningLogged = true;
+  }
+
+  setBoundedMapValue(map, key, value) {
+    const alreadyPresent = map.has(key);
+    map.delete(key);
+    if (map === this.lockouts) {
+      if (!alreadyPresent && this.lockoutCapacityReached) {
+        this.warnLockoutCapacity();
+        return false;
+      }
+      if (map.size >= MAX_RUNTIME_MAP_KEYS) {
+        const now = Date.now();
+        for (const [lockoutKey, expiresAt] of map.entries()) {
+          if (expiresAt <= now) map.delete(lockoutKey);
+          if (map.size < MAX_RUNTIME_MAP_KEYS) break;
+        }
+      }
+      if (map.size >= MAX_RUNTIME_MAP_KEYS) {
+        this.lockoutCapacityReached = true;
+        this.warnLockoutCapacity();
+        return false;
+      }
+      map.set(key, value);
+      this.lockoutCapacityReached = map.size >= MAX_RUNTIME_MAP_KEYS;
+      if (!this.lockoutCapacityReached) this.lockoutCapacityWarningLogged = false;
+      return true;
+    }
+
+    while (map.size >= MAX_RUNTIME_MAP_KEYS) {
+      const oldestKey = map.keys().next().value;
+      if (oldestKey === undefined) break;
+      map.delete(oldestKey);
+    }
+    map.set(key, value);
+  }
+
+  sweepRuntimeState(now = Date.now()) {
+    if (now - this.lastRuntimeSweepAt < RUNTIME_SWEEP_INTERVAL_MS) return;
+    this.lastRuntimeSweepAt = now;
+    const cutoff = now - this.getConfig().windowMs;
+
+    for (const map of [this.ipAttempts, this.accountAttempts, this.pairFailures]) {
+      for (const [key, events] of map.entries()) {
+        const remaining = this.pruneEvents(events, cutoff);
+        if (remaining.length === 0) map.delete(key);
+        else map.set(key, remaining);
+      }
+    }
+    for (const [key, expiresAt] of this.lockouts.entries()) {
+      if (expiresAt <= now) this.lockouts.delete(key);
+    }
+    if (this.lockouts.size < MAX_RUNTIME_MAP_KEYS) {
+      this.lockoutCapacityReached = false;
+      this.lockoutCapacityWarningLogged = false;
+    }
+    for (const map of [this.ipAttempts, this.accountAttempts, this.pairFailures, this.lockouts]) {
+      while (map.size > MAX_RUNTIME_MAP_KEYS) {
+        const oldestKey = map.keys().next().value;
+        if (oldestKey === undefined) break;
+        map.delete(oldestKey);
+      }
+    }
+  }
+
   getActiveLockout(key, now) {
     const until = this.lockouts.get(key);
     if (!until) return 0;
     if (until <= now) {
       this.lockouts.delete(key);
+      if (this.lockouts.size < MAX_RUNTIME_MAP_KEYS) {
+        this.lockoutCapacityReached = false;
+        this.lockoutCapacityWarningLogged = false;
+      }
       return 0;
     }
     return Math.ceil((until - now) / 1000);
@@ -128,6 +212,7 @@ class AuthSecurityService {
   }
 
   trackAttemptInMemory({ ipAddress, attemptedEmail, status, now = Date.now() }) {
+    this.sweepRuntimeState(now);
     const cfg = this.getConfig();
     const cutoff = now - cfg.windowMs;
     const normalizedEmail = sanitizeLogValue(attemptedEmail, 255).toLowerCase();
@@ -138,14 +223,16 @@ class AuthSecurityService {
     if (safeIp !== 'unknown') {
       const ipHistory = this.pruneEvents(this.ipAttempts.get(safeIp), cutoff);
       ipHistory.push({ ts: now, status, email: normalizedEmail });
-      this.ipAttempts.set(safeIp, ipHistory);
+      if (ipHistory.length > MAX_EVENTS_PER_KEY) ipHistory.shift();
+      this.setBoundedMapValue(this.ipAttempts, safeIp, ipHistory);
     }
 
     // Track per-account attempts
     if (normalizedEmail) {
       const accHistory = this.pruneEvents(this.accountAttempts.get(normalizedEmail), cutoff);
       accHistory.push({ ts: now, status, ip: safeIp });
-      this.accountAttempts.set(normalizedEmail, accHistory);
+      if (accHistory.length > MAX_EVENTS_PER_KEY) accHistory.shift();
+      this.setBoundedMapValue(this.accountAttempts, normalizedEmail, accHistory);
     }
 
     // Track per-(IP, account) failures; reset on successful login so legitimate users are not unfairly penalized
@@ -158,10 +245,11 @@ class AuthSecurityService {
       } else if (isFailed) {
         const pairHistory = this.pruneEvents(this.pairFailures.get(pairKey), cutoff);
         pairHistory.push({ ts: now });
-        this.pairFailures.set(pairKey, pairHistory);
+        if (pairHistory.length > MAX_EVENTS_PER_KEY) pairHistory.shift();
+        this.setBoundedMapValue(this.pairFailures, pairKey, pairHistory);
 
         if (pairHistory.length >= cfg.pairMaxFailures) {
-          this.lockouts.set(pairKey, now + cfg.lockoutDurationMs);
+          this.setBoundedMapValue(this.lockouts, pairKey, now + cfg.lockoutDurationMs);
         }
       }
     }
@@ -169,14 +257,14 @@ class AuthSecurityService {
     if (isFailed && safeIp !== 'unknown') {
       const ipFailures = (this.ipAttempts.get(safeIp) || []).filter((item) => item.status === 'FAILED');
       if (ipFailures.length >= cfg.ipMaxFailures) {
-        this.lockouts.set(`ip:${safeIp}`, now + cfg.lockoutDurationMs);
+        this.setBoundedMapValue(this.lockouts, `ip:${safeIp}`, now + cfg.lockoutDurationMs);
       }
     }
 
     if (isFailed && normalizedEmail) {
       const accFailures = (this.accountAttempts.get(normalizedEmail) || []).filter((item) => item.status === 'FAILED');
       if (accFailures.length >= cfg.accountMaxFailures) {
-        this.lockouts.set(`account:${normalizedEmail}`, now + cfg.lockoutDurationMs);
+        this.setBoundedMapValue(this.lockouts, `account:${normalizedEmail}`, now + cfg.lockoutDurationMs);
       }
     }
   }
@@ -293,6 +381,7 @@ class AuthSecurityService {
 
   enrichRecordGeoAsync(recordId, ipAddress) {
     if (!recordId || !ipAddress || ipAddress === 'unknown') return null;
+    if (this.pendingGeoUpdates.size >= MAX_PENDING_GEO_UPDATES) return null;
 
     const promise = Promise.resolve()
       .then(async () => {

@@ -17,6 +17,7 @@ const PermissionsGuard = require('./auth/permissions.guard');
 const AuditService = require('./audit/audit.service');
 const AuditInterceptor = require('./audit/audit.interceptor');
 const RequestValidationMiddleware = require('./common/validation');
+const { createConcurrencyLimit } = require('./common/concurrency-limit');
 const InventoryController = require('./inventory/inventory.controller');
 const InventoryService = require('./inventory/inventory.service');
 const SalesController = require('./sales/sales.controller');
@@ -110,6 +111,16 @@ function ensureApplicationReady() {
 }
 
 function mountLegacyApi(expressApp, { deferFallback = false } = {}) {
+  const uploadConcurrency = Math.min(
+    4,
+    Math.max(1, Number.parseInt(process.env.PRESCRIPTION_UPLOAD_CONCURRENCY || '2', 10) || 2)
+  );
+  expressApp.use(createConcurrencyLimit({
+    maxConcurrent: uploadConcurrency,
+    shouldLimit: (req) => req.method === 'POST' && req.path === '/api/prescriptions/upload',
+    code: 'PRESCRIPTION_UPLOAD_BUSY',
+    message: 'Prescription uploads are busy. Please retry shortly.',
+  }));
   const defaultJsonParser = express.json({ limit: '2mb' });
   const prescriptionJsonParser = express.json({ limit: '8mb' });
   expressApp.use((req, res, next) => {

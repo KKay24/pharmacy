@@ -36,6 +36,7 @@ Backend automated coverage includes:
 - Authenticated inventory fetch, batch receiving and sale creation.
 - Hierarchical taxonomy retrieval, allowed-form scoping, product creation with classification, ID/name inventory filtering and rejection of mismatched form/subcategory filters.
 - Optional-auth customer order and prescription account associations, guest tracking phone-length validation, insufficient-stock order rejection with transaction safety, preflight headers and endpoint-specific JSON body limits.
+- Memory safeguards: bounded prescription-upload concurrency, periodic safe process-memory metrics, bounded AI/auth in-memory maps, chunked financial report aggregation, compact price-derived catalogue scans and large prescription document isolation/pagination.
 - Customer account sign-in-to-registration mode switching.
 - AI session ownership isolation across guest and authenticated users.
 
@@ -46,6 +47,7 @@ Web automated coverage includes:
 - Sync status indicator rendering and user-visible states.
 - Dependent stock-entry category/subcategory/form selectors, POS main-category → subcategory → form filtering, and inventory taxonomy, generic-name and brand filters.
 - Staff support inbox rendering, contact links, status updates, API error handling, and authenticated backend inquiry listing/status transitions.
+- Customer prescription-history pagination and loading additional pages without fetching document payloads in the list.
 - Production API URL resolution through the same-origin Vercel proxy and response-header filtering for transparently decoded proxy responses.
 
 The inventory of test files may change; inspect the package before relying on this list.
@@ -61,12 +63,12 @@ The inventory of test files may change; inspect the package before relying on th
 | Batches/expiry | Expiry date persistence and display, quantity across multiple batches, ordering used by sales, analytics warnings and retained references. Do not assume expiry-sale blocking unless code/tests implement it. |
 | Sales/POS | Cart payload, quantity/total validation, insufficient stock, batch deduction, movement creation, customer association, exact confirmed payment allocation, refund limits, reversal and sale/movement transaction atomicity. |
 | Offline PWA/sync | Data available from cache, enqueue and persistence across reload, online retry, duplicate idempotency, permission failures, server stock conflicts, failed-operation visibility and queue removal only after success. |
-| Customers/prescriptions | Customer required/optional fields, list/search/detail/create, customer associations, prescription create/list/status validation and sensitive data handling. |
+| Customers/prescriptions | Customer required/optional fields, list/search/detail/create, customer associations, prescription create/list/status validation, paginated history, omission of document payloads in collections, authorized document access and sensitive data handling. |
 | Customer support | Public inquiry submission; authenticated staff-only inbox listing with pagination/search/status filtering; valid and invalid status changes; customer contact links and visible API error states. |
-| Reports/analytics | Empty and representative datasets, Africa/Lusaka date boundaries, explicit half-open reporting intervals, Week/Current Month/Previous Month/Yearly calendar ranges, daily versus yearly-monthly analytics, verified/unknown COGS, active/voided expenses, payment allocation warnings, refunds, period-filtered cash-reconciliation immutability, forecast input, stockout/expiry results and no sensitive-field leakage. |
+| Reports/analytics | Empty and representative datasets, Africa/Lusaka date boundaries, explicit half-open reporting intervals, Week/Current Month/Previous Month/Yearly calendar ranges, daily versus yearly-monthly analytics, chunk boundaries within one receipt, verified/unknown COGS, active/voided expenses, payment allocation warnings, refunds, period-filtered cash-reconciliation immutability, forecast input, stockout/expiry results and no sensitive-field leakage. |
 | UI components/pages | Loading/error/empty states, keyboard/accessible interactions where established, API failure messaging and role-based display. |
 | Mobile client | API URL resolution, SecureStore session behavior, login redirect, inventory loading/search and category → subcategory → form filters, online POS success/error and `npm run typecheck`. |
-| Deployment/configuration | Production config checks, build output including the local PDF worker, CORS/proxy path and headers, JSON body-size limits, `/health`, PostgreSQL connectivity, migration rollout and client-to-backend connectivity. |
+| Deployment/configuration | Production config checks, build output including the local PDF worker, CORS/proxy path and headers, JSON body-size limits, upload concurrency limits, `/health`, PostgreSQL connectivity, migration rollout and client-to-backend connectivity. |
 
 ## 6. Manual acceptance scenarios
 
@@ -141,3 +143,4 @@ For a release, record the commit/revision, environment (without secret values), 
 - No API schema/contract test suite or checked-in OpenAPI definition was found.
 - Test coverage for complete prescription fulfillment, comprehensive role matrices, PostgreSQL migration upgrades and the full offline conflict matrix is not currently documented/verified.
 - Formal load, accessibility, backup-restore, security penetration and disaster-recovery test evidence is not currently documented/verified.
+- Render RSS measurements and representative peak-load evidence are not currently documented/verified; passing unit/integration tests does not establish a 512 MB peak-memory guarantee.

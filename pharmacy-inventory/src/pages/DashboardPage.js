@@ -121,10 +121,12 @@ export default function DashboardPage() {
     inventory,
     sales = [],
     expenses = [],
+    userRole,
     predictiveAnalytics = EMPTY_PREDICTIVE_ANALYTICS,
     reorderInsights = EMPTY_REORDER_INSIGHTS,
     riskInsights = EMPTY_RISK_INSIGHTS,
   } = useContext(DataContext);
+  const isAdmin = userRole === "admin";
   const LOW_STOCK_THRESHOLD = 10;
   const [inventoryBreakdownLevel, setInventoryBreakdownLevel] = useState("main");
   const [activeListKey, setActiveListKey] = useState(null);
@@ -359,14 +361,18 @@ export default function DashboardPage() {
       sparkValue: totalProducts,
       to: "/inventory",
     },
-    {
-      title: "Stock Value",
-      value: formatCurrency(stockValue),
-      accentClass: "",
-      sparkColor: "#10b981",
-      sparkValue: stockValue,
-      to: "/inventory",
-    },
+    ...(isAdmin
+      ? [
+          {
+            title: "Stock Value",
+            value: formatCurrency(stockValue),
+            accentClass: "",
+            sparkColor: "#10b981",
+            sparkValue: stockValue,
+            to: "/inventory",
+          },
+        ]
+      : []),
     {
       title: "Low Stock Items",
       value: lowStockItems.length,
@@ -540,7 +546,7 @@ export default function DashboardPage() {
 
       <div className="dash-card">
         <div className="dash-card-header">
-          <h3>Inventory Classification & Value</h3>
+          <h3>{isAdmin ? "Inventory Classification & Value" : "Inventory Classification"}</h3>
           <select
             className="dash-select"
             aria-label="Inventory reporting level"
@@ -559,18 +565,18 @@ export default function DashboardPage() {
                 <th>{inventoryBreakdownLevel === "main" ? "Main Category" : inventoryBreakdownLevel === "subcategory" ? "Subcategory" : "Product Form"}</th>
                 <th>Products</th>
                 <th>Units</th>
-                <th>Stock Value</th>
+                {isAdmin && <th>Stock Value</th>}
               </tr>
             </thead>
             <tbody>
               {inventoryBreakdown.length === 0 ? (
-                <tr><td colSpan="4" style={{ textAlign: "center", padding: "2rem" }}>No inventory is available for reporting.</td></tr>
+                <tr><td colSpan={isAdmin ? "4" : "3"} style={{ textAlign: "center", padding: "2rem" }}>No inventory is available for reporting.</td></tr>
               ) : inventoryBreakdown.map((row) => (
                 <tr key={row.label}>
                   <td style={{ fontWeight: 600 }}>{row.label}</td>
                   <td>{row.products}</td>
                   <td>{row.units.toLocaleString()}</td>
-                  <td>{formatCurrency(row.stockValue)}</td>
+                  {isAdmin && <td>{formatCurrency(row.stockValue)}</td>}
                 </tr>
               ))}
             </tbody>

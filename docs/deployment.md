@@ -46,14 +46,22 @@ Configure these values through the deployment provider's environment/secret mana
 | `AI_TIMEOUT_MS` | Optional upstream AI timeout in milliseconds (`2000`–`45000`, default `15000`). |
 | `AI_RATE_LIMIT_MAX` | Optional max AI chat messages per client per window (default `15`). |
 | `AI_RATE_LIMIT_WINDOW_MS` | Optional AI rate-limit window in milliseconds (default `60000`). |
+| `PRESCRIPTION_UPLOAD_CONCURRENCY` | Optional concurrent JSON prescription-upload limit (default `2`, clamped to `1`–`4`). |
+| `MEMORY_MONITOR_ENABLED` | Set to `false` to disable periodic process-memory logging; enabled by default. |
+| `MEMORY_LOG_INTERVAL_MS` | Optional memory sample interval in milliseconds (default `30000`, clamped to `5000`–`300000`). |
+| `MEMORY_WARNING_RSS_MB` | Optional RSS warning threshold in MiB (default `400`, clamped to `128`–`4096`). |
 
 `POSTGRES_URL` is recognized by the Sequelize connection setup as a fallback, but production startup explicitly requires `DATABASE_URL`; configure the latter. Do not set `SQLITE_STORAGE_PATH` or a SQLite URL in production; the backend rejects SQLite production configuration.
 
 The PostgreSQL Sequelize pool is capped at five connections and waits up to ten seconds to acquire a connection. Database initialization failures return a safe `503` for data routes without preventing the process from starting; `/health/database` is the separate connectivity diagnostic.
 
-The canonical API applies a 2 MB JSON body limit by default and an 8 MB limit only to `POST /api/prescriptions/upload`. The prescription file itself is limited to 5 MB; keep upload limits aligned if the storefront limit changes.
+The canonical API applies a 2 MB JSON body limit by default and an 8 MB limit only to `POST /api/prescriptions/upload`. The prescription file itself is limited to 5 MB; keep upload limits aligned if the storefront limit changes. Uploads still use JSON/base64 and are parsed into memory; the concurrency limit bounds the number processed simultaneously but is not streaming. Moving to streaming requires a durable storage design and compatibility review for the existing `Prescription.imagePath` persistence contract.
 
-AI conversation history and per-client rate-limit buckets are held in process memory. Sessions expire after 30 minutes and are capped at 1,000 per process; rate-limit buckets are pruned as they expire. Both are lost on process restart and are not shared across instances. Keep a single backend instance for consistent rate limiting/session continuity, or introduce a reviewed shared store before horizontal scaling.
+The backend periodically logs structured RSS, heap, external-memory and array-buffer measurements. It emits a warning when RSS reaches `MEMORY_WARNING_RSS_MB`; this is monitoring, not a hard memory cap or a guarantee of staying below the host limit. Analytics coalesces identical in-flight work and allows at most two distinct heavy jobs concurrently. Financial reports, expenses and refunds are queried in bounded chunks; price-derived product filtering scans compact 200-product chunks, and price-sorted deep pages are capped. The final report still retains its response data, including any allocation warnings, in memory.
+
+AI conversation history and per-client rate-limit buckets are held in process memory. Sessions expire after 30 minutes and are capped at 1,000 per process; rate-limit buckets are pruned and bounded. Authentication runtime maps are also pruned and capped. Active lockouts are not evicted to make room; if the 5,000-entry lockout cap is saturated, new lockouts are not retained and a structured warning is logged. This extreme high-cardinality case should be monitored and addressed with a shared rate-limit/lockout store before horizontal scaling. These values are lost on process restart and are not shared across instances. Keep a single backend instance for consistent rate limiting/session continuity, or introduce a reviewed shared store before horizontal scaling.
+
+The safeguards reduce avoidable intermediate allocations, but do not prove that peak memory stays below 512 MB. Confirm RSS and crash diagnostics in Render, inspect the deployed PostgreSQL prescription-column type, and run representative peak-load tests before making that production claim. No object-storage/streaming migration or production database change is included here.
 
 The checked-in Render blueprint links the backend to the database named `pharmacy-db`, generates a JWT secret, runs `npm install && npm run migrate` as its build command, uses `npm start` for startup, and checks `/health`. `/health` is a liveness check and does not depend on PostgreSQL or AI availability; use `/health/database` for a separate database connectivity diagnostic. Verify plan, service names, database retention, backups and current provider requirements before applying the blueprint.
 

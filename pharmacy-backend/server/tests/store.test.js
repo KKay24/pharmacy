@@ -16,6 +16,8 @@ process.env.SQLITE_STORAGE_PATH = join(tempDirectory, 'store.sqlite');
 process.env.ENABLE_DEMO_SEEDING = 'true';
 process.env.JWT_SECRET = 'store-test-secret-value-12345';
 
+const StoreService = require('../src/store/store.service');
+
 async function request(path, options = {}) {
   const url = `${baseUrl}${path}`;
   const res = await fetch(url, {
@@ -74,6 +76,56 @@ describe('Store E-Commerce Endpoints', () => {
     assert.equal(res.data[0].stock, undefined);
     assert.equal(res.data[0].inStock, undefined);
     assert.equal(res.data[0].batches, undefined);
+  });
+
+  test('popular product limit is capped for untrusted query values', async () => {
+    const { Medicine } = require('../models');
+    const originalFindAll = Medicine.findAll;
+    let capturedLimit;
+    Medicine.findAll = async (options) => {
+      capturedLimit = options.limit;
+      return [];
+    };
+    try {
+      await new StoreService().getPopularProducts('999999');
+      assert.equal(capturedLimit, 50);
+    } finally {
+      Medicine.findAll = originalFindAll;
+    }
+  });
+
+  test('price-sorted product filters scan compact chunks and return only the requested page', async () => {
+    const { Medicine } = require('../models');
+    const originalFindAll = Medicine.findAll;
+    const products = [
+      { id: 1, name: 'Aspirin', basePrice: 20, Batches: [] },
+      { id: 2, name: 'Bandage', basePrice: 10, Batches: [] },
+      { id: 3, name: 'Cream', basePrice: 15, Batches: [] },
+    ];
+    const calls = [];
+    Medicine.findAll = async (options) => {
+      calls.push(options);
+      if (options.attributes) {
+        return products.slice(options.offset, options.offset + options.limit)
+          .map((product) => ({ get: () => product }));
+      }
+      const requestedIds = options.where.id[require('sequelize').Op.in];
+      return requestedIds.map((id) => {
+        const product = products.find((candidate) => candidate.id === id);
+        return { id: product.id, get: () => product };
+      });
+    };
+
+    try {
+      const result = await new StoreService().listProducts({ sort: 'price_asc', limit: 2 });
+      assert.deepEqual(result.data.map((product) => product.id), [2, 3]);
+      assert.equal(result.pagination.total, 3);
+      assert.deepEqual(calls[0].attributes, ['id', 'name', 'basePrice']);
+      assert.equal(calls[0].limit, 200);
+      assert.equal(calls[1].limit, undefined);
+    } finally {
+      Medicine.findAll = originalFindAll;
+    }
   });
 
   test('GET /api/products/categories returns categories', async () => {
@@ -383,6 +435,7 @@ describe('Store E-Commerce Endpoints', () => {
         patientPhone: res.data.customer.phone,
         deliveryPreference: 'pickup',
         medications: 'Test prescription',
+        fileData: `data:image/png;base64,${'A'.repeat(1024)}`,
       }),
     });
     assert.equal(prescriptionResponse.status, 201);
@@ -395,8 +448,20 @@ describe('Store E-Commerce Endpoints', () => {
       headers: { Authorization: `Bearer ${res.data.token}` },
     });
     assert.equal(accountPrescriptions.status, 200);
-    assert.ok(accountPrescriptions.data.some(
+    assert.ok(accountPrescriptions.data.data.some(
       (prescription) => prescription.prescriptionNumber === prescriptionResponse.data.prescriptionNumber
     ));
+    const listedPrescription = accountPrescriptions.data.data.find(
+      (prescription) => prescription.prescriptionNumber === prescriptionResponse.data.prescriptionNumber
+    );
+    assert.equal(listedPrescription.imagePath, null);
+    assert.equal(listedPrescription.hasDocument, true);
+
+    const documentResponse = await request(
+      `/api/prescriptions/my/${storedPrescription.id}/document`,
+      { headers: { Authorization: `Bearer ${res.data.token}` } }
+    );
+    assert.equal(documentResponse.status, 200);
+    assert.equal(documentResponse.data.imagePath, `data:image/png;base64,${'A'.repeat(1024)}`);
   });
 });

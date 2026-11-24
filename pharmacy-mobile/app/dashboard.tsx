@@ -78,7 +78,7 @@ async function fetchAllInventoryPages() {
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
 
@@ -272,14 +272,16 @@ export default function DashboardScreen() {
         {/* KPI Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>
-            <StatCard
-              style={styles.statCard}
-              label="Total Stock Value"
-              value={`K ${Math.round(kpis.stockValue).toLocaleString()}`}
-              icon={<DollarSign size={20} color={theme.primary} />}
-              iconBg={theme.primarySoft}
-              trend={{ direction: 'up', value: 'Active assets' }}
-            />
+            {isAdmin && (
+              <StatCard
+                style={styles.statCard}
+                label="Total Stock Value"
+                value={`K ${Math.round(kpis.stockValue).toLocaleString()}`}
+                icon={<DollarSign size={20} color={theme.primary} />}
+                iconBg={theme.primarySoft}
+                trend={{ direction: 'up', value: 'Active assets' }}
+              />
+            )}
             <StatCard
               style={styles.statCard}
               label="Monthly Revenue"

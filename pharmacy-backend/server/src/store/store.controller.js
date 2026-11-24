@@ -85,8 +85,12 @@ class StoreController {
     return this.service.trackPrescription(params.ref);
   }
 
-  getMyPrescriptions(req) {
-    return this.service.getCustomerPrescriptions(req.user);
+  getMyPrescriptions(req, query) {
+    return this.service.getCustomerPrescriptions(req.user, query);
+  }
+
+  getMyPrescriptionDocument(params, req) {
+    return this.service.getCustomerPrescriptionDocument(params.id, req.user);
   }
 
   // Support
@@ -166,7 +170,13 @@ applyParameterDecorator(Param, StoreController.prototype, 'trackPrescription', 0
 
 applyMethodDecorator(Get, StoreController.prototype, 'getMyPrescriptions', 'prescriptions/my');
 applyParameterDecorator(Req, StoreController.prototype, 'getMyPrescriptions', 0);
+applyParameterDecorator(Query, StoreController.prototype, 'getMyPrescriptions', 1);
 applyMethodDecorator(UseGuards, StoreController.prototype, 'getMyPrescriptions', AuthGuard);
+
+applyMethodDecorator(Get, StoreController.prototype, 'getMyPrescriptionDocument', 'prescriptions/my/:id/document');
+applyParameterDecorator(Param, StoreController.prototype, 'getMyPrescriptionDocument', 0);
+applyParameterDecorator(Req, StoreController.prototype, 'getMyPrescriptionDocument', 1);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'getMyPrescriptionDocument', AuthGuard);
 
 // Support inquiry
 applyMethodDecorator(Post, StoreController.prototype, 'createSupportInquiry', 'support/inquiries');

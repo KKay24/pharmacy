@@ -9,7 +9,7 @@ const {
 } = require('@nestjs/common');
 const { randomBytes } = require('node:crypto');
 const { InsufficientStockException, OrderStateException } = require('../common/errors');
-const { Op } = require('sequelize');
+const { Op, col, fn } = require('sequelize');
 const {
   Batch,
   Customer,
@@ -37,7 +37,10 @@ function validatePrescriptionFile(fileData) {
   }
 
   const match = fileData.match(/^data:(image\/(?:jpeg|png)|application\/pdf);base64,([A-Za-z0-9+/]+={0,2})$/);
-  if (!match || Buffer.from(match[2], 'base64').byteLength > 5 * 1024 * 1024) {
+  const encoded = match?.[2];
+  const padding = encoded ? (encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0) : 0;
+  const decodedSize = encoded ? Math.floor(encoded.length * 3 / 4) - padding : 0;
+  if (!match || decodedSize > 5 * 1024 * 1024) {
     throw new BadRequestException('Prescription file must be a PNG, JPEG, or PDF under 5 MB');
   }
   return fileData;
@@ -249,6 +252,10 @@ class StoreService {
       || query.sort === 'price_asc'
       || query.sort === 'price_desc';
 
+    if (requiresDerivedFiltering) {
+      return this.listProductsWithDerivedFilters(where, query, pagination);
+    }
+
     const { count, rows } = await Medicine.findAndCountAll({
       where,
       include: [
@@ -257,32 +264,95 @@ class StoreService {
         { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug'] },
         { model: InventoryCategory, as: 'ProductForm', attributes: ['id', 'name', 'slug'] },
       ],
-      order: requiresDerivedFiltering ? [['name', 'ASC']] : order,
+      order,
       distinct: true,
-      ...(requiresDerivedFiltering ? {} : { limit: pagination.limit, offset: pagination.offset }),
+      limit: pagination.limit,
+      offset: pagination.offset,
     });
 
-    let formattedRows = rows.map(formatProduct);
+    return paginatedResponse(rows.map(formatProduct), count, pagination);
+  }
 
-    if (query.minPrice !== undefined && !isNaN(Number(query.minPrice))) {
-      formattedRows = formattedRows.filter((p) => p.price >= Number(query.minPrice));
-    }
-    if (query.maxPrice !== undefined && !isNaN(Number(query.maxPrice))) {
-      formattedRows = formattedRows.filter((p) => p.price <= Number(query.maxPrice));
-    }
-    if (query.sort === 'price_asc') {
-      formattedRows.sort((a, b) => a.price - b.price || a.name.localeCompare(b.name));
-    } else if (query.sort === 'price_desc') {
-      formattedRows.sort((a, b) => b.price - a.price || a.name.localeCompare(b.name));
+  async listProductsWithDerivedFilters(where, query, pagination) {
+    const isPriceSort = query.sort === 'price_asc' || query.sort === 'price_desc';
+    const maxRetainedRows = pagination.offset + pagination.limit;
+    if (isPriceSort && pagination.offset > 5000) {
+      throw new BadRequestException('Price-sorted product pages cannot exceed the supported depth');
     }
 
-    if (requiresDerivedFiltering) {
-      const total = formattedRows.length;
-      formattedRows = formattedRows.slice(pagination.offset, pagination.offset + pagination.limit);
-      return paginatedResponse(formattedRows, total, pagination);
+    const minPrice = query.minPrice !== undefined && !isNaN(Number(query.minPrice))
+      ? Number(query.minPrice)
+      : null;
+    const maxPrice = query.maxPrice !== undefined && !isNaN(Number(query.maxPrice))
+      ? Number(query.maxPrice)
+      : null;
+    const chunkSize = 200;
+    const pageRows = [];
+    let rankedRows = [];
+    let matchedCount = 0;
+    let offset = 0;
+    const comparePrice = query.sort === 'price_desc'
+      ? (left, right) => right.price - left.price || left.name.localeCompare(right.name)
+      : (left, right) => left.price - right.price || left.name.localeCompare(right.name);
+
+    while (true) {
+      const rows = await Medicine.findAll({
+        where,
+        attributes: ['id', 'name', 'basePrice'],
+        include: [{
+          model: Batch,
+          attributes: ['quantity', 'expiryDate', 'sellingPrice'],
+        }],
+        order: [['name', 'ASC'], ['id', 'ASC']],
+        limit: chunkSize,
+        offset,
+      });
+      if (rows.length === 0) break;
+
+      for (const medicine of rows) {
+        const plain = medicine.get({ plain: true });
+        const price = calculateProductPrice(plain);
+        if ((minPrice !== null && price < minPrice) || (maxPrice !== null && price > maxPrice)) continue;
+
+        if (isPriceSort) {
+          rankedRows.push({ id: plain.id, name: plain.name, price });
+        } else if (matchedCount >= pagination.offset && pageRows.length < pagination.limit) {
+          pageRows.push({ id: plain.id });
+        }
+        matchedCount += 1;
+      }
+
+      if (isPriceSort && rankedRows.length > maxRetainedRows * 2) {
+        rankedRows.sort(comparePrice);
+        rankedRows = rankedRows.slice(0, maxRetainedRows);
+      }
+      if (rows.length < chunkSize) break;
+      offset += rows.length;
     }
 
-    return paginatedResponse(formattedRows, count, pagination);
+    let selectedRows = pageRows;
+    if (isPriceSort) {
+      rankedRows.sort(comparePrice);
+      selectedRows = rankedRows.slice(pagination.offset, pagination.offset + pagination.limit);
+    }
+    if (selectedRows.length === 0) return paginatedResponse([], matchedCount, pagination);
+
+    const ids = selectedRows.map((row) => row.id);
+    const selectedMedicines = await Medicine.findAll({
+      where: { id: { [Op.in]: ids } },
+      include: [
+        { model: Batch },
+        { model: InventoryCategory, as: 'MainCategory', attributes: ['id', 'name', 'slug'] },
+        { model: InventoryCategory, as: 'Subcategory', attributes: ['id', 'name', 'slug'] },
+        { model: InventoryCategory, as: 'ProductForm', attributes: ['id', 'name', 'slug'] },
+      ],
+    });
+    const medicineById = new Map(selectedMedicines.map((medicine) => [Number(medicine.id), medicine]));
+    const formattedRows = ids
+      .map((id) => medicineById.get(Number(id)))
+      .filter(Boolean)
+      .map(formatProduct);
+    return paginatedResponse(formattedRows, matchedCount, pagination);
   }
 
   async getProduct(id) {
@@ -301,10 +371,12 @@ class StoreService {
   }
 
   async getPopularProducts(limit = 8) {
+    const parsedLimit = Number.parseInt(limit, 10);
+    const safeLimit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 50) : 8;
     const medicines = await Medicine.findAll({
       where: { isCustomerVisible: true },
       include: [{ model: Batch }],
-      limit: Number(limit),
+      limit: safeLimit,
     });
     const formatted = medicines.map(formatProduct);
     return formatted;
@@ -960,7 +1032,7 @@ class StoreService {
     };
   }
 
-  async getCustomerPrescriptions(user) {
+  async getCustomerPrescriptions(user, query = {}) {
     if (!user) throw new BadRequestException('Authentication required');
     const customer = await Customer.findOne({ where: { userId: user.id } });
     const where = {};
@@ -969,7 +1041,44 @@ class StoreService {
     } else {
       where.patientName = user.username;
     }
-    return Prescription.findAll({ where, order: [['createdAt', 'DESC']] });
+    const pagination = parsePagination(query);
+    const result = await Prescription.findAndCountAll({
+      where,
+      attributes: {
+        exclude: ['imagePath'],
+        include: [[fn('LENGTH', col('imagePath')), 'documentSize']],
+      },
+      order: [['createdAt', 'DESC']],
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+    const rows = result.rows.map((prescription) => ({
+      ...prescription.get({ plain: true }),
+      imagePath: null,
+      hasDocument: Number(prescription.get('documentSize') || 0) > 0,
+    }));
+    return paginatedResponse(rows, result.count, pagination);
+  }
+
+  async getCustomerPrescriptionDocument(id, user) {
+    if (!user) throw new BadRequestException('Authentication required');
+    const customer = await Customer.findOne({ where: { userId: user.id } });
+    const where = { id };
+    if (customer) {
+      where[Op.or] = [{ customerId: customer.id }, { patientPhone: customer.phone }];
+    } else {
+      where.patientName = user.username;
+    }
+    const prescription = await Prescription.findOne({
+      where,
+      attributes: ['id', 'prescriptionNumber', 'imagePath'],
+    });
+    if (!prescription) throw new NotFoundException('Prescription not found');
+    return {
+      id: prescription.id,
+      prescriptionNumber: prescription.prescriptionNumber,
+      imagePath: prescription.imagePath || null,
+    };
   }
 
   async createSupportInquiry(payload) {

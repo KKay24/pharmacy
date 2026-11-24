@@ -136,7 +136,12 @@ class SalesService {
 
     const requestedName = normalizeIdentityValue(item.name);
     if (!requestedName) throw new BadRequestException('Medicine ID or name is required');
-    const candidates = await Medicine.findAll({ transaction, lock: transaction.LOCK.UPDATE });
+    const candidates = await Medicine.findAll({
+      attributes: ['id', 'name'],
+      raw: true,
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
     const matches = candidates.filter((medicine) => normalizeIdentityValue(medicine.name) === requestedName);
     if (matches.length > 1) {
       throw new BadRequestException('Multiple medicines share this name. Select the medicine before recording a sale.');

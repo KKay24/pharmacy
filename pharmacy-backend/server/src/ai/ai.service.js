@@ -19,6 +19,8 @@ const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const MAX_SESSIONS = 1000;
 const MAX_HISTORY_TURNS = 16; // 8 user + 8 assistant messages
 const MAX_MESSAGE_LENGTH = 1000;
+const MAX_RATE_LIMIT_BUCKETS = 2000;
+const MAX_REQUESTS_PER_BUCKET = 1000;
 
 const VERIFIED_GENERAL_SOURCES = [
   { label: 'World Health Organization (WHO)', url: 'https://www.who.int/health-topics' },
@@ -36,7 +38,7 @@ class AiService {
   getRateLimitConfig() {
     return {
       windowMs: Math.max(Number(process.env.AI_RATE_LIMIT_WINDOW_MS) || 60000, 1000),
-      maxRequests: Math.max(Number(process.env.AI_RATE_LIMIT_MAX) || 15, 1),
+      maxRequests: Math.min(Math.max(Number(process.env.AI_RATE_LIMIT_MAX) || 15, 1), MAX_REQUESTS_PER_BUCKET),
     };
   }
 
@@ -70,15 +72,25 @@ class AiService {
     }
 
     timestamps.push(now);
-    this.rateLimitBuckets.set(key, timestamps);
-
-    // Prevent unbounded bucket growth
-    if (this.rateLimitBuckets.size > 2000) {
+    this.rateLimitBuckets.delete(key);
+    if (!this.rateLimitBuckets.has(key) && this.rateLimitBuckets.size >= MAX_RATE_LIMIT_BUCKETS) {
       for (const [bucketKey, bucketTimes] of this.rateLimitBuckets.entries()) {
         if (!bucketTimes.some((ts) => now - ts < windowMs)) {
           this.rateLimitBuckets.delete(bucketKey);
         }
       }
+      while (this.rateLimitBuckets.size >= MAX_RATE_LIMIT_BUCKETS) {
+        const oldestKey = this.rateLimitBuckets.keys().next().value;
+        if (oldestKey === undefined) break;
+        this.rateLimitBuckets.delete(oldestKey);
+      }
+    }
+    this.rateLimitBuckets.set(key, timestamps);
+
+    while (this.rateLimitBuckets.size > MAX_RATE_LIMIT_BUCKETS) {
+      const oldestKey = this.rateLimitBuckets.keys().next().value;
+      if (oldestKey === undefined) break;
+      this.rateLimitBuckets.delete(oldestKey);
     }
   }
 

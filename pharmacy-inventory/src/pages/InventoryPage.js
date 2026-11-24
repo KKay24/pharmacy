@@ -30,6 +30,7 @@ export default function InventoryPage() {
     predictiveAnalytics = {},
   } = useContext(DataContext);
   const navigate = useNavigate();
+  const isAdmin = userRole === "admin";
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
   const [selectedMedicine, setSelectedMedicine] = useState(null);
@@ -242,12 +243,14 @@ export default function InventoryPage() {
             <span className="inv-health-value">{stats.expired}</span>
           </div>
         </div>
-        <div className="inv-health-card">
-          <div className="inv-health-copy">
-            <span className="inv-health-label">Stock Value</span>
-            <span className="inv-health-value">K{stats.stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+        {isAdmin && (
+          <div className="inv-health-card">
+            <div className="inv-health-copy">
+              <span className="inv-health-label">Stock Value</span>
+              <span className="inv-health-value">K{stats.stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+            </div>
           </div>
-        </div>
+        )}
         <div className="inv-health-actions-card" aria-label="Inventory actions">
           <button className="asm-btn asm-btn-secondary" disabled title="Export data is unavailable">
             <Download size={18} /> Export Data (Unavailable)

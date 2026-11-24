@@ -11,6 +11,7 @@ const PermissionsGuard = require('../auth/permissions.guard');
 class PrescriptionsController {
   constructor(service) { this.service = service; }
   list(query) { return this.service.list(query); }
+  getDocument(params) { return this.service.getDocument(params.id); }
   create(body) { return this.service.create(body); }
   updateStatus(params, body) { return this.service.updateStatus(params.id, body.status); }
 }
@@ -18,13 +19,18 @@ class PrescriptionsController {
 applyClassDecorator(Controller, PrescriptionsController, 'api/prescriptions');
 Inject(PrescriptionsService)(PrescriptionsController, undefined, 0);
 applyMethodDecorator(Get, PrescriptionsController.prototype, 'list');
+applyMethodDecorator(Get, PrescriptionsController.prototype, 'getDocument', ':id/document');
 applyMethodDecorator(Post, PrescriptionsController.prototype, 'create');
 applyMethodDecorator(Put, PrescriptionsController.prototype, 'updateStatus', ':id/status');
 for (const method of ['list', 'create', 'updateStatus']) { applyMethodDecorator(UseGuards, PrescriptionsController.prototype, method, AuthGuard, RolesGuard, PermissionsGuard); Roles('admin', 'manager')(PrescriptionsController.prototype, method); }
+applyMethodDecorator(UseGuards, PrescriptionsController.prototype, 'getDocument', AuthGuard, RolesGuard, PermissionsGuard);
+Roles('admin', 'manager')(PrescriptionsController.prototype, 'getDocument');
 RequirePermissions(Permissions.PRESCRIPTIONS_READ)(PrescriptionsController.prototype, 'list');
+RequirePermissions(Permissions.PRESCRIPTIONS_READ)(PrescriptionsController.prototype, 'getDocument');
 for (const method of ['create', 'updateStatus']) RequirePermissions(Permissions.PRESCRIPTIONS_WRITE)(PrescriptionsController.prototype, method);
 applyParameterDecorator(Body, PrescriptionsController.prototype, 'create', 0);
 applyParameterDecorator(Query, PrescriptionsController.prototype, 'list', 0);
+applyParameterDecorator(Param, PrescriptionsController.prototype, 'getDocument', 0);
 applyParameterDecorator(Param, PrescriptionsController.prototype, 'updateStatus', 0);
 applyParameterDecorator(Body, PrescriptionsController.prototype, 'updateStatus', 1);
 module.exports = PrescriptionsController;

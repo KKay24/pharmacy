@@ -321,6 +321,14 @@ test('health is independent from AI and database diagnostics are separate', asyn
   assert.deepEqual(await database.json(), { status: 'ok', database: 'ok' });
 });
 
+test('low-stock inventory query returns its existing array contract', async () => {
+  const response = await fetch(`${baseUrl}/api/inventory/low-stock`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  assert.equal(response.status, 200);
+  assert.ok(Array.isArray(await response.json()));
+});
+
 test('CORS handles OPTIONS and preserves allowed-origin headers on request errors', async () => {
   const origin = 'https://www.mediquick.online';
   const preflight = await fetch(`${baseUrl}/api/inventory`, {
@@ -369,6 +377,44 @@ test('JSON body limits are small by default and larger only for prescription upl
     body: JSON.stringify({ extra: 'x'.repeat(5 * 1024 * 1024) }),
   });
   assert.equal(largePrescriptionPayload.status, 400);
+});
+
+test('prescription collections omit image payloads and keep document reads separately protected', async () => {
+  const createResponse = await fetch(`${baseUrl}/api/prescriptions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      patientName: 'Memory Test Patient',
+      patientPhone: '+260970000001',
+      prescriptionNumber: `RX-MEM-${Date.now()}`,
+      date: new Date().toISOString().slice(0, 10),
+      imagePath: `data:image/png;base64,${'A'.repeat(1024)}`,
+    }),
+  });
+  assert.equal(createResponse.status, 201);
+  const created = await createResponse.json();
+
+  const listResponse = await fetch(`${baseUrl}/api/prescriptions?limit=100`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  assert.equal(listResponse.status, 200);
+  const listPayload = await listResponse.json();
+  const listed = listPayload.data.find((item) => String(item.id) === String(created.id));
+  assert.ok(listed);
+  assert.equal(listed.imagePath, null);
+  assert.equal(listed.hasDocument, true);
+
+  const documentResponse = await fetch(`${baseUrl}/api/prescriptions/${created.id}/document`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  assert.equal(documentResponse.status, 200);
+  assert.equal((await documentResponse.json()).imagePath, created.imagePath);
+
+  const unauthorizedDocument = await fetch(`${baseUrl}/api/prescriptions/${created.id}/document`);
+  assert.equal(unauthorizedDocument.status, 401);
 });
 
 test('inventory taxonomy is hierarchical and limits forms to the selected subcategory', async () => {

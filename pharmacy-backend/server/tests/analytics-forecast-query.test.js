@@ -29,8 +29,12 @@ test('forecast queries only the sales history required by its configured windows
   const originalMedicineFindAll = Medicine.findAll;
   const originalSalesFindAll = Sales.findAll;
   let salesQuery;
+  let medicineQuery;
 
-  Medicine.findAll = async () => [];
+  Medicine.findAll = async (options) => {
+    medicineQuery = options;
+    return [];
+  };
   Sales.findAll = async (options) => {
     salesQuery = options;
     return [];
@@ -59,10 +63,57 @@ test('forecast queries only the sales history required by its configured windows
     assert.equal(salesQuery.where.date[Op.gte], expectedDate);
     assert.equal(salesQuery.where.date[Op.lt], expectedEnd);
     assert.equal(salesQuery.where.saleStatus[Op.ne], 'REVERSED');
+    assert.deepEqual(medicineQuery.attributes, ['id', 'name', 'genericName', 'category', 'lowStockThreshold']);
+    assert.ok(!medicineQuery.attributes.includes('imageUrl'));
+    assert.deepEqual(salesQuery.attributes, ['medicineId', 'name', 'date', 'quantity']);
   } finally {
     Medicine.findAll = originalMedicineFindAll;
     Sales.findAll = originalSalesFindAll;
   }
+});
+
+test('concurrent analytics endpoints reuse the same in-flight forecast snapshot', async () => {
+  const originalMedicineFindAll = Medicine.findAll;
+  const originalSalesFindAll = Sales.findAll;
+  let medicineQueries = 0;
+  let salesQueries = 0;
+  Medicine.findAll = async () => {
+    medicineQueries += 1;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return [];
+  };
+  Sales.findAll = async () => {
+    salesQueries += 1;
+    return [];
+  };
+
+  try {
+    const service = new AnalyticsService();
+    await Promise.all([service.predictions({}), service.risks({}), service.reorderSuggestions({})]);
+    assert.equal(medicineQueries, 1);
+    assert.equal(salesQueries, 1);
+    assert.equal(service.inFlightJobs.size, 0);
+    assert.equal(service.activeJobs, 0);
+  } finally {
+    Medicine.findAll = originalMedicineFindAll;
+    Sales.findAll = originalSalesFindAll;
+  }
+});
+
+test('analytics limits concurrent distinct heavy jobs', async () => {
+  const service = new AnalyticsService();
+  service.maxConcurrentJobs = 1;
+  let releaseFirst;
+  const first = service.runHeavyJob('first', () => new Promise((resolve) => { releaseFirst = resolve; }));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.throws(
+    () => service.runHeavyJob('second', async () => 'unused'),
+    (error) => error.getStatus() === 503
+  );
+  releaseFirst('done');
+  assert.equal(await first, 'done');
+  assert.equal(service.activeJobs, 0);
 });
 
 test('analytics read failures are logged safely and remain request-scoped', async () => {

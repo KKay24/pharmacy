@@ -1,4 +1,5 @@
 const { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } = require('@nestjs/common');
+const { col, fn } = require('sequelize');
 const { Prescription, Customer } = require('../../models');
 const { paginatedResponse, parsePagination } = require('../common/pagination');
 
@@ -6,9 +7,35 @@ class PrescriptionsService {
   async list(query) {
     try {
       const pagination = parsePagination(query);
-      const result = await Prescription.findAndCountAll({ include: [Customer], order: [['date', 'DESC']], distinct: true, limit: pagination.limit, offset: pagination.offset });
-      return paginatedResponse(result.rows, result.count, pagination);
+      const result = await Prescription.findAndCountAll({
+        attributes: {
+          exclude: ['imagePath'],
+          include: [[fn('LENGTH', col('imagePath')), 'documentSize']],
+        },
+        include: [Customer],
+        order: [['date', 'DESC']],
+        distinct: true,
+        limit: pagination.limit,
+        offset: pagination.offset,
+      });
+      const rows = result.rows.map((prescription) => ({
+        ...prescription.get({ plain: true }),
+        imagePath: null,
+        hasDocument: Number(prescription.get('documentSize') || 0) > 0,
+      }));
+      return paginatedResponse(rows, result.count, pagination);
     } catch { throw new InternalServerErrorException('Failed to fetch prescriptions'); }
+  }
+  async getDocument(id) {
+    const prescription = await Prescription.findByPk(id, {
+      attributes: ['id', 'prescriptionNumber', 'imagePath'],
+    });
+    if (!prescription) throw new NotFoundException('Prescription not found');
+    return {
+      id: prescription.id,
+      prescriptionNumber: prescription.prescriptionNumber,
+      imagePath: prescription.imagePath || null,
+    };
   }
   async create(body) { try { return await Prescription.create(body); } catch { throw new BadRequestException('Failed to create prescription'); } }
   async updateStatus(id, status) {
