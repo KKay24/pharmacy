@@ -81,6 +81,8 @@ BACKEND_API_URL=<BACKEND_API_BASE_URL>
 
 Set `BACKEND_API_URL` in each Vercel environment that should reach the API (Production and any approved Preview environment). Leave `REACT_APP_API_BASE_URL` unset on Vercel; the browser client ignores direct backend base URLs outside local development and routes through the same-origin proxy. In local development set `REACT_APP_API_BASE_URL=http://localhost:5001` (or the appropriate local API URL).
 
+Vercel applies a Content Security Policy from `pharmacy-inventory/vercel.json`. It does not allow JavaScript `unsafe-eval` or inline scripts. Inline styles are permitted because the existing React UI uses style props; this does not enable JavaScript execution. Google Fonts, Unsplash images, and the version-pinned Tesseract worker/core and English OCR data are explicitly allowed. The `wasm-unsafe-eval` source permits WebAssembly compilation for OCR only; it does not permit JavaScript `eval()` or `new Function()`. If those integrations or package versions change, update and verify the corresponding CSP sources before deployment.
+
 Backend-only packages for the non-canonical legacy server are declared in `pharmacy-inventory/server/package.json`, not in the web client manifest. To run that legacy server manually, install its dependencies from that directory; Vercel's web build does not install them.
 
 The repository README identifies the web package as a Create React App project. Validate the production build with `npm run build` from `pharmacy-inventory` before deployment.

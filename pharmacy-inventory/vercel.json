@@ -3,6 +3,15 @@
   "version": 2,
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/tesseract.js@v7.0.0/dist/worker.min.js https://cdn.jsdelivr.net/npm/tesseract.js-core@v7.0.0/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://images.unsplash.com; media-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int/; worker-src 'self' blob:; manifest-src 'self'; frame-src 'none'"
+        }
+      ]
+    },
+    {
       "source": "/service-worker.js",
       "headers": [
         {
