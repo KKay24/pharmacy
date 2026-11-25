@@ -113,7 +113,14 @@ export default function LoginPage({ staffMode = false, heroBanners = HERO_BANNER
       const data = await response.json();
       toast.success(`Welcome back, ${data.user?.username || "Staff"}`, { id: toastId });
       loginUser(data);
-      navigate(data.user?.role === "admin" || data.user?.role === "manager" ? "/dashboard" : "/pos");
+      const requestedPath = location.state?.from?.pathname;
+      const fallbackPath = data.user?.role === "admin" || data.user?.role === "manager"
+        ? "/dashboard"
+        : "/pos";
+      const safeRequestedPath = requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+        ? requestedPath
+        : fallbackPath;
+      navigate(safeRequestedPath, { replace: true });
     } catch (error) {
       console.error("Login error", error);
       toast.error(getNetworkErrorMessage(error), { id: toastId });

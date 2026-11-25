@@ -1,21 +1,22 @@
-import React, { useContext } from "react";
-import { Navigate } from "react-router-dom";
-import { DataContext } from "../context/DataContext";
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import useStaffSession from "../hooks/useStaffSession";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { userRole } = useContext(DataContext);
+  const { role, isStaff } = useStaffSession();
+  const location = useLocation();
 
-  // If there's no role yet (or they are completely logged out/session expired)
-  if (!userRole) {
-    return <Navigate to="/staff/login" replace />;
+  if (!isStaff) {
+    if (role === "customer") {
+      return <Navigate to="/" replace />;
+    }
+    return <Navigate to="/staff/login" replace state={{ from: location }} />;
   }
 
-  // If their role is not in the allowed list, send them to POS (or a generic safe page)
-  if (!allowedRoles.includes(userRole)) {
+  if (!allowedRoles.includes(role)) {
     return <Navigate to="/pos" replace />;
   }
 
-  // Otherwise, render the requested component
   return children;
 };
 

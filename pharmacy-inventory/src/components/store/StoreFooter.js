@@ -1,8 +1,13 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Shield, Truck } from "lucide-react";
+import useStaffSession from "../../hooks/useStaffSession";
+import { getStaffWorkspacePath } from "../../utils/staffAccess";
 
 export default function StoreFooter() {
+  const { role, isStaff } = useStaffSession();
+  const staffWorkspacePath = isStaff ? getStaffWorkspacePath(role) : null;
+
   return (
     <footer className="store-footer">
       <div className="store-footer__top">
@@ -41,7 +46,7 @@ export default function StoreFooter() {
           <h4>Pharmacy</h4>
           <ul>
             <li><Link to="/about">About MediQuick</Link></li>
-            <li><Link to="/staff/login">Staff sign in</Link></li>
+            {staffWorkspacePath && <li><Link to={staffWorkspacePath}>Staff Workspace</Link></li>}
             <li><Link to="/account">Order history</Link></li>
           </ul>
         </div>
