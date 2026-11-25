@@ -6,7 +6,13 @@ export interface InventoryBatch {
   expiryDate?: string | null;
   receivedDate?: string | null;
   createdAt?: string | null;
+  status?: string | null;
 }
+
+const INACTIVE_BATCH_STATUSES = new Set(['archived', 'deleted']);
+
+const isInactiveBatch = (batch: InventoryBatch) =>
+  INACTIVE_BATCH_STATUSES.has(String(batch.status || '').toLowerCase());
 
 const toNumber = (value: number | string | null | undefined) => {
   const numericValue = Number(value);
@@ -29,7 +35,10 @@ export const getMedicineBatches = (value: unknown) => {
   }
 
   return [...value]
-    .filter((batch): batch is InventoryBatch => typeof batch === 'object' && batch !== null)
+    .filter(
+      (batch): batch is InventoryBatch =>
+        typeof batch === 'object' && batch !== null && !isInactiveBatch(batch)
+    )
     .sort((left, right) => {
       const timestampDifference = getBatchTimestamp(left) - getBatchTimestamp(right);
       if (timestampDifference !== 0) {
@@ -55,7 +64,10 @@ export const getMedicineCurrentPrice = (batches: InventoryBatch[]) => {
 // cost uses the first batch's cost rather than being treated as zero value.
 export const getMedicineStockValue = (value: unknown) => {
   const batches = Array.isArray(value)
-    ? value.filter((batch): batch is InventoryBatch => typeof batch === 'object' && batch !== null)
+    ? value.filter(
+        (batch): batch is InventoryBatch =>
+          typeof batch === 'object' && batch !== null && !isInactiveBatch(batch)
+      )
     : [];
   const fallbackCost = Number(batches[0]?.costPrice || 0);
 
@@ -78,7 +90,11 @@ export const resolveProductImageUrl = (
     return null;
   }
 
-  if (/^(https?:\/\/|data:image\/)/i.test(trimmed)) {
+  if (/^data:image\//i.test(trimmed)) {
+    return trimmed.replace(/\s+/g, '');
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
     return trimmed;
   }
 
@@ -86,8 +102,14 @@ export const resolveProductImageUrl = (
     return `https:${trimmed}`;
   }
 
-  if (trimmed.startsWith('/') && apiBaseUrl) {
-    return `${apiBaseUrl.replace(/\/+$/, '')}${trimmed}`;
+  if (apiBaseUrl) {
+    const cleanBase = apiBaseUrl.replace(/\/+$/, '');
+    if (trimmed.startsWith('/')) {
+      return `${cleanBase}${trimmed}`;
+    }
+    if (/^(api\/|uploads\/|images\/)/i.test(trimmed)) {
+      return `${cleanBase}/${trimmed}`;
+    }
   }
 
   return trimmed;

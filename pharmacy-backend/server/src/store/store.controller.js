@@ -8,6 +8,7 @@ const {
   Put,
   Query,
   Req,
+  Res,
   UseGuards,
 } = require('@nestjs/common');
 const StoreService = require('./store.service');
@@ -53,6 +54,10 @@ class StoreController {
 
   getProductAlternatives(params) {
     return this.service.getProductAlternatives(params.id);
+  }
+
+  getProductImage(params, req, res) {
+    return this.service.getProductImage(params.id, req, res);
   }
 
   getProduct(params) {
@@ -132,6 +137,11 @@ applyParameterDecorator(Body, StoreController.prototype, 'recordSearchClick', 0)
 
 applyMethodDecorator(Get, StoreController.prototype, 'getProductAlternatives', 'products/:id/alternatives');
 applyParameterDecorator(Param, StoreController.prototype, 'getProductAlternatives', 0);
+
+applyMethodDecorator(Get, StoreController.prototype, 'getProductImage', 'products/:id/image');
+applyParameterDecorator(Param, StoreController.prototype, 'getProductImage', 0);
+applyParameterDecorator(Req, StoreController.prototype, 'getProductImage', 1);
+applyParameterDecorator(Res, StoreController.prototype, 'getProductImage', 2);
 
 applyMethodDecorator(Get, StoreController.prototype, 'getProduct', 'products/:id');
 applyParameterDecorator(Param, StoreController.prototype, 'getProduct', 0);

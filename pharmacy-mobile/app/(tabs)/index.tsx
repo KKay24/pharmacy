@@ -244,7 +244,7 @@ export default function HomeScreen() {
       }
 
       try {
-        let url = `/api/products?page=${targetPage}&limit=${PAGE_LIMIT}`;
+        let url = `/api/products?page=${targetPage}&limit=${PAGE_LIMIT}&compactImages=true`;
         if (selectedCategory && selectedCategory !== 'all') {
           if (selectedCategory === 'prescriptions') {
             url += '&prescriptionRequired=true';

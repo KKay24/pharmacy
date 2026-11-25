@@ -30,6 +30,7 @@ const {
 } = require('./contact-validation');
 const searchService = require('./search.service');
 const { activeBatchWhere, isBatchInactive, resolveBatchStatus } = require('../inventory/batch-utils');
+const { parseImageDataUri, toCompactProductImageUrl } = require('../inventory/image-utils');
 
 function validatePrescriptionFile(fileData) {
   if (!fileData) return null;
@@ -69,9 +70,12 @@ function calculateProductPrice(medicine) {
   return Number(medicine.basePrice || 0);
 }
 
-function formatProduct(medicine) {
+function formatProduct(medicine, options = {}) {
   const plain = typeof medicine.get === 'function' ? medicine.get({ plain: true }) : medicine;
   const price = calculateProductPrice(plain);
+  const imageUrl = options.compactImages
+    ? toCompactProductImageUrl(plain)
+    : plain.imageUrl;
 
   return {
     id: plain.id,
@@ -82,7 +86,7 @@ function formatProduct(medicine) {
     strength: plain.strength,
     dosage: plain.dosage,
     manufacturer: plain.manufacturer,
-    imageUrl: plain.imageUrl,
+    imageUrl,
     description: plain.description,
     warnings: plain.warnings,
     packSize: plain.packSize,
@@ -101,6 +105,7 @@ function formatProduct(medicine) {
 class StoreService {
   async listProducts(query = {}) {
     const pagination = parsePagination(query);
+    const compactImages = String(query.compactImages || '').toLowerCase() === 'true';
 
     if (query.search) {
       const searchResult = await searchService.searchProducts({
@@ -141,7 +146,7 @@ class StoreService {
         }
 
         let formatted = scoredItems.map(({ medicine, score, matchType }) => ({
-          ...formatProduct(medicine),
+          ...formatProduct(medicine, { compactImages }),
           searchScore: score,
           searchMatchType: matchType,
         }));
@@ -274,7 +279,11 @@ class StoreService {
       offset: pagination.offset,
     });
 
-    return paginatedResponse(rows.map(formatProduct), count, pagination);
+    return paginatedResponse(
+      rows.map((medicine) => formatProduct(medicine, { compactImages })),
+      count,
+      pagination
+    );
   }
 
   async listProductsWithDerivedFilters(where, query, pagination) {
@@ -353,12 +362,52 @@ class StoreService {
         { model: InventoryCategory, as: 'ProductForm', attributes: ['id', 'name', 'slug'] },
       ],
     });
+    const compactImages = String(query.compactImages || '').toLowerCase() === 'true';
     const medicineById = new Map(selectedMedicines.map((medicine) => [Number(medicine.id), medicine]));
     const formattedRows = ids
       .map((id) => medicineById.get(Number(id)))
       .filter(Boolean)
-      .map(formatProduct);
+      .map((medicine) => formatProduct(medicine, { compactImages }));
     return paginatedResponse(formattedRows, matchedCount, pagination);
+  }
+
+  async getProductImage(id, req, res) {
+    const medicineId = Number(id);
+    if (!Number.isInteger(medicineId) || medicineId <= 0) {
+      throw new NotFoundException('Product image not found');
+    }
+
+    const medicine = await Medicine.findByPk(medicineId, {
+      attributes: ['id', 'imageUrl', 'updatedAt'],
+    });
+    if (!medicine || typeof medicine.imageUrl !== 'string' || !medicine.imageUrl.trim()) {
+      throw new NotFoundException('Product image not found');
+    }
+
+    const rawUrl = medicine.imageUrl.trim();
+    if (/^https?:\/\//i.test(rawUrl)) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      return res.redirect(302, rawUrl);
+    }
+
+    const parsed = parseImageDataUri(rawUrl);
+    if (!parsed) {
+      throw new NotFoundException('Product image not found');
+    }
+
+    res.setHeader('Content-Type', parsed.contentType);
+    res.setHeader('Content-Length', String(parsed.buffer.length));
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('ETag', parsed.etag);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    if (req?.headers?.['if-none-match'] === parsed.etag) {
+      return res.status(304).end();
+    }
+
+    return res.status(200).send(parsed.buffer);
   }
 
   async getProduct(id) {

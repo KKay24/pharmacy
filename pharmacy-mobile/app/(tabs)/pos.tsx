@@ -119,7 +119,7 @@ export default function PosScreen() {
     try {
       setFetching(true);
       const [firstInvRes, catRes, custRes] = await Promise.allSettled([
-        apiClient.get('/api/inventory?page=1&limit=100'),
+        apiClient.get('/api/inventory?page=1&limit=100&compactImages=true'),
         apiClient.get('/api/inventory/categories'),
         apiClient.get('/api/customers'),
       ]);
@@ -132,16 +132,20 @@ export default function PosScreen() {
         const totalPages = Number(firstData?.pagination?.totalPages) || 1;
 
         if (totalPages > 1) {
-          const pagePromises = [];
-          for (let p = 2; p <= totalPages; p++) {
-            pagePromises.push(apiClient.get(`/api/inventory?page=${p}&limit=100`));
-          }
-          const results = await Promise.allSettled(pagePromises);
-          for (const res of results) {
-            if (res.status === 'fulfilled') {
-              const pageData = res.value.data;
-              const rows = Array.isArray(pageData) ? pageData : pageData?.data || [];
-              allRows.push(...rows);
+          for (let startPage = 2; startPage <= totalPages; startPage += 2) {
+            const chunk = [startPage];
+            if (startPage + 1 <= totalPages) {
+              chunk.push(startPage + 1);
+            }
+            const results = await Promise.allSettled(
+              chunk.map((p) => apiClient.get(`/api/inventory?page=${p}&limit=100&compactImages=true`))
+            );
+            for (const res of results) {
+              if (res.status === 'fulfilled') {
+                const pageData = res.value.data;
+                const rows = Array.isArray(pageData) ? pageData : pageData?.data || [];
+                allRows.push(...rows);
+              }
             }
           }
         }
@@ -485,6 +489,7 @@ export default function PosScreen() {
         {/* Product Grid */}
         <FlatList
           data={filteredMedicines}
+          extraData={failedImageIds}
           numColumns={2}
           keyExtractor={(item) => String(item.id)}
           refreshControl={
@@ -523,11 +528,17 @@ export default function PosScreen() {
                       source={{ uri: item.imageUrl }}
                       style={styles.productImage}
                       resizeMode="contain"
-                      onError={() =>
+                      onError={(event) => {
+                        if (__DEV__) {
+                          console.warn(
+                            `[POS] Failed to load image for product #${item.id} (${item.name}):`,
+                            event?.nativeEvent?.error
+                          );
+                        }
                         setFailedImageIds((prev) =>
                           prev[item.id] ? prev : { ...prev, [item.id]: true }
-                        )
-                      }
+                        );
+                      }}
                     />
                   ) : (
                     <Pill size={36} color={theme.primary} strokeWidth={1.8} />
@@ -930,7 +941,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   productVisual: {
-    height: 90,
+    width: '100%',
+    height: 96,
     borderRadius: layout.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -939,6 +951,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   productImage: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     width: '100%',
     height: '100%',
   },

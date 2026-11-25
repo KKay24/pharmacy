@@ -22,6 +22,7 @@ const {
   reserveUniqueBatchNumberCandidate,
   resolveBatchStatus,
 } = require('./batch-utils');
+const { toCompactProductImageUrl } = require('./image-utils');
 const { DuplicateResourceException } = require('../common/errors');
 
 const MEDICINE_UPDATE_FIELDS = [
@@ -400,6 +401,7 @@ class InventoryService {
     }
 
     const includeArchived = String(query.includeArchived || '').toLowerCase() === 'true';
+    const compactImages = String(query.compactImages || '').toLowerCase() === 'true';
     const result = await Medicine.findAndCountAll({
       where,
       order: [['name', 'ASC']],
@@ -415,7 +417,16 @@ class InventoryService {
       limit: pagination.limit,
       offset: pagination.offset,
     });
-    return paginatedResponse(result.rows, result.count, pagination);
+    const rows = compactImages
+      ? result.rows.map((row) => {
+          const plain = row.get({ plain: true });
+          return {
+            ...plain,
+            imageUrl: toCompactProductImageUrl(plain),
+          };
+        })
+      : result.rows;
+    return paginatedResponse(rows, result.count, pagination);
   }
 
   async lowStock() {
