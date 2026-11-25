@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.mediquick.pharmacymobile",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -31,6 +31,13 @@
       "expo-secure-store",
       "expo-font",
       "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow MediQuick Pharmacy to access your photo library so you can attach prescription photos.",
+          "cameraPermission": "Allow MediQuick Pharmacy to use your camera to take a photo of your written prescription."
+        }
+      ],
       "./plugins/withAndroidCleartextTraffic",
       [
         "expo-splash-screen",

@@ -38,14 +38,24 @@ function validatePrescriptionFile(fileData) {
     throw new BadRequestException('Prescription file must be a supported image or PDF');
   }
 
-  const match = fileData.match(/^data:(image\/(?:jpeg|png)|application\/pdf);base64,([A-Za-z0-9+/]+={0,2})$/);
-  const encoded = match?.[2];
-  const padding = encoded ? (encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0) : 0;
-  const decodedSize = encoded ? Math.floor(encoded.length * 3 / 4) - padding : 0;
-  if (!match || decodedSize > 5 * 1024 * 1024) {
+  const headerMatch = fileData.trim().match(/^data:(image\/(?:jpe?g|png)|application\/pdf);base64,([\s\S]+)$/i);
+  if (!headerMatch) {
     throw new BadRequestException('Prescription file must be a PNG, JPEG, or PDF under 5 MB');
   }
-  return fileData;
+
+  const rawMime = headerMatch[1].toLowerCase();
+  const normalizedMime = rawMime === 'image/jpg' ? 'image/jpeg' : rawMime;
+  const encoded = headerMatch[2].replace(/\s+/g, '');
+  if (!encoded || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+    throw new BadRequestException('Prescription file must be a PNG, JPEG, or PDF under 5 MB');
+  }
+
+  const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0;
+  const decodedSize = Math.floor(encoded.length * 3 / 4) - padding;
+  if (decodedSize <= 0 || decodedSize > 5 * 1024 * 1024) {
+    throw new BadRequestException('Prescription file must be a PNG, JPEG, or PDF under 5 MB');
+  }
+  return `data:${normalizedMime};base64,${encoded}`;
 }
 
 function calculateProductPrice(medicine) {

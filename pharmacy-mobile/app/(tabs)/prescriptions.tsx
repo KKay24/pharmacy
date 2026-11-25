@@ -85,7 +85,7 @@ export default function PrescriptionsTabScreen() {
       {/* Quick Action 2: Track */}
       <TouchableOpacity
         style={styles.actionCard}
-        onPress={() => router.push('/track-order')}
+        onPress={() => router.push({ pathname: '/prescription-upload', params: { tab: 'track' } })}
       >
         <View style={[styles.actionIconCircle, { backgroundColor: '#eff6ff' }]}>
           <Search size={24} color="#3b82f6" />
@@ -93,7 +93,7 @@ export default function PrescriptionsTabScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.actionTitle}>Track Prescription Status</Text>
           <Text style={styles.actionDesc}>
-            Check the dispensing progress of your submitted prescription using your order number.
+            Check the dispensing progress of your submitted prescription using your prescription reference (e.g. RX-123456).
           </Text>
         </View>
         <ChevronRight size={20} color="#94a3b8" />

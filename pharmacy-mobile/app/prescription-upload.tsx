@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,13 +9,22 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { File as ExpoFile } from 'expo-file-system';
 import {
   UploadCloud,
   Search,
   CheckCircle,
   Camera,
+  Image as ImageIcon,
+  FileText,
+  Trash2,
   ChevronRight,
   Truck,
   Store,
@@ -26,15 +35,47 @@ import { useTheme } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
 import { ERROR_MESSAGES, resolveMobileErrorMessage } from '../utils/errorMessages';
+import {
+  MAX_PRESCRIPTION_FILE_BYTES,
+  PrescriptionTrackResult,
+  SelectedPrescriptionAttachment,
+  buildPrescriptionFileDataUri,
+  buildPrescriptionUploadPayload,
+  extractPrescriptionTrackError,
+  formatDeliveryPreferenceLabel,
+  formatFileSize,
+} from '../utils/prescriptionUpload';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 
+async function readWebFileAsDataUri(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Unable to read selected file.'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Unable to read selected file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function readNativeUriAsBase64(uri: string): Promise<string> {
+  const file = new ExpoFile(uri);
+  return file.base64();
+}
+
 export default function PrescriptionUploadScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const params = useLocalSearchParams<{ tab?: string; ref?: string }>();
 
-  const [activeTab, setActiveTab] = useState<'upload' | 'track'>('upload');
+  const initialTab: 'upload' | 'track' = params.tab === 'track' ? 'track' : 'upload';
+  const [activeTab, setActiveTab] = useState<'upload' | 'track'>(initialTab);
 
   // Form states
   const [patientName, setPatientName] = useState(user?.username || '');
@@ -44,16 +85,190 @@ export default function PrescriptionUploadScreen() {
   const [deliveryPreference, setDeliveryPreference] = useState<'delivery' | 'pickup'>('delivery');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [notes, setNotes] = useState('');
-  const [fileSimulated, setFileSimulated] = useState(false);
+  const [attachment, setAttachment] = useState<SelectedPrescriptionAttachment | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [pickingFile, setPickingFile] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ prescriptionNumber: string } | null>(null);
 
   // Track tab states
-  const [trackRef, setTrackRef] = useState('');
+  const [trackRef, setTrackRef] = useState(typeof params.ref === 'string' ? params.ref : '');
   const [tracking, setTracking] = useState(false);
-  const [trackResult, setTrackResult] = useState<any | null>(null);
+  const [trackResult, setTrackResult] = useState<PrescriptionTrackResult | null>(null);
   const [trackError, setTrackError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (params.tab === 'track') {
+      setActiveTab('track');
+    } else if (params.tab === 'upload') {
+      setActiveTab('upload');
+    }
+  }, [params.tab]);
+
+  useEffect(() => {
+    if (typeof params.ref === 'string' && params.ref.trim()) {
+      setTrackRef(params.ref.trim());
+    }
+  }, [params.ref]);
+
+  const applyPickedImage = async (asset: ImagePicker.ImagePickerAsset) => {
+    setAttachmentError(null);
+    const fileName = asset.fileName || `prescription_${Date.now()}.jpg`;
+
+    if (typeof asset.fileSize === 'number' && asset.fileSize > MAX_PRESCRIPTION_FILE_BYTES) {
+      setAttachmentError('Selected photo exceeds the 5 MB limit. Please take a lower-resolution photo.');
+      return;
+    }
+
+    let base64 = asset.base64 ?? null;
+    if (!base64 && Platform.OS !== 'web' && asset.uri) {
+      base64 = await readNativeUriAsBase64(asset.uri);
+    }
+
+    const built = buildPrescriptionFileDataUri({
+      base64,
+      dataUri: asset.uri?.startsWith('data:') ? asset.uri : null,
+      mimeType: asset.mimeType,
+      fileName,
+      byteSize: asset.fileSize,
+    });
+
+    if (!built.ok) {
+      setAttachmentError(built.error);
+      return;
+    }
+
+    setAttachment({
+      uri: asset.uri,
+      fileName,
+      mimeType: built.mimeType,
+      byteSize: built.byteSize,
+      fileData: built.fileData,
+      isImage: built.isImage,
+    });
+  };
+
+  const handleTakePhoto = async () => {
+    setAttachmentError(null);
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Camera Permission Needed',
+          'Please allow camera access in your device settings to photograph your prescription.'
+        );
+        return;
+      }
+
+      setPickingFile(true);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.75,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets?.[0]) {
+        await applyPickedImage(result.assets[0]);
+      }
+    } catch {
+      setAttachmentError('Unable to open the camera. Please try choosing an image or PDF instead.');
+    } finally {
+      setPickingFile(false);
+    }
+  };
+
+  const handleChoosePhoto = async () => {
+    setAttachmentError(null);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Photo Library Permission Needed',
+          'Please allow photo library access in your device settings to select a prescription photo.'
+        );
+        return;
+      }
+
+      setPickingFile(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets?.[0]) {
+        await applyPickedImage(result.assets[0]);
+      }
+    } catch {
+      setAttachmentError('Unable to open your photo library. Please try again.');
+    } finally {
+      setPickingFile(false);
+    }
+  };
+
+  const handleChooseDocument = async () => {
+    setAttachmentError(null);
+    try {
+      setPickingFile(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets?.[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (typeof asset.size === 'number' && asset.size > MAX_PRESCRIPTION_FILE_BYTES) {
+        setAttachmentError('Prescription file must be 5 MB or smaller. Please select a smaller file.');
+        return;
+      }
+
+      let base64: string | null = asset.base64 ?? null;
+      let dataUri: string | null = null;
+
+      if (!base64) {
+        if (Platform.OS === 'web' && asset.file) {
+          dataUri = await readWebFileAsDataUri(asset.file);
+        } else if (asset.uri.startsWith('data:')) {
+          dataUri = asset.uri;
+        } else {
+          base64 = await readNativeUriAsBase64(asset.uri);
+        }
+      }
+
+      const built = buildPrescriptionFileDataUri({
+        base64,
+        dataUri,
+        mimeType: asset.mimeType,
+        fileName: asset.name,
+        byteSize: asset.size,
+      });
+
+      if (!built.ok) {
+        setAttachmentError(built.error);
+        return;
+      }
+
+      setAttachment({
+        uri: asset.uri,
+        fileName: asset.name,
+        mimeType: built.mimeType,
+        byteSize: built.byteSize,
+        fileData: built.fileData,
+        isImage: built.isImage,
+      });
+    } catch {
+      setAttachmentError('Unable to read the selected document. Please choose a valid JPG, PNG, or PDF.');
+    } finally {
+      setPickingFile(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!patientName.trim()) {
@@ -67,19 +282,19 @@ export default function PrescriptionUploadScreen() {
 
     setSubmitting(true);
     try {
-      const payload = {
-        patientName: patientName.trim(),
-        patientPhone: patientPhone.trim(),
-        doctorName: doctorName.trim() || undefined,
-        medications: medications.trim() || undefined,
+      const payload = buildPrescriptionUploadPayload({
+        patientName,
+        patientPhone,
+        doctorName,
+        medications,
         deliveryPreference,
-        deliveryAddress: deliveryPreference === 'delivery' ? deliveryAddress.trim() : undefined,
-        notes: notes.trim() || undefined,
-        fileName: fileSimulated ? 'prescription_scan.jpg' : undefined,
-      };
+        deliveryAddress,
+        notes,
+        attachment,
+      });
 
       const res = await apiClient.post('/api/prescriptions/upload', payload);
-      const data = res.data;
+      const data = res.data as { prescriptionNumber?: string; referenceNumber?: string };
       const rxNum =
         data.prescriptionNumber ||
         data.referenceNumber ||
@@ -98,8 +313,9 @@ export default function PrescriptionUploadScreen() {
     }
   };
 
-  const handleTrack = async () => {
-    if (!trackRef.trim()) {
+  const handleTrack = async (overrideRef?: string) => {
+    const queryRef = (overrideRef ?? trackRef).trim();
+    if (!queryRef) {
       setTrackError('Please enter your prescription tracking reference.');
       return;
     }
@@ -109,16 +325,12 @@ export default function PrescriptionUploadScreen() {
     setTrackResult(null);
 
     try {
-      const res = await apiClient.get(
-        `/api/prescriptions/track/${encodeURIComponent(trackRef.trim())}`
+      const res = await apiClient.get<PrescriptionTrackResult>(
+        `/api/prescriptions/track/${encodeURIComponent(queryRef)}`
       );
       setTrackResult(res.data);
-    } catch (e: any) {
-      setTrackError(
-        e.response?.data?.error ||
-          e.message ||
-          'No prescription found matching that reference code.'
-      );
+    } catch (e: unknown) {
+      setTrackError(extractPrescriptionTrackError(e));
     } finally {
       setTracking(false);
     }
@@ -132,7 +344,8 @@ export default function PrescriptionUploadScreen() {
     setMedications('');
     setDeliveryAddress('');
     setNotes('');
-    setFileSimulated(false);
+    setAttachment(null);
+    setAttachmentError(null);
   };
 
   return (
@@ -196,7 +409,7 @@ export default function PrescriptionUploadScreen() {
                   Prescription Received!
                 </Text>
                 <Text style={[styles.successSub, { color: colors.textMuted }]}>
-                  Our licensed pharmacist will review the medication request, check inventory, and contact you via phone or WhatsApp.
+                  Our licensed pharmacist will review your prescription, check inventory, and contact you via phone or WhatsApp.
                 </Text>
 
                 <View style={[styles.refBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
@@ -214,9 +427,11 @@ export default function PrescriptionUploadScreen() {
                     variant="primary"
                     leftIcon={<Search size={16} color="#ffffff" />}
                     onPress={() => {
-                      setTrackRef(submitResult.prescriptionNumber);
+                      const refCode = submitResult.prescriptionNumber;
+                      setTrackRef(refCode);
                       setActiveTab('track');
                       setSubmitResult(null);
+                      void handleTrack(refCode);
                     }}
                   />
                   <Button
@@ -297,36 +512,125 @@ export default function PrescriptionUploadScreen() {
                   />
                 </Card>
 
-                {/* Prescription Image Upload Area */}
+                {/* Prescription Document / Photo Picker */}
                 <Card style={styles.formCard}>
                   <Text style={[styles.sectionHeading, { color: colors.text }]}>
                     Prescription Document / Photo
                   </Text>
+                  <Text style={[styles.fieldSub, { color: colors.textMuted, marginBottom: 12 }]}>
+                    Attach a clear photo or PDF of your written prescription (JPG, PNG, or PDF up to 5 MB).
+                  </Text>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.uploadZone,
-                      {
-                        backgroundColor: fileSimulated ? colors.success + '10' : colors.surfaceMuted,
-                        borderColor: fileSimulated ? colors.success : colors.border,
-                      },
-                    ]}
-                    onPress={() => setFileSimulated(!fileSimulated)}
-                  >
-                    {fileSimulated ? (
-                      <CheckCircle size={40} color={colors.success} />
-                    ) : (
-                      <Camera size={40} color={colors.primary} />
-                    )}
-                    <Text style={[styles.uploadTitle, { color: colors.text }]}>
-                      {fileSimulated ? 'prescription_scan_attached.jpg' : 'Take Photo or Choose File'}
-                    </Text>
-                    <Text style={[styles.uploadSub, { color: colors.textMuted }]}>
-                      {fileSimulated
-                        ? 'Tap to replace image'
-                        : 'Capture legible picture of the written prescription (JPG, PNG, PDF)'}
-                    </Text>
-                  </TouchableOpacity>
+                  {attachment ? (
+                    <View
+                      style={[
+                        styles.attachmentPreview,
+                        {
+                          backgroundColor: colors.success + '10',
+                          borderColor: colors.success,
+                        },
+                      ]}
+                    >
+                      <View style={styles.attachmentTopRow}>
+                        {attachment.isImage ? (
+                          <Image
+                            source={{ uri: attachment.uri }}
+                            style={styles.attachmentThumb}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={[styles.pdfBadge, { backgroundColor: colors.primary + '15' }]}>
+                            <FileText size={28} color={colors.primary} />
+                          </View>
+                        )}
+                        <View style={styles.attachmentMeta}>
+                          <View style={styles.attachmentTitleRow}>
+                            <CheckCircle size={15} color={colors.success} />
+                            <Text
+                              style={[styles.attachmentName, { color: colors.text }]}
+                              numberOfLines={1}
+                            >
+                              {attachment.fileName}
+                            </Text>
+                          </View>
+                          <Text style={[styles.attachmentDetails, { color: colors.textMuted }]}>
+                            {attachment.mimeType === 'application/pdf' ? 'PDF Document' : 'Image'} •{' '}
+                            {formatFileSize(attachment.byteSize)}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.removeAttachmentBtn, { backgroundColor: colors.danger + '15' }]}
+                          onPress={() => {
+                            setAttachment(null);
+                            setAttachmentError(null);
+                          }}
+                          accessibilityLabel="Remove prescription attachment"
+                        >
+                          <Trash2 size={18} color={colors.danger} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.pickerActionsRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.pickerActionBtn,
+                        { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+                      ]}
+                      onPress={handleTakePhoto}
+                      disabled={pickingFile}
+                    >
+                      <Camera size={22} color={colors.primary} />
+                      <Text style={[styles.pickerActionLabel, { color: colors.text }]}>
+                        Take Photo
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.pickerActionBtn,
+                        { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+                      ]}
+                      onPress={handleChoosePhoto}
+                      disabled={pickingFile}
+                    >
+                      <ImageIcon size={22} color={colors.primary} />
+                      <Text style={[styles.pickerActionLabel, { color: colors.text }]}>
+                        Gallery
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.pickerActionBtn,
+                        { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+                      ]}
+                      onPress={handleChooseDocument}
+                      disabled={pickingFile}
+                    >
+                      <FileText size={22} color={colors.primary} />
+                      <Text style={[styles.pickerActionLabel, { color: colors.text }]}>
+                        PDF / File
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {pickingFile && (
+                    <View style={styles.pickingRow}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={[styles.pickingText, { color: colors.textMuted }]}>
+                        Preparing prescription file...
+                      </Text>
+                    </View>
+                  )}
+
+                  {attachmentError && (
+                    <View style={[styles.errorBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger + '30' }]}>
+                      <AlertCircle size={18} color={colors.danger} />
+                      <Text style={[styles.errorText, { color: colors.danger }]}>{attachmentError}</Text>
+                    </View>
+                  )}
                 </Card>
 
                 {/* Delivery Options */}
@@ -427,6 +731,7 @@ export default function PrescriptionUploadScreen() {
                   leftIcon={<Send size={18} color="#ffffff" />}
                   onPress={handleSubmit}
                   loading={submitting}
+                  disabled={pickingFile}
                 />
               </View>
             )
@@ -461,7 +766,7 @@ export default function PrescriptionUploadScreen() {
                   title="Check Status"
                   variant="primary"
                   leftIcon={<Search size={16} color="#ffffff" />}
-                  onPress={handleTrack}
+                  onPress={() => void handleTrack()}
                   loading={tracking}
                   style={{ marginTop: 16 }}
                 />
@@ -479,7 +784,9 @@ export default function PrescriptionUploadScreen() {
                     <Badge
                       label={trackResult.status || 'Under Review'}
                       variant={
-                        trackResult.status === 'Approved' || trackResult.status === 'Completed'
+                        trackResult.status === 'Approved' ||
+                        trackResult.status === 'Ready for Pickup' ||
+                        trackResult.status === 'Completed'
                           ? 'success'
                           : trackResult.status === 'Rejected'
                           ? 'danger'
@@ -491,30 +798,46 @@ export default function PrescriptionUploadScreen() {
 
                   <View style={[styles.metaGrid, { borderTopColor: colors.border }]}>
                     <View style={styles.metaCell}>
-                      <Text style={[styles.metaCellLabel, { color: colors.textMuted }]}>Patient</Text>
-                      <Text style={[styles.metaCellValue, { color: colors.text }]}>
-                        {trackResult.patientName || 'Patient'}
-                      </Text>
-                    </View>
-                    <View style={styles.metaCell}>
                       <Text style={[styles.metaCellLabel, { color: colors.textMuted }]}>Date Submitted</Text>
                       <Text style={[styles.metaCellValue, { color: colors.text }]}>
-                        {trackResult.date ? new Date(trackResult.date).toLocaleDateString() : 'Today'}
+                        {trackResult.date ? new Date(trackResult.date).toLocaleDateString() : '—'}
                       </Text>
                     </View>
                     <View style={styles.metaCell}>
                       <Text style={[styles.metaCellLabel, { color: colors.textMuted }]}>Fulfilment</Text>
                       <Text style={[styles.metaCellValue, { color: colors.text }]}>
-                        {trackResult.deliveryPreference || 'Home Delivery'}
+                        {formatDeliveryPreferenceLabel(trackResult.deliveryPreference)}
                       </Text>
                     </View>
-                    <View style={styles.metaCell}>
-                      <Text style={[styles.metaCellLabel, { color: colors.textMuted }]}>Doctor</Text>
-                      <Text style={[styles.metaCellValue, { color: colors.text }]}>
-                        {trackResult.doctorName || 'Not specified'}
-                      </Text>
-                    </View>
+                    {trackResult.dueDate ? (
+                      <View style={styles.metaCell}>
+                        <Text style={[styles.metaCellLabel, { color: colors.textMuted }]}>Target Date</Text>
+                        <Text style={[styles.metaCellValue, { color: colors.text }]}>
+                          {new Date(trackResult.dueDate).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {trackResult.patientName ? (
+                      <View style={styles.metaCell}>
+                        <Text style={[styles.metaCellLabel, { color: colors.textMuted }]}>Patient</Text>
+                        <Text style={[styles.metaCellValue, { color: colors.text }]}>
+                          {trackResult.patientName}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {trackResult.doctorName ? (
+                      <View style={styles.metaCell}>
+                        <Text style={[styles.metaCellLabel, { color: colors.textMuted }]}>Doctor</Text>
+                        <Text style={[styles.metaCellValue, { color: colors.text }]}>
+                          {trackResult.doctorName}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
+
+                  <Text style={[styles.privacyNote, { color: colors.textMuted }]}>
+                    Personal details are hidden on public status lookups to protect patient privacy.
+                  </Text>
                 </Card>
               )}
             </View>
@@ -588,7 +911,7 @@ const styles = StyleSheet.create({
   sectionHeading: {
     fontSize: 16,
     fontWeight: '800',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   fieldSub: {
     fontSize: 13,
@@ -616,23 +939,81 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlignVertical: 'top',
   },
-  uploadZone: {
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: 14,
-    padding: 24,
+  attachmentPreview: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  attachmentTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  attachmentThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+  },
+  pdfBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  attachmentMeta: {
+    flex: 1,
+    gap: 4,
+  },
+  attachmentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  attachmentName: {
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  attachmentDetails: {
+    fontSize: 12,
+  },
+  removeAttachmentBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerActionsRow: {
+    flexDirection: 'row',
     gap: 8,
   },
-  uploadTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+  pickerActionBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
-  uploadSub: {
+  pickerActionLabel: {
     fontSize: 12,
+    fontWeight: '700',
     textAlign: 'center',
-    paddingHorizontal: 12,
+  },
+  pickingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  pickingText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   radioRow: {
     flexDirection: 'row',
@@ -738,5 +1119,9 @@ const styles = StyleSheet.create({
   metaCellValue: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  privacyNote: {
+    fontSize: 11,
+    lineHeight: 16,
   },
 });
