@@ -11,9 +11,30 @@ const Customer = sequelize.define('Customer', {
     type: DataTypes.INTEGER,
     allowNull: true
   },
+  patientCode: {
+    type: DataTypes.STRING(32),
+    allowNull: true,
+    unique: true,
+  },
+  firstName: {
+    type: DataTypes.STRING(120),
+    allowNull: true,
+  },
+  lastName: {
+    type: DataTypes.STRING(120),
+    allowNull: true,
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false
+  },
+  gender: {
+    type: DataTypes.STRING(32),
+    allowNull: true,
+  },
+  dateOfBirth: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
   },
   phone: {
     type: DataTypes.STRING,

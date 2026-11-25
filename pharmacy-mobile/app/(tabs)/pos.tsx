@@ -29,6 +29,8 @@ import {
   User,
   X,
   Layers,
+  ChevronRight,
+  AlertCircle,
 } from 'lucide-react-native';
 import {
   getMedicineBatches,
@@ -46,6 +48,11 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { RoleGuard } from '@/components/ui/RoleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import {
+  CustomerAssignModal,
+  CustomerAssignment,
+  PosCustomer,
+} from '@/components/pos/CustomerAssignModal';
 
 interface Medicine {
   id: number;
@@ -67,15 +74,10 @@ interface ConfirmedReceipt {
   receiptNumber: string;
   date: string;
   cashierName: string;
+  customerLabel: string;
   items: Array<{ name: string; quantity: number; price: number; total: number }>;
   paymentMethod: string;
   total: number;
-}
-
-interface Customer {
-  id: number;
-  name: string;
-  phone?: string;
 }
 
 const PAYMENT_METHODS = [
@@ -102,11 +104,32 @@ export default function PosScreen() {
   const [failedImageIds, setFailedImageIds] = useState<Record<number, boolean>>({});
   const [paymentMethod, setPaymentMethod] = useState('Cash');
 
-  // Customers
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  // Customers / Patient assignment
+  const [customers, setCustomers] = useState<PosCustomer[]>([]);
+  const [customerAssignment, setCustomerAssignment] = useState<CustomerAssignment>({
+    type: 'WALK_IN',
+  });
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState('');
+  const [reopenCartAfterCustomer, setReopenCartAfterCustomer] = useState(false);
+
+  const selectedCustomer =
+    customerAssignment.type === 'REGISTERED' ? customerAssignment.customer : null;
+  const customerDisplayName = selectedCustomer ? selectedCustomer.name : 'Walking Customer';
+  const customerButtonLabel = selectedCustomer ? selectedCustomer.name : 'Walking Customer';
+
+  const openCustomerModalFromCart = () => {
+    setReopenCartAfterCustomer(true);
+    setShowCart(false);
+    setShowCustomerModal(true);
+  };
+
+  const closeCustomerModal = () => {
+    setShowCustomerModal(false);
+    if (reopenCartAfterCustomer) {
+      setReopenCartAfterCustomer(false);
+      setShowCart(true);
+    }
+  };
 
   // Receipt
   const [successModal, setSuccessModal] = useState(false);
@@ -114,6 +137,22 @@ export default function PosScreen() {
 
   const checkoutRef = useRef<{ signature: string; transactionId: string } | null>(null);
   const submissionLock = useRef(false);
+  const categoryScrollRef = useRef<ScrollView>(null);
+  const [categoryScrollMetrics, setCategoryScrollMetrics] = useState({
+    scrollX: 0,
+    contentWidth: 0,
+    viewportWidth: 0,
+  });
+
+  const canScrollCategoriesRight =
+    categoryScrollMetrics.contentWidth > categoryScrollMetrics.viewportWidth + 8 &&
+    categoryScrollMetrics.scrollX + categoryScrollMetrics.viewportWidth <
+      categoryScrollMetrics.contentWidth - 10;
+
+  const handleScrollCategoriesNext = () => {
+    const targetX = categoryScrollMetrics.scrollX + 160;
+    categoryScrollRef.current?.scrollTo({ x: targetX, animated: true });
+  };
 
   const fetchInventory = async () => {
     try {
@@ -121,7 +160,7 @@ export default function PosScreen() {
       const [firstInvRes, catRes, custRes] = await Promise.allSettled([
         apiClient.get('/api/inventory?page=1&limit=100&compactImages=true'),
         apiClient.get('/api/inventory/categories'),
-        apiClient.get('/api/customers'),
+        apiClient.get('/api/customers?limit=100'),
       ]);
 
       let allRows: any[] = [];
@@ -217,16 +256,6 @@ export default function PosScreen() {
     return result;
   }, [medicines, selectedCategoryId, searchQuery]);
 
-  const filteredCustomers = useMemo(() => {
-    if (!customerSearch.trim()) return customers;
-    const q = customerSearch.toLowerCase().trim();
-    return customers.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        (c.phone && c.phone.toLowerCase().includes(q))
-    );
-  }, [customers, customerSearch]);
-
   const addToCart = (medicine: Medicine) => {
     if (medicine.totalQuantity <= 0) {
       Alert.alert('Out of Stock', `${medicine.name} is currently out of stock.`);
@@ -280,9 +309,11 @@ export default function PosScreen() {
     submissionLock.current = true;
     setLoading(true);
     try {
-      const signature = JSON.stringify(
-        cart.map(({ id, quantity, price }) => [id, quantity, price])
-      );
+      const signature = JSON.stringify({
+        items: cart.map(({ id, quantity, price }) => [id, quantity, price]),
+        customerType: customerAssignment.type,
+        customerId: selectedCustomer?.id || null,
+      });
       if (!checkoutRef.current || checkoutRef.current.signature !== signature) {
         const randomId =
           typeof globalThis.crypto?.randomUUID === 'function'
@@ -302,6 +333,7 @@ export default function PosScreen() {
         totalPrice: item.price * item.quantity,
         paymentMethod,
         customerId: selectedCustomer?.id || null,
+        customerType: customerAssignment.type,
         date,
         receiptNumber,
         clientTransactionId: `${transactionId}_${index}`,
@@ -316,6 +348,8 @@ export default function PosScreen() {
 
       const response = await apiClient.post('/api/sales', {
         clientTransactionId: transactionId,
+        customerId: selectedCustomer?.id || null,
+        customerType: customerAssignment.type,
         items: salesData,
         payments,
       });
@@ -330,6 +364,9 @@ export default function PosScreen() {
           receiptNumber: confirmedSales[0]?.receiptNumber || receiptNumber,
           date: confirmedSales[0]?.date || date,
           cashierName: confirmedSales[0]?.soldBy || user?.username || 'Not recorded',
+          customerLabel: selectedCustomer
+            ? `${selectedCustomer.name} (${selectedCustomer.patientCode || `MQP-${String(selectedCustomer.id).padStart(6, '0')}`})`
+            : 'Walking Customer',
           items: confirmedSales.map((sale) => ({
             name: sale.name,
             quantity: Number(sale.quantity),
@@ -341,7 +378,7 @@ export default function PosScreen() {
         });
 
         setCart([]);
-        setSelectedCustomer(null);
+        setCustomerAssignment({ type: 'WALK_IN' });
         setShowCart(false);
         setSuccessModal(true);
         checkoutRef.current = null;
@@ -369,7 +406,12 @@ export default function PosScreen() {
 
   if (!user) {
     return (
-      <View style={[styles.accessDenied, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.accessDenied,
+          { backgroundColor: theme.background, paddingTop: Math.max(insets.top, 12) + layout.spacing.xl },
+        ]}
+      >
         <View style={[styles.deniedIconWrap, { backgroundColor: theme.primarySoft }]}>
           <ShoppingCart size={44} color={theme.primary} />
         </View>
@@ -387,7 +429,16 @@ export default function PosScreen() {
     <RoleGuard page="pos">
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* POS Top Bar */}
-        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: theme.surface,
+              borderBottomColor: theme.border,
+              paddingTop: Math.max(insets.top, 12) + layout.spacing.sm,
+            },
+          ]}
+        >
           <View style={styles.brandRow}>
             <View style={[styles.logoMark, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
               <BrandLogo size="icon" width={38} height={38} />
@@ -402,7 +453,7 @@ export default function PosScreen() {
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Select customer"
+              accessibilityLabel="Assign patient or customer"
               style={[
                 styles.customerBtn,
                 {
@@ -420,7 +471,7 @@ export default function PosScreen() {
                 ]}
                 numberOfLines={1}
               >
-                {selectedCustomer ? selectedCustomer.name : 'Patient'}
+                {customerButtonLabel}
               </Text>
             </Pressable>
           </View>
@@ -431,59 +482,106 @@ export default function PosScreen() {
             placeholder="Search medicines, OTC, barcode..."
           />
   
-          {/* Category Pills */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryScroll}
-          >
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setSelectedCategoryId(null)}
-              style={[
-                styles.categoryChip,
-                {
-                  backgroundColor: selectedCategoryId === null ? theme.primary : theme.surfaceMuted,
-                  borderColor: selectedCategoryId === null ? theme.primary : theme.border,
-                },
-              ]}
+          {/* Category Pills with horizontal snapping & scroll hint */}
+          <View style={styles.categoryScrollWrap}>
+            <ScrollView
+              ref={categoryScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToAlignment="start"
+              scrollEventThrottle={16}
+              contentContainerStyle={styles.categoryScroll}
+              onLayout={(event) => {
+                const viewportWidth = event.nativeEvent.layout.width;
+                setCategoryScrollMetrics((prev) =>
+                  prev.viewportWidth === viewportWidth ? prev : { ...prev, viewportWidth }
+                );
+              }}
+              onContentSizeChange={(contentWidth) => {
+                setCategoryScrollMetrics((prev) =>
+                  prev.contentWidth === contentWidth ? prev : { ...prev, contentWidth }
+                );
+              }}
+              onScroll={(event) => {
+                const scrollX = event.nativeEvent.contentOffset.x;
+                setCategoryScrollMetrics((prev) =>
+                  Math.abs(prev.scrollX - scrollX) < 4 ? prev : { ...prev, scrollX }
+                );
+              }}
             >
-              <Text
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setSelectedCategoryId(null)}
                 style={[
-                  styles.categoryChipText,
-                  { color: selectedCategoryId === null ? '#ffffff' : theme.textSecondary },
+                  styles.categoryChip,
+                  {
+                    backgroundColor: selectedCategoryId === null ? theme.primary : theme.surfaceMuted,
+                    borderColor: selectedCategoryId === null ? theme.primary : theme.border,
+                  },
                 ]}
               >
-                All Items
-              </Text>
-            </Pressable>
-            {categories.map((cat) => {
-              const active = selectedCategoryId === cat.id;
-              return (
-                <Pressable
-                  key={cat.id}
-                  accessibilityRole="button"
-                  onPress={() => setSelectedCategoryId(active ? null : cat.id)}
+                <Text
                   style={[
-                    styles.categoryChip,
+                    styles.categoryChipText,
+                    { color: selectedCategoryId === null ? '#ffffff' : theme.textSecondary },
+                  ]}
+                >
+                  All Items
+                </Text>
+              </Pressable>
+              {categories.map((cat) => {
+                const active = selectedCategoryId === cat.id;
+                return (
+                  <Pressable
+                    key={cat.id}
+                    accessibilityRole="button"
+                    onPress={() => setSelectedCategoryId(active ? null : cat.id)}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: active ? theme.primary : theme.surfaceMuted,
+                        borderColor: active ? theme.primary : theme.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        { color: active ? '#ffffff' : theme.textSecondary },
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {canScrollCategoriesRight ? (
+              <View pointerEvents="box-none" style={styles.categoryRightFadeWrap}>
+                <View
+                  pointerEvents="none"
+                  style={[styles.categoryFadeEdge, { backgroundColor: theme.surface }]}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Scroll for more categories"
+                  onPress={handleScrollCategoriesNext}
+                  style={({ pressed }) => [
+                    styles.categoryScrollHintBtn,
                     {
-                      backgroundColor: active ? theme.primary : theme.surfaceMuted,
-                      borderColor: active ? theme.primary : theme.border,
+                      backgroundColor: theme.primarySoft,
+                      borderColor: theme.primary,
+                      opacity: pressed ? 0.8 : 1,
                     },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      { color: active ? '#ffffff' : theme.textSecondary },
-                    ]}
-                  >
-                    {cat.name}
-                  </Text>
+                  <ChevronRight size={16} color={theme.primary} strokeWidth={2.6} />
                 </Pressable>
-              );
-            })}
-          </ScrollView>
+              </View>
+            ) : null}
+          </View>
         </View>
   
         {/* Product Grid */}
@@ -505,70 +603,76 @@ export default function PosScreen() {
             return (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Add ${item.name} to sale`}
+                accessibilityLabel={
+                  outOfStock ? `${item.name} is out of stock` : `Add ${item.name} to sale`
+                }
                 disabled={outOfStock}
                 style={({ pressed }) => [
                   styles.itemCard,
                   {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.border,
-                    opacity: outOfStock ? 0.6 : pressed ? 0.85 : 1,
+                    backgroundColor: outOfStock ? theme.surfaceMuted : theme.surface,
+                    borderColor: outOfStock ? '#fecaca' : theme.border,
+                    opacity: pressed && !outOfStock ? 0.85 : 1,
                   },
                 ]}
                 onPress={() => addToCart(item)}
               >
-                <View
-                  style={[
-                    styles.productVisual,
-                    { backgroundColor: showImage ? theme.surfaceMuted : theme.primarySoft },
-                  ]}
-                >
-                  {showImage && item.imageUrl ? (
-                    <Image
-                      source={{ uri: item.imageUrl }}
-                      style={styles.productImage}
-                      resizeMode="contain"
-                      onError={(event) => {
-                        if (__DEV__) {
-                          console.warn(
-                            `[POS] Failed to load image for product #${item.id} (${item.name}):`,
-                            event?.nativeEvent?.error
+                <View style={[styles.itemCardBody, outOfStock && styles.itemCardBodyOutOfStock]}>
+                  <View
+                    style={[
+                      styles.productVisual,
+                      { backgroundColor: showImage ? theme.surfaceMuted : theme.primarySoft },
+                    ]}
+                  >
+                    {showImage && item.imageUrl ? (
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        style={styles.productImage}
+                        resizeMode="contain"
+                        onError={(event) => {
+                          if (__DEV__) {
+                            console.warn(
+                              `[POS] Failed to load image for product #${item.id} (${item.name}):`,
+                              event?.nativeEvent?.error
+                            );
+                          }
+                          setFailedImageIds((prev) =>
+                            prev[item.id] ? prev : { ...prev, [item.id]: true }
                           );
-                        }
-                        setFailedImageIds((prev) =>
-                          prev[item.id] ? prev : { ...prev, [item.id]: true }
-                        );
-                      }}
-                    />
-                  ) : (
-                    <Pill size={36} color={theme.primary} strokeWidth={1.8} />
-                  )}
-                  {outOfStock ? (
-                    <View style={styles.outOfStockBadge}>
-                      <Text style={styles.outOfStockText}>Out of stock</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text numberOfLines={2} style={[styles.itemName, { color: theme.text }]}>
-                  {item.name}
-                </Text>
-                <Text numberOfLines={1} style={[styles.itemStock, { color: theme.mutedText }]}>
-                  Stock: {item.totalQuantity} units{item.barcode ? ` · #${item.barcode}` : ''}
-                </Text>
-                <Text style={[styles.itemPrice, { color: theme.navigation }]}>
-                  K {item.price.toFixed(2)}
-                </Text>
-                <View
-                  style={[
-                    styles.addButton,
-                    { backgroundColor: outOfStock ? theme.border : theme.primary },
-                  ]}
-                >
-                  <Text style={styles.quickAddText}>
-                    {outOfStock ? 'Unavailable' : 'Add to sale'}
+                        }}
+                      />
+                    ) : (
+                      <Pill size={36} color={theme.primary} strokeWidth={1.8} />
+                    )}
+                  </View>
+                  <Text numberOfLines={2} style={[styles.itemName, { color: theme.text }]}>
+                    {item.name}
                   </Text>
-                  {!outOfStock ? <Plus size={15} color="#ffffff" /> : null}
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.itemStock,
+                      { color: outOfStock ? '#dc2626' : theme.mutedText, fontWeight: outOfStock ? '700' : '400' },
+                    ]}
+                  >
+                    Stock: {item.totalQuantity} units{item.barcode ? ` · #${item.barcode}` : ''}
+                  </Text>
+                  <Text style={[styles.itemPrice, { color: theme.navigation }]}>
+                    K {item.price.toFixed(2)}
+                  </Text>
                 </View>
+
+                {outOfStock ? (
+                  <View style={styles.outOfStockBanner}>
+                    <AlertCircle size={13} color="#ffffff" strokeWidth={2.4} />
+                    <Text style={styles.outOfStockBannerText}>OUT OF STOCK</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.addButton, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.quickAddText}>Add to sale</Text>
+                    <Plus size={15} color="#ffffff" />
+                  </View>
+                )}
               </Pressable>
             );
           }}
@@ -600,7 +704,7 @@ export default function PosScreen() {
               <View style={styles.cartFabCopy}>
                 <Text style={styles.cartFabTitle}>Current Sale</Text>
                 <Text style={styles.cartFabSubtitle}>
-                  {paymentMethod} · {selectedCustomer ? selectedCustomer.name : 'Walk-in'}
+                  {paymentMethod} · {customerDisplayName}
                 </Text>
               </View>
             </View>
@@ -700,29 +804,47 @@ export default function PosScreen() {
                 <View style={styles.customerSection}>
                   <View style={styles.customerHeaderRow}>
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>Patient / Customer</Text>
-                    <Pressable onPress={() => setShowCustomerModal(true)}>
+                    <Pressable onPress={openCustomerModalFromCart}>
                       <Text style={[styles.changeCustomerText, { color: theme.primary }]}>
-                        {selectedCustomer ? 'Change' : 'Assign Patient'}
+                        Change
                       </Text>
                     </Pressable>
                   </View>
                   {selectedCustomer ? (
-                    <View style={[styles.selectedCustomerCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                    <View style={[styles.selectedCustomerCard, { backgroundColor: theme.primarySoft, borderColor: theme.primary }]}>
                       <User size={16} color={theme.primary} />
                       <View style={styles.customerInfo}>
-                        <Text style={[styles.customerNameText, { color: theme.text }]}>{selectedCustomer.name}</Text>
-                        {selectedCustomer.phone ? (
-                          <Text style={[styles.customerPhoneText, { color: theme.mutedText }]}>{selectedCustomer.phone}</Text>
-                        ) : null}
+                        <Text style={[styles.customerNameText, { color: theme.text }]}>
+                          {selectedCustomer.name}
+                        </Text>
+                        <Text style={[styles.customerPhoneText, { color: theme.mutedText }]}>
+                          {selectedCustomer.patientCode || `MQP-${String(selectedCustomer.id).padStart(6, '0')}`}
+                          {selectedCustomer.phone ? ` · ${selectedCustomer.phone}` : ''}
+                        </Text>
                       </View>
-                      <Pressable hitSlop={6} onPress={() => setSelectedCustomer(null)}>
+                      <Pressable
+                        hitSlop={6}
+                        accessibilityLabel="Switch back to Walking Customer"
+                        onPress={() => setCustomerAssignment({ type: 'WALK_IN' })}
+                      >
                         <X size={16} color={theme.mutedText} />
                       </Pressable>
                     </View>
                   ) : (
-                    <Text style={[styles.noCustomerNotice, { color: theme.mutedText }]}>
-                      Walk-in customer (optional patient assignment)
-                    </Text>
+                    <Pressable
+                      onPress={openCustomerModalFromCart}
+                      style={[styles.selectedCustomerCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
+                    >
+                      <User size={16} color={theme.primary} />
+                      <View style={styles.customerInfo}>
+                        <Text style={[styles.customerNameText, { color: theme.text }]}>
+                          Walking Customer
+                        </Text>
+                        <Text style={[styles.customerPhoneText, { color: theme.mutedText }]}>
+                          Tap to assign a registered patient or register a new one
+                        </Text>
+                      </View>
+                    </Pressable>
                   )}
                 </View>
               </ScrollView>
@@ -747,57 +869,21 @@ export default function PosScreen() {
           </View>
         </Modal>
   
-        {/* Customer Selection Modal */}
-        <Modal visible={showCustomerModal} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContentSmall, { backgroundColor: theme.surface }]}>
-              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-                <Text style={[styles.modalTitle, { color: theme.text }]}>Assign Patient / Customer</Text>
-                <Pressable hitSlop={8} onPress={() => setShowCustomerModal(false)}>
-                  <X size={20} color={theme.mutedText} />
-                </Pressable>
-              </View>
-              <View style={{ paddingVertical: 10 }}>
-                <SearchInput
-                  value={customerSearch}
-                  onChangeText={setCustomerSearch}
-                  placeholder="Search by name or phone..."
-                />
-              </View>
-              <FlatList
-                data={filteredCustomers}
-                keyExtractor={(item) => String(item.id)}
-                renderItem={({ item }) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    style={[styles.customerRow, { borderBottomColor: theme.borderLight }]}
-                    onPress={() => {
-                      setSelectedCustomer(item);
-                      setShowCustomerModal(false);
-                    }}
-                  >
-                    <View style={[styles.custAvatar, { backgroundColor: theme.primarySoft }]}>
-                      <Text style={[styles.custAvatarText, { color: theme.primary }]}>
-                        {item.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.custDetails}>
-                      <Text style={[styles.custName, { color: theme.text }]}>{item.name}</Text>
-                      {item.phone ? (
-                        <Text style={[styles.custPhone, { color: theme.mutedText }]}>{item.phone}</Text>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                )}
-                ListEmptyComponent={
-                  <Text style={[styles.emptyCustomer, { color: theme.mutedText }]}>
-                    No patients found.
-                  </Text>
-                }
-              />
-            </View>
-          </View>
-        </Modal>
+        {/* Assign Patient / Customer Modal */}
+        <CustomerAssignModal
+          visible={showCustomerModal}
+          assignment={customerAssignment}
+          initialCustomers={customers}
+          onClose={closeCustomerModal}
+          onSelectWalkIn={() => setCustomerAssignment({ type: 'WALK_IN' })}
+          onSelectPatient={(customer) =>
+            setCustomerAssignment({ type: 'REGISTERED', customer })
+          }
+          onPatientRegistered={(customer) => {
+            setCustomers((prev) => [customer, ...prev.filter((c) => c.id !== customer.id)]);
+            setCustomerAssignment({ type: 'REGISTERED', customer });
+          }}
+        />
   
         {/* Confirmed Receipt Modal */}
         <Modal visible={successModal} transparent animationType="fade">
@@ -822,6 +908,12 @@ export default function PosScreen() {
                   <Text style={[styles.receiptFieldLabel, { color: theme.mutedText }]}>Cashier:</Text>
                   <Text style={[styles.receiptFieldValue, { color: theme.text }]}>
                     {confirmedReceipt?.cashierName}
+                  </Text>
+                </View>
+                <View style={styles.receiptLine}>
+                  <Text style={[styles.receiptFieldLabel, { color: theme.mutedText }]}>Customer:</Text>
+                  <Text style={[styles.receiptFieldValue, { color: theme.text }]} numberOfLines={1}>
+                    {confirmedReceipt?.customerLabel || 'Walking Customer'}
                   </Text>
                 </View>
                 <View style={styles.receiptLine}>
@@ -918,8 +1010,49 @@ const styles = StyleSheet.create({
     borderRadius: layout.radius.sm,
     borderWidth: 1,
   },
-  customerBtnText: { fontSize: 12, fontWeight: '600', maxWidth: 90 },
-  categoryScroll: { gap: 8, paddingVertical: 10 },
+  customerBtnText: { fontSize: 12, fontWeight: '700', maxWidth: 118 },
+  categoryScrollWrap: {
+    position: 'relative',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  categoryScroll: {
+    gap: 8,
+    paddingVertical: 10,
+    paddingRight: 38,
+  },
+  categoryRightFadeWrap: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    backgroundColor: 'transparent',
+  },
+  categoryFadeEdge: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    right: 0,
+    left: 6,
+    opacity: 0.9,
+  },
+  categoryScrollHintBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+  },
   categoryChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -939,6 +1072,13 @@ const styles = StyleSheet.create({
     borderRadius: layout.radius.md,
     marginBottom: layout.spacing.md,
     borderWidth: 1,
+    justifyContent: 'space-between',
+  },
+  itemCardBody: {
+    backgroundColor: 'transparent',
+  },
+  itemCardBodyOutOfStock: {
+    opacity: 0.52,
   },
   productVisual: {
     width: '100%',
@@ -959,16 +1099,22 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  outOfStockBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  outOfStockBanner: {
+    minHeight: 32,
+    borderRadius: layout.radius.sm,
+    backgroundColor: '#dc2626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
   },
-  outOfStockText: { color: '#ffffff', fontSize: 9, fontWeight: '700' },
+  outOfStockBannerText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   itemName: { fontSize: 13, fontWeight: '800', minHeight: 34, lineHeight: 17 },
   itemStock: { fontSize: 10, marginTop: 2 },
   itemPrice: { fontSize: 15, fontWeight: '800', marginTop: 4, marginBottom: 6 },

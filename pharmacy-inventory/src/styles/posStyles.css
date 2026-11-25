@@ -678,4 +678,472 @@
   .pos-payment-options {
     grid-template-columns: 1fr;
   }
+
+  .pos-customer-dialog {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .pos-customer-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Assign Patient / Customer Trigger & Modal */
+.pos-topbar-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.pos-customer-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.pos-customer-trigger:hover:not(:disabled) {
+  border-color: #00966d;
+  background: #f0fdfa;
+  color: #00966d;
+}
+
+.pos-customer-trigger.is-registered {
+  border-color: #00966d;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.pos-customer-dialog {
+  width: min(100%, 540px);
+  max-height: min(88vh, 720px);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pos-customer-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.pos-customer-dialog-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.pos-customer-dialog-title-wrap h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0e3854;
+}
+
+.pos-customer-current {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.pos-customer-current strong {
+  color: #00966d;
+}
+
+.pos-customer-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.pos-customer-body {
+  padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+  flex: 1;
+}
+
+.pos-customer-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.pos-customer-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.pos-customer-clear-btn {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+}
+
+.pos-customer-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.pos-walkin-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pos-walkin-card.is-selected {
+  border-color: #00966d;
+  background: #ecfdf5;
+}
+
+.pos-walkin-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #00966d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pos-walkin-card.is-selected .pos-walkin-icon {
+  background: #00966d;
+  color: #ffffff;
+}
+
+.pos-walkin-copy {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.pos-walkin-copy strong {
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.pos-walkin-copy span {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.pos-customer-selected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #00966d;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.pos-register-patient-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 42px;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: #00966d;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pos-register-patient-btn:hover:not(:disabled) {
+  background: #047857;
+}
+
+.pos-customer-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pos-customer-refresh-btn {
+  border: none;
+  background: transparent;
+  color: #00966d;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+
+.pos-customer-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 140px;
+  max-height: 290px;
+}
+
+.pos-customer-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pos-customer-row:hover {
+  border-color: #99f6e4;
+  background: #f8fffe;
+}
+
+.pos-customer-row.is-selected {
+  border-color: #00966d;
+  background: #ecfdf5;
+}
+
+.pos-customer-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #e6f7f2;
+  color: #00966d;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pos-customer-row.is-selected .pos-customer-avatar {
+  background: #00966d;
+  color: #ffffff;
+}
+
+.pos-customer-row-copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.pos-customer-row-copy strong {
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.pos-customer-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.pos-customer-row-meta code {
+  background: #f1f5f9;
+  color: #0e3854;
+  padding: 0.1rem 0.4rem;
+  border-radius: 5px;
+  font-weight: 700;
+}
+
+.pos-customer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 1.5rem 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.pos-customer-empty p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.pos-customer-empty-cta {
+  margin-top: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #00966d;
+  background: #ecfdf5;
+  color: #00966d;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.pos-customer-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pos-customer-alert.is-column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.pos-customer-alert-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.pos-use-existing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border: none;
+  border-radius: 7px;
+  background: #00966d;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pos-customer-form {
+  padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow-y: auto;
+}
+
+.pos-customer-autoid {
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  font-size: 0.8rem;
+}
+
+.pos-customer-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.pos-customer-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.pos-customer-form-grid input,
+.pos-customer-form-grid select {
+  min-height: 40px;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font: inherit;
+  font-weight: 500;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.pos-customer-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.pos-customer-cancel-btn {
+  min-height: 42px;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
 }

@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { 
   Search, ShoppingCart, Trash2, CreditCard, Plus, Minus, 
-  ArrowRight, Pause, Tag, Banknote, Smartphone
+  ArrowRight, Pause, Tag, Banknote, Smartphone, User
 } from "lucide-react";
+import PosCustomerModal, { formatPatientId } from "./PosCustomerModal";
 import "../styles/posStyles.css";
 
 const PAYMENT_METHODS = ["Cash", "Airtel Money", "MTN Mobile Money", "Card"];
@@ -72,6 +73,7 @@ function Pos({
   const [activeSubcategoryId, setActiveSubcategoryId] = useState("");
   const [activeFormId, setActiveFormId] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkoutRetry, setCheckoutRetry] = useState(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -236,7 +238,8 @@ function Pos({
         subTotal,
         totalToPay,
         customerId: selectedCustomer?.id || null,
-        customerName: selectedCustomer?.name || "Walk-in Customer",
+        customerType: selectedCustomer ? "REGISTERED" : "WALK_IN",
+        customerName: selectedCustomer?.name || "Walking Customer",
         customerPhone: selectedCustomer?.phone || "",
         customerEmail: selectedCustomer?.email || "",
         clientTransactionId: checkoutKey.current,
@@ -275,8 +278,23 @@ function Pos({
         {/* LEFT: Product Selection */}
         <div className="pos-product-section">
           <div className="pos-header">
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem', color: '#475569', fontSize: '0.85rem' }}>
-              Sold By: <strong style={{ marginLeft: '0.35rem' }}>{cashierName || 'Current cashier'}</strong>
+            <div className="pos-topbar-meta">
+              <button
+                type="button"
+                className={`pos-customer-trigger ${selectedCustomer ? "is-registered" : ""}`}
+                onClick={() => setCustomerModalOpen(true)}
+                disabled={isSubmitting || cartLocked}
+              >
+                <User size={15} />
+                <span>
+                  {selectedCustomer
+                    ? `${selectedCustomer.name} (${formatPatientId(selectedCustomer)})`
+                    : "Walking Customer"}
+                </span>
+              </button>
+              <div style={{ color: '#475569', fontSize: '0.85rem' }}>
+                Sold By: <strong style={{ marginLeft: '0.35rem' }}>{cashierName || 'Current cashier'}</strong>
+              </div>
             </div>
             <div className="pos-search-wrapper">
               <Search size={20} color="#64748b" />
@@ -625,6 +643,16 @@ function Pos({
           <button className="pos-tool-btn" style={{background:'var(--primary)'}} disabled title="Checkout all is unavailable"><ArrowRight size={16} /> Checkout All (Unavailable)</button>
         </div>
       </div>
+
+      <PosCustomerModal
+        isOpen={customerModalOpen}
+        selectedCustomer={selectedCustomer}
+        customers={customers}
+        onClose={() => setCustomerModalOpen(false)}
+        onSelectWalkIn={() => setSelectedCustomer(null)}
+        onSelectPatient={(customer) => setSelectedCustomer(customer)}
+        onRegisterPatient={addCustomer}
+      />
     </div>
   );
 }

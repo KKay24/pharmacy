@@ -1,6 +1,14 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, LayoutGrid, FileText, ShoppingCart, User } from 'lucide-react-native';
+import {
+  Home,
+  LayoutGrid,
+  FileText,
+  ShoppingCart,
+  User,
+  Boxes,
+  Store,
+} from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/context/AuthContext';
@@ -8,49 +16,84 @@ import { useCart } from '@/context/CartContext';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const ACTIVE_GREEN = '#00966d';
+const ACTIVE_GREEN_BG = '#d1fae5';
+const ACTIVE_GREEN_DARK_BG = 'rgba(0, 150, 109, 0.22)';
+
+function TabIcon({
+  focused,
+  isDark,
+  children,
+}: {
+  focused: boolean;
+  isDark: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      style={[
+        styles.tabIconWrap,
+        focused && [
+          styles.tabIconActive,
+          { backgroundColor: isDark ? ACTIVE_GREEN_DARK_BG : ACTIVE_GREEN_BG },
+        ],
+      ]}
+    >
+      {focused ? <View style={styles.activeTopBar} /> : null}
+      {children}
+    </View>
+  );
+}
+
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
+  const isDark = colorScheme === 'dark';
   const { user } = useAuth();
   const { cartCount } = useCart();
   const insets = useSafeAreaInsets();
 
-  // Tab bar height: 60dp content area + bottom safe-area inset
-  // This ensures the bar always sits above Android system nav (3-button ~48dp, gesture ~16-24dp)
-  const TAB_BAR_CONTENT_HEIGHT = 60;
+  const isStaff = Boolean(
+    user && ['admin', 'manager', 'user'].includes(user.role?.toLowerCase() || '')
+  );
+
+  // Tab bar height: 64dp content area + bottom safe-area inset
+  // Ensures the bar always sits above Android system nav (3-button ~48dp, gesture ~16-24dp)
+  const TAB_BAR_CONTENT_HEIGHT = 64;
   const tabBarHeight = TAB_BAR_CONTENT_HEIGHT + insets.bottom;
   const tabBarPaddingBottom = insets.bottom > 0 ? insets.bottom + 4 : 8;
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#00966d',
-        tabBarInactiveTintColor: '#64748b',
+        tabBarActiveTintColor: ACTIVE_GREEN,
+        tabBarInactiveTintColor: theme.mutedText,
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopColor: '#eef2f6',
+          backgroundColor: theme.surface,
+          borderTopColor: theme.border,
           borderTopWidth: 1,
-          elevation: 6,
+          elevation: 8,
           shadowColor: '#000',
-          shadowOpacity: 0.04,
-          shadowRadius: 6,
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
           height: tabBarHeight,
           paddingBottom: tabBarPaddingBottom,
           paddingTop: 6,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
+          fontSize: 10.5,
+          fontWeight: '700',
+          marginTop: 2,
         },
         headerStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: theme.surface,
         },
         headerTitleStyle: {
           fontWeight: '800',
-          color: '#0e3854',
+          color: theme.navigation,
         },
-        headerTintColor: '#00966d',
+        headerTintColor: ACTIVE_GREEN,
         headerShown: false,
       }}
     >
@@ -60,49 +103,85 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIconWrap, focused && styles.tabIconActive]}>
-              <Home size={21} color={focused ? '#00966d' : color} strokeWidth={focused ? 2.5 : 2} />
-            </View>
+            <TabIcon focused={focused} isDark={isDark}>
+              <Home size={20} color={focused ? ACTIVE_GREEN : color} strokeWidth={focused ? 2.6 : 2} />
+            </TabIcon>
           ),
         }}
       />
 
-      {/* 2. Categories */}
+      {/* 2a. POS (Visible for staff/cashiers so active POS tab is highlighted in MediQuick green) */}
+      <Tabs.Screen
+        name="pos"
+        options={{
+          href: isStaff ? undefined : null,
+          title: 'POS',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused} isDark={isDark}>
+              <Store size={20} color={focused ? ACTIVE_GREEN : color} strokeWidth={focused ? 2.6 : 2} />
+            </TabIcon>
+          ),
+        }}
+      />
+
+      {/* 2b. Categories (Visible for customers/guests; still routable for staff) */}
       <Tabs.Screen
         name="categories"
         options={{
+          href: isStaff ? null : undefined,
           title: 'Categories',
           tabBarIcon: ({ color, focused }) => (
-            <LayoutGrid size={21} color={focused ? '#00966d' : color} strokeWidth={focused ? 2.5 : 2} />
+            <TabIcon focused={focused} isDark={isDark}>
+              <LayoutGrid size={20} color={focused ? ACTIVE_GREEN : color} strokeWidth={focused ? 2.6 : 2} />
+            </TabIcon>
           ),
         }}
       />
 
-      {/* 3. Prescriptions */}
+      {/* 3a. Inventory (Visible for staff/cashiers) */}
+      <Tabs.Screen
+        name="inventory"
+        options={{
+          href: isStaff ? undefined : null,
+          title: 'Inventory',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused} isDark={isDark}>
+              <Boxes size={20} color={focused ? ACTIVE_GREEN : color} strokeWidth={focused ? 2.6 : 2} />
+            </TabIcon>
+          ),
+        }}
+      />
+
+      {/* 3b. Prescriptions / Scripts */}
       <Tabs.Screen
         name="prescriptions"
         options={{
-          title: 'Prescriptions',
+          title: 'Scripts',
           tabBarIcon: ({ color, focused }) => (
-            <FileText size={21} color={focused ? '#00966d' : color} strokeWidth={focused ? 2.5 : 2} />
+            <TabIcon focused={focused} isDark={isDark}>
+              <FileText size={20} color={focused ? ACTIVE_GREEN : color} strokeWidth={focused ? 2.6 : 2} />
+            </TabIcon>
           ),
         }}
       />
 
-      {/* 4. Cart */}
+      {/* 4. Cart (Visible for customers/guests; staff can still open via header cart icon) */}
       <Tabs.Screen
         name="cart"
         options={{
+          href: isStaff ? null : undefined,
           title: 'Cart',
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ position: 'relative' }}>
-              <ShoppingCart size={21} color={focused ? '#00966d' : color} strokeWidth={focused ? 2.5 : 2} />
-              {cartCount > 0 ? (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
-                </View>
-              ) : null}
-            </View>
+            <TabIcon focused={focused} isDark={isDark}>
+              <View style={{ position: 'relative' }}>
+                <ShoppingCart size={20} color={focused ? ACTIVE_GREEN : color} strokeWidth={focused ? 2.6 : 2} />
+                {cartCount > 0 ? (
+                  <View style={styles.cartBadge}>
+                    <Text style={styles.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </TabIcon>
           ),
         }}
       />
@@ -113,26 +192,14 @@ export default function TabLayout() {
         options={{
           title: 'Account',
           tabBarIcon: ({ color, focused }) => (
-            <User size={21} color={focused ? '#00966d' : color} strokeWidth={focused ? 2.5 : 2} />
+            <TabIcon focused={focused} isDark={isDark}>
+              <User size={20} color={focused ? ACTIVE_GREEN : color} strokeWidth={focused ? 2.6 : 2} />
+            </TabIcon>
           ),
         }}
       />
 
-      {/* Hidden Routes (Staff & Operations accessible via Hamburger Menu / Account) */}
-      <Tabs.Screen
-        name="pos"
-        options={{
-          href: null,
-          title: 'POS',
-        }}
-      />
-      <Tabs.Screen
-        name="inventory"
-        options={{
-          href: null,
-          title: 'Inventory',
-        }}
-      />
+      {/* Hidden Staff Route (accessible via Hamburger Menu / Account) */}
       <Tabs.Screen
         name="operations"
         options={{
@@ -146,17 +213,31 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabIconWrap: {
+    position: 'relative',
+    minWidth: 46,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 10,
   },
   tabIconActive: {
-    transform: [{ scale: 1.05 }],
+    borderWidth: 1,
+    borderColor: 'rgba(0, 150, 109, 0.25)',
+  },
+  activeTopBar: {
+    position: 'absolute',
+    top: -6,
+    width: 24,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: ACTIVE_GREEN,
   },
   cartBadge: {
     position: 'absolute',
-    top: -4,
-    right: -8,
-    backgroundColor: '#00966d',
+    top: -5,
+    right: -9,
+    backgroundColor: ACTIVE_GREEN,
     borderRadius: 8,
     minWidth: 15,
     height: 15,

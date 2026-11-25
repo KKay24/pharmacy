@@ -19,6 +19,11 @@ const Sales = sequelize.define('Sales', {
     type: DataTypes.INTEGER,
     allowNull: true 
   },
+  customerType: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    defaultValue: 'WALK_IN',
+  },
   soldBy: {
     type: DataTypes.STRING,
     allowNull: true

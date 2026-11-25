@@ -472,6 +472,49 @@ class SalesService {
     const transaction = await sequelize.transaction();
     try {
       const createdSales = [];
+      const topLevelCustomerId = !Array.isArray(payload) ? payload?.customerId : undefined;
+      const topLevelCustomerType = !Array.isArray(payload) ? payload?.customerType : undefined;
+      const verifiedCustomers = new Map();
+      const customerSpendTotals = new Map();
+
+      const resolveSaleCustomer = async (item) => {
+        const rawCustomerId = item.customerId !== undefined ? item.customerId : topLevelCustomerId;
+        const rawCustomerType = item.customerType !== undefined ? item.customerType : topLevelCustomerType;
+        const normalizedType = typeof rawCustomerType === 'string' && rawCustomerType.trim()
+          ? rawCustomerType.trim().toUpperCase()
+          : null;
+
+        if (normalizedType && normalizedType !== 'WALK_IN' && normalizedType !== 'REGISTERED') {
+          throw new BadRequestException('Customer type must be WALK_IN or REGISTERED');
+        }
+
+        const hasCustomerId = rawCustomerId !== null && rawCustomerId !== undefined && rawCustomerId !== '';
+        if (!hasCustomerId) {
+          if (normalizedType === 'REGISTERED') {
+            throw new BadRequestException('A registered patient sale requires a valid patient ID');
+          }
+          return { customerId: null, customerType: 'WALK_IN' };
+        }
+
+        if (normalizedType === 'WALK_IN') {
+          throw new BadRequestException('Walking customer sales cannot be linked to a patient ID');
+        }
+
+        const parsedCustomerId = Number(rawCustomerId);
+        if (!Number.isInteger(parsedCustomerId) || parsedCustomerId <= 0) {
+          throw new BadRequestException('Patient ID must be a valid positive integer');
+        }
+
+        if (!verifiedCustomers.has(parsedCustomerId)) {
+          const customer = await Customer.findByPk(parsedCustomerId, { transaction });
+          if (!customer) {
+            throw new NotFoundException(`Patient #${parsedCustomerId} not found`);
+          }
+          verifiedCustomers.set(parsedCustomerId, customer);
+        }
+
+        return { customerId: parsedCustomerId, customerType: 'REGISTERED' };
+      };
 
       for (const item of items) {
         if (item.clientTransactionId) {
@@ -484,6 +527,8 @@ class SalesService {
             continue;
           }
         }
+
+        const { customerId, customerType } = await resolveSaleCustomer(item);
 
         const quantity = Number(item.quantity);
         if (!Number.isInteger(quantity) || quantity <= 0) {
@@ -530,7 +575,8 @@ class SalesService {
           name: medicine.name,
           medicineId: medicine.id,
           batchId: deductions.length === 1 ? deductions[0].batch.id : null,
-          customerId: item.customerId || null,
+          customerId,
+          customerType,
           soldBy: actor?.username || null,
           soldByUserId: actor?.id || null,
           saleStatus: 'COMPLETED',
@@ -565,7 +611,23 @@ class SalesService {
           }, { transaction });
         }
         await medicine.update({ totalQuantity: available - quantity }, { transaction });
+        if (customerId) {
+          customerSpendTotals.set(
+            customerId,
+            (customerSpendTotals.get(customerId) || 0) + totalPrice
+          );
+        }
         createdSales.push(sale);
+      }
+
+      for (const [custId, addedSpend] of customerSpendTotals.entries()) {
+        const customer = verifiedCustomers.get(custId);
+        if (customer && addedSpend > 0) {
+          await customer.update(
+            { totalPurchases: Number(customer.totalPurchases || 0) + addedSpend },
+            { transaction }
+          );
+        }
       }
 
       for (const payment of payments) {

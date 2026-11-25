@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.mediquick.pharmacymobile",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

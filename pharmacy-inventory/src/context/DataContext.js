@@ -226,7 +226,7 @@ export const DataProvider = ({ children }) => {
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/customers");
+      const res = await apiFetch("/api/customers?limit=100");
       if (res.ok) {
         const data = await res.json();
         const rows = responseRows(data);
@@ -240,6 +240,33 @@ export const DataProvider = ({ children }) => {
       console.warn("Failed to fetch customers, reading offline store", err);
       const cached = await getOfflineCustomers();
       if (cached && cached.length > 0) setCustomers(cached);
+    }
+  }, []);
+
+  const addCustomer = useCallback(async (payload) => {
+    try {
+      const res = await apiFetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          status: res.status,
+          error: data?.message || data?.error || "Failed to register patient.",
+          existingCustomer: data?.existingCustomer || null,
+        };
+      }
+      setCustomers((prev) => {
+        const next = [data, ...prev.filter((item) => item.id !== data.id)];
+        saveOfflineCustomers(next).catch(console.warn);
+        return next;
+      });
+      return { success: true, customer: data };
+    } catch (err) {
+      return { success: false, error: "Unable to reach the patient registry." };
     }
   }, []);
 
@@ -625,6 +652,7 @@ export const DataProvider = ({ children }) => {
         fetchInventoryCategories,
         customers,
         fetchCustomers,
+        addCustomer,
         userRole,
         username,
         userId,

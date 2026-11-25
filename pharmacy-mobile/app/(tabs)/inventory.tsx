@@ -413,7 +413,12 @@ export default function InventoryScreen() {
 
   if (!user) {
     return (
-      <View style={[styles.accessDenied, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.accessDenied,
+          { backgroundColor: theme.background, paddingTop: Math.max(insets.top, 12) + 24 },
+        ]}
+      >
         <Boxes size={48} color={theme.primary} />
         <Text style={[styles.deniedTitle, { color: theme.text }]}>Staff Access Required</Text>
         <Text style={[styles.deniedSubtitle, { color: theme.mutedText }]}>
@@ -427,7 +432,16 @@ export default function InventoryScreen() {
     <RoleGuard page="inventory">
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Top Header & Search */}
-        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: theme.surface,
+              borderBottomColor: theme.border,
+              paddingTop: Math.max(insets.top, 12) + layout.spacing.sm,
+            },
+          ]}
+        >
           <View style={styles.topRow}>
             <View>
               <Text style={[styles.headerTitle, { color: theme.navigation }]}>

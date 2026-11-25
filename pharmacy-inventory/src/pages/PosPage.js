@@ -33,7 +33,7 @@ function buildConfirmedReceipt(sales, checkout) {
     subTotal,
     discount,
     totalToPay: rows.reduce((sum, sale) => sum + Number(sale.totalPrice || 0), 0),
-    customerName: checkout.customerName || "Walk-in Customer",
+    customerName: checkout.customerName || "Walking Customer",
     customerPhone: checkout.customerPhone || "",
     customerEmail: checkout.customerEmail || "",
     cashierName: rows[0]?.soldBy || "Not recorded",
@@ -128,6 +128,7 @@ export default function PosPage() {
     paymentMethod,
     payments,
     customerId,
+    customerType,
     customerName,
     customerPhone,
     customerEmail,
@@ -135,10 +136,11 @@ export default function PosPage() {
   }) => {
     const now = new Date();
     const receiptNo = makeReceiptNo(clientTransactionId);
+    const resolvedCustomerType = customerType || (customerId ? "REGISTERED" : "WALK_IN");
     const checkout = {
       paymentMethod,
       payments,
-      customerName,
+      customerName: customerName || "Walking Customer",
       customerPhone,
       customerEmail,
       cashierName: username,
@@ -151,6 +153,7 @@ export default function PosPage() {
       return {
         medicineId: inventoryItem?.id || item.id,
         customerId: customerId || null,
+        customerType: resolvedCustomerType,
         name: inventoryItem?.name || item.name,
         quantity: item.quantity,
         pricePerUnit: Number(item.price || 0),
@@ -164,6 +167,8 @@ export default function PosPage() {
 
     const result = await recordSale({
       items: saleItems,
+      customerId: customerId || null,
+      customerType: resolvedCustomerType,
       payments,
       clientTransactionId,
     });

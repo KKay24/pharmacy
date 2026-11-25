@@ -25,7 +25,7 @@ applyMethodDecorator(Get, CustomersController.prototype, 'get', ':id');
 for (const method of ['list', 'search', 'create', 'get']) applyMethodDecorator(UseGuards, CustomersController.prototype, method, AuthGuard, RolesGuard, PermissionsGuard);
 for (const method of ['list', 'search', 'get']) RequirePermissions(Permissions.CUSTOMERS_READ)(CustomersController.prototype, method);
 RequirePermissions(Permissions.CUSTOMERS_WRITE)(CustomersController.prototype, 'create');
-for (const method of ['list', 'search', 'create', 'get']) Roles('admin', 'manager')(CustomersController.prototype, method);
+for (const method of ['list', 'search', 'create', 'get']) Roles('admin', 'manager', 'user')(CustomersController.prototype, method);
 applyParameterDecorator(Query, CustomersController.prototype, 'search', 0);
 applyParameterDecorator(Query, CustomersController.prototype, 'list', 0);
 applyParameterDecorator(Body, CustomersController.prototype, 'create', 0);

@@ -29,6 +29,7 @@ const ROLE_PERMISSIONS = Object.freeze({
     Permissions.SALES_READ,
     Permissions.SALES_WRITE,
     Permissions.CUSTOMERS_READ,
+    Permissions.CUSTOMERS_WRITE,
     Permissions.PRESCRIPTIONS_READ,
   ],
   customer: [],

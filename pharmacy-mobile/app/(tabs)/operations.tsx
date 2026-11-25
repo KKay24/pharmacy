@@ -257,7 +257,10 @@ export default function OperationsScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: Math.max(insets.top, 12) + layout.spacing.sm },
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
