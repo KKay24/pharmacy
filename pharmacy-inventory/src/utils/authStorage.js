@@ -1,3 +1,5 @@
+import { isStaffRole } from './staffAccess';
+
 const SESSION_KEY = 'mediquick.auth';
 
 export const loadAuthSession = () => {
@@ -7,7 +9,11 @@ export const loadAuthSession = () => {
 
   try {
     const rawValue = window.localStorage.getItem(SESSION_KEY);
-    return rawValue ? JSON.parse(rawValue) : null;
+    if (rawValue) return JSON.parse(rawValue);
+
+    const token = window.localStorage.getItem('store_token');
+    const user = JSON.parse(window.localStorage.getItem('store_user') || 'null');
+    return token && isStaffRole(user?.role) ? { token, user } : null;
   } catch (error) {
     return null;
   }

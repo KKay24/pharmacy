@@ -5,6 +5,8 @@ import {
   getHttpErrorMessage,
   getNetworkErrorMessage,
 } from "../utils/errorMessages";
+import { DataContext } from "./DataContext";
+import { isStaffRole } from "../utils/staffAccess";
 
 export const StoreContext = createContext(null);
 
@@ -17,6 +19,8 @@ function withoutInventoryLevels(product) {
 }
 
 export function StoreProvider({ children }) {
+  const dataContext = useContext(DataContext);
+
   // Auth
   const [storeUser, setStoreUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem("store_user")); } catch { return null; }
@@ -68,6 +72,9 @@ export function StoreProvider({ children }) {
     localStorage.setItem("store_user", JSON.stringify(data.user));
     setStoreToken(data.token);
     setStoreUser(data.user);
+    if (isStaffRole(data.user?.role)) {
+      dataContext?.loginUser?.(data);
+    }
     return data;
   };
 
@@ -98,11 +105,15 @@ export function StoreProvider({ children }) {
   };
 
   const storeLogout = useCallback(() => {
+    const hadStaffSession = isStaffRole(storeUser?.role);
     localStorage.removeItem("store_token");
     localStorage.removeItem("store_user");
     setStoreToken(null);
     setStoreUser(null);
-  }, []);
+    if (hadStaffSession) {
+      dataContext?.logoutUser?.();
+    }
+  }, [dataContext, storeUser]);
 
   // --- API helpers ---
   const apiFetch = useCallback(async (path, options = {}) => {
