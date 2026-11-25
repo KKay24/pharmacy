@@ -13,6 +13,7 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
+import { canViewStaffWorkspace } from '@/utils/accountAccess';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -53,9 +54,7 @@ export default function TabLayout() {
   const { cartCount } = useCart();
   const insets = useSafeAreaInsets();
 
-  const isStaff = Boolean(
-    user && ['admin', 'manager', 'user'].includes(user.role?.toLowerCase() || '')
-  );
+  const isStaff = canViewStaffWorkspace(user);
 
   // Tab bar height: 64dp content area + bottom safe-area inset
   // Ensures the bar always sits above Android system nav (3-button ~48dp, gesture ~16-24dp)

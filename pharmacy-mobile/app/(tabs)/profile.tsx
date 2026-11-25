@@ -1,14 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Pressable, Alert, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, View } from '@/components/Themed';
 import { useAuth } from '@/context/AuthContext';
 import {
-  User,
   LogOut,
   ShieldCheck,
   Mail,
   LogIn,
-  HeartPulse,
   Package,
   FileText,
   Heart,
@@ -24,14 +23,35 @@ import Colors from '@/constants/Colors';
 import { layout } from '@/constants/theme';
 import { API_URL } from '@/api/client';
 import { Badge } from '@/components/ui/Badge';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import {
+  DEBUG_TAP_THRESHOLD,
+  canViewDeveloperInfo,
+  canViewStaffWorkspace,
+  formatRoleBadgeLabel,
+  shouldRevealDeveloperInfo,
+} from '@/utils/accountAccess';
 
 export default function ProfileScreen() {
-  const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
+
+  const [debugTapCount, setDebugTapCount] = useState(0);
+
+  const isStaffWorkspaceVisible = canViewStaffWorkspace(user);
+  const isAdminAccount = canViewDeveloperInfo(user);
+  const showDeveloperInfo = shouldRevealDeveloperInfo(user, debugTapCount);
+
+  const handleVersionTap = () => {
+    if (!isAdminAccount) return;
+    setDebugTapCount((prev) => {
+      if (prev >= DEBUG_TAP_THRESHOLD) {
+        return 0;
+      }
+      return prev + 1;
+    });
+  };
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out of MediQuick?', [
@@ -39,6 +59,7 @@ export default function ProfileScreen() {
       {
         text: 'Sign Out',
         onPress: async () => {
+          setDebugTapCount(0);
           await logout();
           router.replace('/(tabs)');
         },
@@ -48,217 +69,329 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={{ paddingTop: Math.max(insets.top, 12) + 8, paddingBottom: 24 }}
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.surface }]}
+      edges={['top']}
     >
-      {/* Header Profile Card */}
-      <View style={[styles.headerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <View style={styles.headerRow}>
-          <View style={[styles.avatar, { backgroundColor: user ? theme.primarySoft : '#ffffff', borderColor: theme.primary, overflow: 'hidden' }]}>
-            {user ? (
-              <Text style={[styles.avatarText, { color: theme.primary }]}>
-                {user.username.charAt(0).toUpperCase()}
+      {/* Solid Top Header — prevents scrolled cards from colliding with system status bar icons */}
+      <View
+        style={[
+          styles.topHeader,
+          { backgroundColor: theme.surface, borderBottomColor: theme.border },
+        ]}
+      >
+        <Text style={[styles.topHeaderTitle, { color: theme.text }]}>Account</Text>
+      </View>
+
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Profile Card */}
+        <View
+          style={[
+            styles.headerCard,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
+          <View style={styles.headerRow}>
+            <View
+              style={[
+                styles.avatar,
+                {
+                  backgroundColor: user ? theme.primarySoft : '#ffffff',
+                  borderColor: theme.primary,
+                  overflow: 'hidden',
+                },
+              ]}
+            >
+              {user ? (
+                <Text style={[styles.avatarText, { color: theme.primary }]}>
+                  {user.username.charAt(0).toUpperCase()}
+                </Text>
+              ) : (
+                <BrandLogo size="icon" width={52} height={52} />
+              )}
+            </View>
+            <View style={styles.userCopy}>
+              <Text style={[styles.username, { color: theme.text }]}>
+                {user ? user.username : 'Guest Customer'}
               </Text>
-            ) : (
-              <BrandLogo size="icon" width={52} height={52} />
-            )}
+              {user ? (
+                <View style={styles.badgeRow}>
+                  <Badge
+                    label={formatRoleBadgeLabel(user.role)}
+                    variant="primary"
+                    icon={<ShieldCheck size={12} color={theme.primary} />}
+                  />
+                </View>
+              ) : (
+                <Text style={[styles.guestSubtitle, { color: theme.mutedText }]}>
+                  Sign in to access your account or staff workspace
+                </Text>
+              )}
+            </View>
           </View>
-          <View style={styles.userCopy}>
-            <Text style={[styles.username, { color: theme.text }]}>
-              {user ? user.username : 'Guest Customer'}
-            </Text>
-            {user ? (
-              <View style={styles.badgeRow}>
-                <Badge
-                  label={user.role ? user.role.toUpperCase() : 'STAFF'}
-                  variant="primary"
-                  icon={<ShieldCheck size={12} color={theme.primary} />}
-                />
-              </View>
-            ) : (
-              <Text style={[styles.guestSubtitle, { color: theme.mutedText }]}>
-                Sign in with a staff account for operations access
+
+          {user?.email ? (
+            <View style={[styles.emailRow, { borderTopColor: theme.borderLight }]}>
+              <Mail size={16} color={theme.mutedText} />
+              <Text style={[styles.emailText, { color: theme.textSecondary }]}>
+                {user.email}
               </Text>
-            )}
-          </View>
+            </View>
+          ) : null}
+
+          {!user ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign In"
+              style={({ pressed }) => [
+                styles.signInBtn,
+                { backgroundColor: theme.primary, opacity: pressed ? 0.85 : 1 },
+              ]}
+              onPress={() => router.push('/(auth)/login')}
+            >
+              <LogIn size={18} color="#ffffff" />
+              <Text style={styles.signInBtnText}>Sign In</Text>
+            </Pressable>
+          ) : null}
         </View>
 
-        {user?.email ? (
-          <View style={[styles.emailRow, { borderTopColor: theme.borderLight }]}>
-            <Mail size={16} color={theme.mutedText} />
-            <Text style={[styles.emailText, { color: theme.textSecondary }]}>{user.email}</Text>
-          </View>
-        ) : null}
-
-        {user ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Sign out"
-            style={({ pressed }) => [
-              styles.signOutBtn,
-              { backgroundColor: theme.dangerSoft, borderColor: theme.danger, opacity: pressed ? 0.8 : 1 },
-            ]}
-            onPress={handleLogout}
-          >
-            <LogOut size={16} color={theme.danger} />
-            <Text style={[styles.signOutText, { color: theme.danger }]}>Sign Out</Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Staff Sign In"
-            style={({ pressed }) => [
-              styles.signInBtn,
-              { backgroundColor: theme.primary, opacity: pressed ? 0.85 : 1 },
-            ]}
-            onPress={() => router.push('/(auth)/login')}
-          >
-            <LogIn size={18} color="#ffffff" />
-            <Text style={styles.signInBtnText}>Staff Sign In</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* Customer Quick Links */}
-      <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.sectionHeading, { color: theme.mutedText }]}>CUSTOMER SERVICES</Text>
-
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
-          onPress={() => router.push('/track-order')}
+        {/* Customer Quick Links */}
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
         >
-          <View style={[styles.menuIconWrap, { backgroundColor: theme.infoSoft }]}>
-            <Package size={18} color={theme.info} />
-          </View>
-          <View style={styles.menuCopy}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>Track Order</Text>
-            <Text style={[styles.menuSub, { color: theme.mutedText }]}>
-              Check status with order & phone number
-            </Text>
-          </View>
-          <ChevronRight size={18} color={theme.mutedText} />
-        </Pressable>
+          <Text style={[styles.sectionHeading, { color: theme.mutedText }]}>
+            CUSTOMER SERVICES
+          </Text>
 
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
-          onPress={() => router.push('/prescription-upload')}
-        >
-          <View style={[styles.menuIconWrap, { backgroundColor: theme.primarySoft }]}>
-            <FileText size={18} color={theme.primary} />
-          </View>
-          <View style={styles.menuCopy}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>Prescription Upload & Track</Text>
-            <Text style={[styles.menuSub, { color: theme.mutedText }]}>
-              Upload doctor scripts for pharmacy review
-            </Text>
-          </View>
-          <ChevronRight size={18} color={theme.mutedText} />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
-          onPress={() => router.push('/health-wellness')}
-        >
-          <View style={[styles.menuIconWrap, { backgroundColor: theme.accentSoft }]}>
-            <Heart size={18} color={theme.accent} />
-          </View>
-          <View style={styles.menuCopy}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>Health & Wellness Guide</Text>
-            <Text style={[styles.menuSub, { color: theme.mutedText }]}>
-              Nutrition, OTC guidance & wellness tips
-            </Text>
-          </View>
-          <ChevronRight size={18} color={theme.mutedText} />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
-          onPress={() => router.push('/contact')}
-        >
-          <View style={[styles.menuIconWrap, { backgroundColor: theme.successSoft }]}>
-            <Phone size={18} color={theme.success} />
-          </View>
-          <View style={styles.menuCopy}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>Contact Pharmacy & Support</Text>
-            <Text style={[styles.menuSub, { color: theme.mutedText }]}>
-              Send inquiry, phone & store location
-            </Text>
-          </View>
-          <ChevronRight size={18} color={theme.mutedText} />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
-          onPress={() => router.push('/about')}
-        >
-          <View style={[styles.menuIconWrap, { backgroundColor: theme.surfaceMuted }]}>
-            <Info size={18} color={theme.textSecondary} />
-          </View>
-          <View style={styles.menuCopy}>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>About MediQuick</Text>
-            <Text style={[styles.menuSub, { color: theme.mutedText }]}>
-              Hours, licensed premises & pharmacy info
-            </Text>
-          </View>
-          <ChevronRight size={18} color={theme.mutedText} />
-        </Pressable>
-      </View>
-
-      {/* Staff Operations Shortcut */}
-      {user ? (
-        <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.sectionHeading, { color: theme.mutedText }]}>STAFF WORKSPACE</Text>
           <Pressable
             accessibilityRole="button"
             style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
-            onPress={() => router.push('/(tabs)/operations')}
+            onPress={() => router.push('/track-order')}
           >
-            <View style={[styles.menuIconWrap, { backgroundColor: theme.primarySoft }]}>
-              <Layers size={18} color={theme.primary} />
+            <View style={[styles.menuIconWrap, { backgroundColor: theme.infoSoft }]}>
+              <Package size={18} color={theme.info} />
             </View>
             <View style={styles.menuCopy}>
-              <Text style={[styles.menuTitle, { color: theme.text }]}>Operations Command Center</Text>
+              <Text style={[styles.menuTitle, { color: theme.text }]}>Track Order</Text>
               <Text style={[styles.menuSub, { color: theme.mutedText }]}>
-                Dashboard, Orders, Prescriptions, Reports & Admin
+                Check status with order & phone number
+              </Text>
+            </View>
+            <ChevronRight size={18} color={theme.mutedText} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
+            onPress={() => router.push('/prescription-upload')}
+          >
+            <View style={[styles.menuIconWrap, { backgroundColor: theme.primarySoft }]}>
+              <FileText size={18} color={theme.primary} />
+            </View>
+            <View style={styles.menuCopy}>
+              <Text style={[styles.menuTitle, { color: theme.text }]}>
+                Prescription Upload & Track
+              </Text>
+              <Text style={[styles.menuSub, { color: theme.mutedText }]}>
+                Upload doctor scripts for pharmacy review
+              </Text>
+            </View>
+            <ChevronRight size={18} color={theme.mutedText} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
+            onPress={() => router.push('/health-wellness')}
+          >
+            <View style={[styles.menuIconWrap, { backgroundColor: theme.accentSoft }]}>
+              <Heart size={18} color={theme.accent} />
+            </View>
+            <View style={styles.menuCopy}>
+              <Text style={[styles.menuTitle, { color: theme.text }]}>
+                Health & Wellness Guide
+              </Text>
+              <Text style={[styles.menuSub, { color: theme.mutedText }]}>
+                Nutrition, OTC guidance & wellness tips
+              </Text>
+            </View>
+            <ChevronRight size={18} color={theme.mutedText} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
+            onPress={() => router.push('/contact')}
+          >
+            <View style={[styles.menuIconWrap, { backgroundColor: theme.successSoft }]}>
+              <Phone size={18} color={theme.success} />
+            </View>
+            <View style={styles.menuCopy}>
+              <Text style={[styles.menuTitle, { color: theme.text }]}>
+                Contact Pharmacy & Support
+              </Text>
+              <Text style={[styles.menuSub, { color: theme.mutedText }]}>
+                Send inquiry, phone & store location
+              </Text>
+            </View>
+            <ChevronRight size={18} color={theme.mutedText} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
+            onPress={() => router.push('/about')}
+          >
+            <View style={[styles.menuIconWrap, { backgroundColor: theme.surfaceMuted }]}>
+              <Info size={18} color={theme.textSecondary} />
+            </View>
+            <View style={styles.menuCopy}>
+              <Text style={[styles.menuTitle, { color: theme.text }]}>
+                About MediQuick
+              </Text>
+              <Text style={[styles.menuSub, { color: theme.mutedText }]}>
+                Hours, licensed premises & pharmacy info
               </Text>
             </View>
             <ChevronRight size={18} color={theme.mutedText} />
           </Pressable>
         </View>
-      ) : null}
 
-      {/* System & Connection Info */}
-      <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.sectionHeading, { color: theme.mutedText }]}>SYSTEM INFORMATION</Text>
-        <View style={styles.infoRow}>
-          <Server size={16} color={theme.mutedText} />
-          <Text style={[styles.infoLabel, { color: theme.mutedText }]}>Connected API Server:</Text>
-          <Text style={[styles.infoValue, { color: theme.text }]} numberOfLines={1}>
-            {API_URL}
+        {/* Staff Operations Shortcut — strictly restricted to staff/cashier/pharmacist/manager/admin roles */}
+        {isStaffWorkspaceVisible ? (
+          <View
+            style={[
+              styles.section,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Text style={[styles.sectionHeading, { color: theme.mutedText }]}>
+              STAFF WORKSPACE
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.menuItem, pressed && styles.itemPressed]}
+              onPress={() => router.push('/(tabs)/operations')}
+            >
+              <View style={[styles.menuIconWrap, { backgroundColor: theme.primarySoft }]}>
+                <Layers size={18} color={theme.primary} />
+              </View>
+              <View style={styles.menuCopy}>
+                <Text style={[styles.menuTitle, { color: theme.text }]}>
+                  Operations Command Center
+                </Text>
+                <Text style={[styles.menuSub, { color: theme.mutedText }]}>
+                  Dashboard, Orders, Prescriptions, Reports & Admin
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.mutedText} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* App Version & Admin-Only Hidden Developer Server Info (5 taps on version row for admins) */}
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
+          <Text style={[styles.sectionHeading, { color: theme.mutedText }]}>
+            APP INFORMATION
           </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <ShieldCheck size={16} color={theme.mutedText} />
-          <Text style={[styles.infoLabel, { color: theme.mutedText }]}>App Build:</Text>
-          <Text style={[styles.infoValue, { color: theme.text }]}>MediQuick Mobile v1.0.0</Text>
-        </View>
-      </View>
+          <Pressable
+            onPress={handleVersionTap}
+            accessibilityRole="text"
+            style={styles.infoRow}
+          >
+            <ShieldCheck size={16} color={theme.mutedText} />
+            <Text style={[styles.infoLabel, { color: theme.mutedText }]}>App Build:</Text>
+            <Text style={[styles.infoValue, { color: theme.text }]}>
+              MediQuick Mobile v1.0.0
+            </Text>
+          </Pressable>
 
-      <View style={styles.footerSpace} />
-    </ScrollView>
+          {showDeveloperInfo ? (
+            <View
+              style={[
+                styles.devInfoBox,
+                { borderTopColor: theme.borderLight },
+              ]}
+            >
+              <View style={styles.infoRow}>
+                <Server size={16} color={theme.mutedText} />
+                <Text style={[styles.infoLabel, { color: theme.mutedText }]}>
+                  Connected API Server:
+                </Text>
+                <Text
+                  style={[styles.infoValue, { color: theme.text }]}
+                  numberOfLines={1}
+                >
+                  {API_URL}
+                </Text>
+              </View>
+              <Text style={[styles.devHint, { color: theme.mutedText }]}>
+                Admin diagnostics active — tap App Build again to hide
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Destructive Sign Out button placed safely at the very bottom */}
+        {user ? (
+          <View style={styles.signOutSection}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+              style={({ pressed }) => [
+                styles.signOutBtn,
+                {
+                  backgroundColor: theme.dangerSoft,
+                  borderColor: theme.danger,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              onPress={handleLogout}
+            >
+              <LogOut size={16} color={theme.danger} />
+              <Text style={[styles.signOutText, { color: theme.danger }]}>Sign Out</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        <View style={styles.footerSpace} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
+  topHeader: {
+    paddingHorizontal: layout.spacing.lg,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  topHeaderTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
   container: {
     flex: 1,
+  },
+  scrollContent: {
     padding: layout.spacing.lg,
+    paddingBottom: 24,
   },
   headerCard: {
     borderRadius: layout.radius.xl,
@@ -320,13 +453,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
+  signOutSection: {
+    marginTop: layout.spacing.xs,
+    marginBottom: layout.spacing.md,
+    backgroundColor: 'transparent',
+  },
   signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: layout.spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: layout.radius.md,
     borderWidth: 1,
   },
@@ -409,8 +546,19 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
+  devInfoBox: {
+    marginTop: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  devHint: {
+    fontSize: 11,
+    paddingHorizontal: 4,
+    paddingBottom: 2,
+  },
   footerSpace: {
-    height: 40,
+    height: 24,
     backgroundColor: 'transparent',
   },
 });
