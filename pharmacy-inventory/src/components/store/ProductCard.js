@@ -25,9 +25,6 @@ export function ProductCard({ product, onCartOpen }) {
       {product.prescriptionRequired && (
         <span className="store-product-card__badge store-product-card__badge--rx">Prescription</span>
       )}
-      {!product.prescriptionRequired && product.availabilityStatus === "preorder" && (
-        <span className="store-product-card__badge store-product-card__badge--preorder">Preorder</span>
-      )}
       <button
         type="button"
         className={`store-product-card__wish ${wished ? "active" : ""}`}
@@ -66,7 +63,7 @@ export function ProductCard({ product, onCartOpen }) {
           </Link>
         ) : (
           <button type="button" className="store-product-card__add store-product-card__add--primary" onClick={handleAdd}>
-            <ShoppingCart size={14} /> {product.availabilityStatus === "preorder" ? "Preorder" : "Add to cart"}
+            <ShoppingCart size={14} /> Add to cart
           </button>
         )}
       </div>

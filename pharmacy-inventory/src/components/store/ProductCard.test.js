@@ -43,4 +43,11 @@ describe("ProductCard", () => {
     fireEvent.click(addButton);
     expect(addToCart).toHaveBeenCalledWith(product);
   });
+
+  it("does not label an out-of-stock product as a preorder", () => {
+    render(<ProductCard product={{ ...product, availabilityStatus: "preorder" }} />);
+
+    expect(screen.queryByText(/preorder/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /add to cart/i })).toBeTruthy();
+  });
 });

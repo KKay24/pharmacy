@@ -199,7 +199,6 @@ export default function StoreCheckoutPage() {
                   <div key={item.id} className="store-order-item">
                     <span style={{ fontWeight: 600 }}>
                       {item.name} <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>×{item.quantity}</span>
-                      {item.availabilityStatus === "preorder" && <small style={{ display: "block", color: "#9a3412" }}>Preorder · supplier estimate not confirmed</small>}
                     </span>
                     <span style={{ fontWeight: 700 }}>ZMW {((item.price || 0) * item.quantity).toFixed(2)}</span>
                   </div>

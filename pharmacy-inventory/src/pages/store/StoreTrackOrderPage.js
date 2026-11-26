@@ -130,10 +130,7 @@ export default function StoreTrackOrderPage() {
               <div key={`${item.name}-${index}`} style={{ padding: "0.75rem 0", borderTop: "1px solid var(--border)" }}>
                 <strong>{item.name} × {item.quantity}</strong>
                 <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.82rem" }}>
-                  {item.fulfillmentStatus}
-                  {item.outstandingPreorderQuantity > 0
-                    ? ` · ${item.outstandingPreorderQuantity} awaiting replenishment`
-                    : ""}
+                  {item.fulfillmentStatus === "Awaiting Stock" ? "Processing" : item.fulfillmentStatus}
                   {item.estimatedFulfillmentAt
                     ? ` · Estimated ${new Date(item.estimatedFulfillmentAt).toLocaleDateString()}`
                     : ""}
