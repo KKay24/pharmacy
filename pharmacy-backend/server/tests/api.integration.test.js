@@ -96,6 +96,7 @@ before(async () => {
     NODE_ENV: 'test',
     SQLITE_STORAGE_PATH: sqlitePath,
     JWT_SECRET: 'integration-test-secret',
+    ORDER_PAYMENT_WEBHOOK_SECRET: 'integration-test-webhook-secret',
     SEED_ADMIN_EMAIL: 'admin@example.test',
     SEED_ADMIN_PASSWORD: 'bootstrap-password-for-tests',
   };
@@ -119,6 +120,7 @@ before(async () => {
       NODE_ENV: 'test',
       SQLITE_STORAGE_PATH: sqlitePath,
       JWT_SECRET: 'integration-test-secret',
+      ORDER_PAYMENT_WEBHOOK_SECRET: 'integration-test-webhook-secret',
       ENABLE_DEMO_SEEDING: 'true',
       ALLOW_LEGACY_DEV_AUTH: 'false',
       RESEND_API_KEY: '',

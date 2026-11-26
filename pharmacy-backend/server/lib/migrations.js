@@ -23,6 +23,7 @@ const migrationDefinitions = [
   require('../migrations/020-add-auth-audit-logs'),
   require('../migrations/021-batch-lifecycle-and-traceability'),
   require('../migrations/022-patient-registration-and-sale-customer-type'),
+  require('../migrations/023-hybrid-online-order-fulfillment'),
 ];
 
 function normalizeTableName(table) {

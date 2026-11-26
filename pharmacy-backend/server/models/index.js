@@ -15,6 +15,10 @@ const AuthAuditLog = require('./AuthAuditLog');
 const InventoryMovement = require('./InventoryMovement');
 const InventoryCategory = require('./InventoryCategory');
 const Order = require('./Order');
+const OrderItem = require('./OrderItem');
+const OrderItemReservation = require('./OrderItemReservation');
+const ReplenishmentTask = require('./ReplenishmentTask');
+const OrderPaymentEvent = require('./OrderPaymentEvent');
 const SupportInquiry = require('./SupportInquiry');
 const SearchSynonym = require('./SearchSynonym');
 const SearchAnalytics = require('./SearchAnalytics');
@@ -54,6 +58,18 @@ Order.belongsTo(Customer, { foreignKey: 'customerId' });
 
 User.hasMany(Order, { foreignKey: 'userId' });
 Order.belongsTo(User, { foreignKey: 'userId' });
+Order.hasMany(OrderItem, { as: 'OrderItems', foreignKey: 'orderId', onDelete: 'CASCADE' });
+OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
+Medicine.hasMany(OrderItem, { foreignKey: 'medicineId', onDelete: 'SET NULL' });
+OrderItem.belongsTo(Medicine, { foreignKey: 'medicineId' });
+OrderItem.hasMany(OrderItemReservation, { as: 'Reservations', foreignKey: 'orderItemId', onDelete: 'CASCADE' });
+OrderItemReservation.belongsTo(OrderItem, { foreignKey: 'orderItemId' });
+Batch.hasMany(OrderItemReservation, { foreignKey: 'batchId', onDelete: 'RESTRICT' });
+OrderItemReservation.belongsTo(Batch, { foreignKey: 'batchId' });
+OrderItem.hasOne(ReplenishmentTask, { as: 'ReplenishmentTask', foreignKey: 'orderItemId', onDelete: 'CASCADE' });
+ReplenishmentTask.belongsTo(OrderItem, { foreignKey: 'orderItemId' });
+Order.hasMany(OrderPaymentEvent, { as: 'PaymentEvents', foreignKey: 'orderId', onDelete: 'CASCADE' });
+OrderPaymentEvent.belongsTo(Order, { foreignKey: 'orderId' });
 
 // Supplier Associations
 Supplier.hasMany(Batch, { foreignKey: 'supplierId' });
@@ -88,6 +104,10 @@ module.exports = {
   InventoryMovement,
   InventoryCategory,
   Order,
+  OrderItem,
+  OrderItemReservation,
+  ReplenishmentTask,
+  OrderPaymentEvent,
   SupportInquiry,
   SearchSynonym,
   SearchAnalytics,

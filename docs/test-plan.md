@@ -35,7 +35,7 @@ Backend automated coverage includes:
 - Admin creation is restricted to the controlled seed process.
 - Authenticated inventory fetch, batch receiving and sale creation.
 - Hierarchical taxonomy retrieval, allowed-form scoping, product creation with classification, ID/name inventory filtering and rejection of mismatched form/subcategory filters.
-- Optional-auth customer order and prescription account associations, guest tracking phone-length validation, insufficient-stock order rejection with transaction safety, preflight headers and endpoint-specific JSON body limits.
+- Optional-auth customer order and prescription account associations, guest tracking phone-length validation, order reservations, mixed-order preorder allocation, cancellation release, signed payment callback verification/idempotency, refund callback state, pickup handover, preflight headers and endpoint-specific JSON body limits.
 - Memory safeguards: bounded prescription-upload concurrency, periodic safe process-memory metrics, bounded AI/auth in-memory maps, chunked financial report aggregation, compact price-derived catalogue scans and large prescription document isolation/pagination.
 - Customer account sign-in-to-registration mode switching.
 - AI session ownership isolation across guest and authenticated users.
@@ -49,6 +49,7 @@ Web automated coverage includes:
 - Staff support inbox rendering, contact links, status updates, API error handling, and authenticated backend inquiry listing/status transitions.
 - Customer prescription-history pagination and loading additional pages without fetching document payloads in the list.
 - Production API URL resolution through the same-origin Vercel proxy and response-header filtering for transparently decoded proxy responses.
+- Staff order queue rendering, supplier-confirmed replenishment estimate submission and visible error states.
 
 The inventory of test files may change; inspect the package before relying on this list.
 
@@ -56,10 +57,10 @@ The inventory of test files may change; inspect the package before relying on th
 
 | Change area | Minimum verification |
 |---|---|
-| API routes | Authenticated/unauthenticated access, role/permission boundary, valid/invalid input, response/error shape, database effect and web/mobile caller compatibility. Verify optional-auth storefront associations, stock reservation, and guest tracking phone length. |
-| Models/migrations | Migration on a disposable database, idempotent rerun behavior where intended, relationship/constraint checks, index checks and preservation of existing data. |
+| API routes | Authenticated/unauthenticated access, role/permission boundary, valid/invalid input, response/error shape, database effect and web/mobile caller compatibility. Verify optional-auth storefront associations, reservation/preorder behavior, verified callbacks, pickup handover, replenishment estimates and guest tracking phone length. |
+| Models/migrations | Migration on a disposable database, idempotent rerun behavior where intended, relationship/constraint checks, index checks and preservation of existing data. For order fulfillment, verify physical/reserved/available quantity invariants and nullable batch references. |
 | Authentication | Valid/invalid credentials, expired/invalid token, suspended account, forced password change, password hashing and prohibited role changes. |
-| Inventory/products | Product identity match/ambiguity, unique product/batch behavior, receiving, stock aggregate, low-stock thresholds and movement records. Validate main category requirement, subcategory/form parentage, dependent selector resets, generic/brand/supplier filters and safe legacy-data migration. |
+| Inventory/products | Product identity match/ambiguity, unique product/batch behavior, receiving, preorder allocation FIFO, stock aggregate, low-stock thresholds and movement records. Verify reservations remain protected from POS and offline deductions. Validate main category requirement, subcategory/form parentage, dependent selector resets, generic/brand/supplier filters and safe legacy-data migration. |
 | Batches/expiry | Expiry date persistence and display, quantity across multiple batches, ordering used by sales, analytics warnings and retained references. Do not assume expiry-sale blocking unless code/tests implement it. |
 | Sales/POS | Cart payload, quantity/total validation, insufficient stock, batch deduction, movement creation, customer association, exact confirmed payment allocation, refund limits, reversal and sale/movement transaction atomicity. |
 | Offline PWA/sync | Data available from cache, enqueue and persistence across reload, online retry, duplicate idempotency, permission failures, server stock conflicts, failed-operation visibility and queue removal only after success. |
@@ -98,6 +99,18 @@ The inventory of test files may change; inspect the package before relying on th
 4. For the web PWA, disconnect, record a supported queued operation, reload, reconnect and observe the synced/conflict/failed status.
 5. Verify server-side stock wins after a sync conflict and no failed/conflicted operation disappears silently.
 6. Confirm mobile checkout works online; do not assume mobile offline sync.
+
+### Hybrid online ordering and fulfillment
+
+1. Verify checkout readiness stays unavailable when no payment initiation provider is configured; a callback secret alone must not enable production checkout.
+2. Create a mixed order in an isolated test environment; verify physical stock is unchanged, available stock is reduced by the reservation, and the out-of-stock portion creates one replenishment task without a fabricated ETA.
+3. Reject an invalid callback signature and mismatched amount; accept a valid signed provider event once and treat its duplicate idempotently.
+4. Confirm a paid mixed order cannot enter fulfillment while any preorder quantity remains outstanding.
+5. Receive stock and verify FIFO allocation updates batch/product reserved quantities, remaining task quantities, customer tracking data and supplier-confirmed ETA display. Verify availability emails are sent only when mail configuration exists.
+6. Cancel an unfulfilled order and verify all reservations/tasks are released; for a paid order, verify refund-pending state and completion only after a valid signed refund callback.
+7. Prepare a store-pickup order, verify a unique pickup reference, reject an incorrect handover reference and record the authorized staff member/time for a valid handover.
+8. For home delivery, verify manual Yango reference/rider/actual-fee/tracking fields and status transitions; confirm no prescription details are included in delivery data.
+9. Verify POS sales and offline stock adjustments cannot consume reserved quantities and retain batch/expiry movement history.
 
 ### Customers, prescriptions and reporting
 
@@ -140,6 +153,8 @@ For a release, record the commit/revision, environment (without secret values), 
 ## 9. Coverage gaps
 
 - Mobile automated tests are not currently verified.
+- No production payment gateway, provider-specific payment initiation, automated provider refund, Yango API or end-to-end Resend delivery is currently verified.
+- Automated Yango API integration/status tests are not currently present; the supported workflow is manual staff booking and status entry.
 - No API schema/contract test suite or checked-in OpenAPI definition was found.
 - Test coverage for complete prescription fulfillment, comprehensive role matrices, PostgreSQL migration upgrades and the full offline conflict matrix is not currently documented/verified.
 - Formal load, accessibility, backup-restore, security penetration and disaster-recovery test evidence is not currently documented/verified.

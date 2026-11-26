@@ -6,8 +6,9 @@ const {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  ServiceUnavailableException,
 } = require('@nestjs/common');
-const { randomBytes } = require('node:crypto');
+const { createHmac, randomBytes, timingSafeEqual } = require('node:crypto');
 const { InsufficientStockException, OrderStateException } = require('../common/errors');
 const { Op, col, fn } = require('sequelize');
 const {
@@ -17,7 +18,11 @@ const {
   InventoryMovement,
   Medicine,
   Order,
+  OrderItem,
+  OrderItemReservation,
+  OrderPaymentEvent,
   Prescription,
+  ReplenishmentTask,
   Sales,
   SupportInquiry,
   User,
@@ -31,6 +36,7 @@ const {
 const searchService = require('./search.service');
 const { activeBatchWhere, isBatchInactive, resolveBatchStatus } = require('../inventory/batch-utils');
 const { parseImageDataUri, toCompactProductImageUrl } = require('../inventory/image-utils');
+const { sendReceiptEmail } = require('../sales/receipt-email');
 
 function validatePrescriptionFile(fileData) {
   if (!fileData) return null;
@@ -83,6 +89,22 @@ function calculateProductPrice(medicine) {
 function formatProduct(medicine, options = {}) {
   const plain = typeof medicine.get === 'function' ? medicine.get({ plain: true }) : medicine;
   const price = calculateProductPrice(plain);
+  const today = new Date().toISOString().slice(0, 10);
+  const availableStock = (Array.isArray(plain.Batches) ? plain.Batches : [])
+    .filter((batch) => (
+      !isBatchInactive(batch)
+      && String(batch.expiryDate) >= today
+    ))
+    .reduce((sum, batch) => (
+      sum + Math.max(0, Number(batch.quantity || 0) - Number(batch.reservedQuantity || 0))
+    ), 0);
+  const hasBatches = Array.isArray(plain.Batches) && plain.Batches.length > 0;
+  const fallbackStock = Math.max(
+    0,
+    Number(plain.totalQuantity || 0) - Number(plain.reservedQuantity || 0)
+  );
+  const preorderEligible = !Boolean(plain.prescriptionRequired);
+  const orderableStock = hasBatches ? availableStock : fallbackStock;
   const imageUrl = options.compactImages
     ? toCompactProductImageUrl(plain)
     : plain.imageUrl;
@@ -109,6 +131,8 @@ function formatProduct(medicine, options = {}) {
     ProductForm: plain.ProductForm,
     price,
     prescriptionRequired: Boolean(plain.prescriptionRequired),
+    availabilityStatus: orderableStock > 0 ? 'in_stock' : (preorderEligible ? 'preorder' : 'unavailable'),
+    preorderEligible,
   };
 }
 
@@ -550,46 +574,60 @@ class StoreService {
   }
 
   async createOrder(payload, user = null) {
-    const items = Array.isArray(payload.items) ? payload.items : [];
-    if (items.length === 0) {
-      throw new BadRequestException('Order must contain at least one item');
+    if (!this.getPaymentReadiness().available) {
+      throw new ServiceUnavailableException('Online checkout is unavailable until a payment provider is configured');
     }
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    if (items.length === 0) throw new BadRequestException('Order must contain at least one item');
     if (!payload.customerName || !payload.customerPhone) {
       throw new BadRequestException('Customer name and phone number are required');
     }
+    const phone = validateAndNormalizePhone(payload.customerPhone);
+    if (!phone.valid) throw new BadRequestException(phone.error);
+    const email = validateAndNormalizeOptionalEmail(payload.customerEmail);
+    if (!email.valid) throw new BadRequestException(email.error);
+
     const deliveryMethod = payload.deliveryMethod || 'delivery';
     if (!['delivery', 'pickup'].includes(deliveryMethod)) {
       throw new BadRequestException('Invalid delivery method');
     }
+    if (deliveryMethod === 'delivery' && !String(payload.deliveryAddress || '').trim()) {
+      throw new BadRequestException('A delivery address is required');
+    }
     const paymentMethod = payload.paymentMethod || 'Mobile Money';
-    if (!['Mobile Money', 'Cash on Delivery', 'Bank Transfer'].includes(paymentMethod)) {
+    if (!['Online Gateway', 'Mobile Money', 'Cash on Delivery', 'Bank Transfer'].includes(paymentMethod)) {
       throw new BadRequestException('Invalid payment method');
     }
 
-    const transaction = await sequelize.transaction();
-    try {
+    const groupedItems = new Map();
+    for (const item of items) {
+      const medicineId = Number(item.id || item.medicineId);
+      const quantity = Number(item.quantity ?? 1);
+      if (!Number.isInteger(medicineId) || medicineId <= 0) {
+        throw new BadRequestException('A valid product is required for each order item');
+      }
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        throw new BadRequestException('Order quantities must be positive whole numbers');
+      }
+      const current = groupedItems.get(medicineId);
+      groupedItems.set(medicineId, {
+        medicineId,
+        quantity: quantity + (current?.quantity || 0),
+      });
+    }
+
+    return sequelize.transaction(async (transaction) => {
       const orderNumber = `ORD-${randomBytes(10).toString('hex').toUpperCase()}`;
+      const preparedItems = [];
       let calculatedSubtotal = 0;
-      const verifiedItems = [];
+      const today = new Date().toISOString().slice(0, 10);
 
-      for (const item of items) {
-        const medicineId = item.id || item.medicineId;
-        const requestedQuantity = Number(item.quantity ?? 1);
-        if (!Number.isInteger(Number(medicineId)) || Number(medicineId) <= 0) {
-          throw new BadRequestException('A valid product is required for each order item');
-        }
-        if (!Number.isInteger(requestedQuantity) || requestedQuantity <= 0) {
-          throw new BadRequestException(`Invalid quantity for ${item.name}`);
-        }
-
+      for (const { medicineId, quantity } of groupedItems.values()) {
         const medicine = await Medicine.findByPk(medicineId, {
           transaction,
           lock: transaction.LOCK.UPDATE,
         });
-        if (!medicine) {
-          throw new NotFoundException(`Product not found: ${item.name || medicineId}`);
-        }
-        if (medicine.isCustomerVisible === false) {
+        if (!medicine || medicine.isCustomerVisible === false) {
           throw new NotFoundException('This product is not available for customer orders');
         }
         if (medicine.prescriptionRequired) {
@@ -597,123 +635,66 @@ class StoreService {
         }
 
         const batches = await Batch.findAll({
-          where: activeBatchWhere({ medicineId: medicine.id }),
+          where: activeBatchWhere({ medicineId }),
           order: [['expiryDate', 'ASC'], ['id', 'ASC']],
           transaction,
           lock: transaction.LOCK.UPDATE,
         });
-
-        const today = new Date().toISOString().slice(0, 10);
         const saleableBatches = batches.filter((batch) => (
           String(batch.expiryDate) >= today && Number(batch.quantity || 0) > 0
         ));
-        const availableStock = batches.length > 0
+        const physicalQuantity = batches.length > 0
           ? saleableBatches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
           : Number(medicine.totalQuantity || 0);
-        if (availableStock < requestedQuantity) {
-          throw new InsufficientStockException(
-            `Insufficient stock for ${medicine.name}. `
-            + `Required: ${requestedQuantity}, available: ${availableStock}.`
-          );
-        }
-        // Only create the order after confirming that all requested units are saleable.
-        let itemPrice = calculateProductPrice({
-          basePrice: medicine.basePrice,
-          Batches: batches,
-        });
+        const reservedQuantity = batches.length > 0
+          ? saleableBatches.reduce((sum, batch) => sum + Number(batch.reservedQuantity || 0), 0)
+          : Number(medicine.reservedQuantity || 0);
+        const availableQuantity = Math.max(0, physicalQuantity - reservedQuantity);
+        const itemPrice = calculateProductPrice({ basePrice: medicine.basePrice, Batches: batches });
         if (!Number.isFinite(itemPrice) || itemPrice <= 0) {
           throw new BadRequestException(`A valid selling price is not configured for ${medicine.name}`);
         }
-        calculatedSubtotal += itemPrice * requestedQuantity;
 
-        // Deduct batches if batches exist
-        let remainingToDeduct = requestedQuantity;
-        let totalCost = 0;
-        const deductions = [];
-        const unbatchedQuantityToDeduct = batches.length === 0
-          ? Math.min(Math.max(availableStock, 0), requestedQuantity)
-          : 0;
-
+        let quantityToReserve = Math.min(availableQuantity, quantity);
+        const allocations = [];
         for (const batch of saleableBatches) {
-          if (remainingToDeduct <= 0) break;
-          const currentBatchQty = Number(batch.quantity || 0);
-          if (currentBatchQty <= 0) continue;
-          const deduct = Math.min(currentBatchQty, remainingToDeduct);
-          deductions.push({ batch, deduct });
-          totalCost += Number(batch.costPrice || 0) * deduct;
-          remainingToDeduct -= deduct;
-        }
-
-        for (const { batch, deduct } of deductions) {
-          const nextQty = Number(batch.quantity) - deduct;
+          if (quantityToReserve <= 0) break;
+          const freeQuantity = Math.max(
+            0,
+            Number(batch.quantity || 0) - Number(batch.reservedQuantity || 0)
+          );
+          const allocation = Math.min(freeQuantity, quantityToReserve);
+          if (allocation <= 0) continue;
           await batch.update({
-            quantity: nextQty,
-            status: resolveBatchStatus(nextQty, batch.status),
+            reservedQuantity: Number(batch.reservedQuantity || 0) + allocation,
           }, { transaction });
-          await InventoryMovement.create({
-            medicineId: medicine.id,
-            batchId: batch.id,
-            movementType: 'SALE',
-            quantityChange: -deduct,
-            referenceType: 'ONLINE_ORDER',
-            reason: `Order ${orderNumber}`,
-          }, { transaction });
+          allocations.push({ batchId: batch.id, quantity: allocation });
+          quantityToReserve -= allocation;
         }
-        if (batches.length === 0) {
-          if (unbatchedQuantityToDeduct > 0) {
-            await InventoryMovement.create({
-              medicineId: medicine.id,
-              batchId: null,
-              movementType: 'SALE',
-              quantityChange: -unbatchedQuantityToDeduct,
-              referenceType: 'ONLINE_ORDER',
-              reason: `Order ${orderNumber}`,
-            }, { transaction });
-          }
+        const reservedForItem = Math.min(availableQuantity, quantity);
+        const preorderQuantity = quantity - reservedForItem;
+        if (reservedForItem > 0) {
+          await medicine.update({
+            reservedQuantity: Number(medicine.reservedQuantity || 0) + reservedForItem,
+          }, { transaction });
+          if (batches.length === 0) allocations.push({ batchId: null, quantity: reservedForItem });
         }
 
-        const newMedicineTotal = batches.length > 0
-          ? batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0)
-          : Math.max(0, Number(medicine.totalQuantity || 0) - unbatchedQuantityToDeduct);
-        await medicine.update({ totalQuantity: newMedicineTotal }, { transaction });
-
-        // Record line item in Sales table for unified accounting/reporting
-        await Sales.create({
-          name: medicine.name,
-          medicineId: medicine.id,
-          batchId: deductions.length > 0 ? deductions[0].batch.id : null,
-          quantity: requestedQuantity,
-          pricePerUnit: itemPrice,
-          totalPrice: itemPrice * requestedQuantity,
-          totalCost,
-          paymentMethod,
-          receiptNumber: orderNumber,
-          date: new Date(),
-        }, { transaction });
-
-        verifiedItems.push({
-          id: medicine.id,
-          name: medicine.name,
-          quantity: requestedQuantity,
-          price: itemPrice,
-          total: itemPrice * requestedQuantity,
-          dosage: medicine.dosage,
-          strength: medicine.strength,
-          imageUrl: medicine.imageUrl,
-          prescriptionRequired: medicine.prescriptionRequired,
+        calculatedSubtotal += itemPrice * quantity;
+        preparedItems.push({
+          medicine,
+          quantity,
+          unitPrice: itemPrice,
+          totalPrice: itemPrice * quantity,
+          reservedQuantity: reservedForItem,
+          preorderQuantity,
+          allocations,
         });
       }
 
-      const deliveryFee = deliveryMethod === 'pickup' ? 0 : 25;
-      const totalAmount = calculatedSubtotal + deliveryFee;
-
-      // Link to customer record if exists or create one
       let customerId = null;
       if (user) {
-        let existingCustomer = await Customer.findOne({
-          where: { userId: user.id },
-          transaction,
-        });
+        let existingCustomer = await Customer.findOne({ where: { userId: user.id }, transaction });
         if (!existingCustomer) {
           existingCustomer = await Customer.create({
             name: payload.customerName,
@@ -726,14 +707,16 @@ class StoreService {
         customerId = existingCustomer.id;
       }
 
+      const deliveryFee = deliveryMethod === 'pickup' ? 0 : 25;
       const order = await Order.create({
         orderNumber,
         customerId,
         userId: user ? user.id : null,
-        customerName: payload.customerName,
-        customerPhone: payload.customerPhone,
-        customerEmail: payload.customerEmail || null,
+        customerName: String(payload.customerName).trim(),
+        customerPhone: phone.normalized,
+        customerEmail: email.normalized,
         deliveryMethod,
+        deliveryProvider: deliveryMethod === 'delivery' ? 'Yango' : null,
         deliveryAddress: payload.deliveryAddress || null,
         deliveryProvince: payload.deliveryProvince || null,
         deliveryCity: payload.deliveryCity || null,
@@ -744,21 +727,514 @@ class StoreService {
         orderStatus: 'Order Placed',
         subtotal: calculatedSubtotal,
         deliveryFee,
-        totalAmount,
-        items: verifiedItems,
-        prescriptionReference: payload.prescriptionReference || null,
+        totalAmount: calculatedSubtotal + deliveryFee,
+        items: [],
+        prescriptionReference: null,
         notes: payload.notes || null,
         date: new Date(),
       }, { transaction });
 
-      await transaction.commit();
+      const orderItems = [];
+      for (const prepared of preparedItems) {
+        const item = await OrderItem.create({
+          orderId: order.id,
+          medicineId: prepared.medicine.id,
+          productName: prepared.medicine.name,
+          quantity: prepared.quantity,
+          reservedQuantity: prepared.reservedQuantity,
+          preorderQuantity: prepared.preorderQuantity,
+          unitPrice: prepared.unitPrice,
+          totalPrice: prepared.totalPrice,
+          fulfillmentStatus: prepared.preorderQuantity > 0 ? 'Awaiting Stock' : 'Awaiting Payment',
+          outstandingPreorderQuantity: prepared.preorderQuantity,
+        }, { transaction });
+        for (const allocation of prepared.allocations) {
+          await OrderItemReservation.create({
+            orderItemId: item.id,
+            batchId: allocation.batchId,
+            quantity: allocation.quantity,
+          }, { transaction });
+        }
+        if (prepared.preorderQuantity > 0) {
+          await ReplenishmentTask.create({
+            orderItemId: item.id,
+            outstandingQuantity: prepared.preorderQuantity,
+            status: 'Open',
+          }, { transaction });
+        }
+        orderItems.push({
+          id: prepared.medicine.id,
+          orderItemId: item.id,
+          name: prepared.medicine.name,
+          quantity: prepared.quantity,
+          reservedQuantity: prepared.reservedQuantity,
+          preorderQuantity: prepared.preorderQuantity,
+          outstandingPreorderQuantity: prepared.preorderQuantity,
+          fulfillmentStatus: item.fulfillmentStatus,
+          estimatedFulfillmentAt: null,
+          price: prepared.unitPrice,
+          total: prepared.totalPrice,
+          dosage: prepared.medicine.dosage,
+          strength: prepared.medicine.strength,
+          imageUrl: prepared.medicine.imageUrl,
+          prescriptionRequired: false,
+        });
+      }
+      await order.update({ items: orderItems }, { transaction });
       return { success: true, order };
-    } catch (error) {
-      await transaction.rollback();
+    }).catch((error) => {
       if (error instanceof HttpException) throw error;
-      console.error('Order creation error:', error);
+      console.error('Order creation error:', error?.name || 'UnknownError');
       throw new InternalServerErrorException('Failed to place order. Please try again.');
+    });
+  }
+
+  async handlePaymentCallback(payload, signature, rawBody) {
+    const secret = process.env.ORDER_PAYMENT_WEBHOOK_SECRET;
+    if (!secret) {
+      throw new ServiceUnavailableException('Online payment confirmation is not configured');
     }
+    if (!Buffer.isBuffer(rawBody) || typeof signature !== 'string') {
+      throw new BadRequestException('A signed payment callback is required');
+    }
+    const expected = createHmac('sha256', secret).update(rawBody).digest();
+    const suppliedSignature = signature.replace(/^sha256=/i, '');
+    if (!/^[a-f0-9]{64}$/i.test(suppliedSignature)) {
+      throw new BadRequestException('Invalid payment callback signature');
+    }
+    const supplied = Buffer.from(suppliedSignature, 'hex');
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+      throw new BadRequestException('Invalid payment callback signature');
+    }
+
+    const eventId = typeof payload?.eventId === 'string' ? payload.eventId.trim() : '';
+    const orderNumber = typeof payload?.orderNumber === 'string' ? payload.orderNumber.trim() : '';
+    const transactionReference = typeof payload?.transactionReference === 'string'
+      ? payload.transactionReference.trim()
+      : '';
+    const eventType = payload?.eventType;
+    if (!eventId || eventId.length > 128 || !orderNumber || !transactionReference
+      || transactionReference.length > 120
+      || !['payment.succeeded', 'payment.failed', 'refund.completed'].includes(eventType)) {
+      throw new BadRequestException('Invalid payment callback details');
+    }
+    const amountMinor = Number(payload.amountMinor);
+    if (!Number.isSafeInteger(amountMinor) || amountMinor < 0 || payload.currency !== 'ZMW') {
+      throw new BadRequestException('Invalid payment callback amount or currency');
+    }
+
+    return sequelize.transaction(async (transaction) => {
+      const duplicate = await OrderPaymentEvent.findOne({ where: { eventId }, transaction });
+      if (duplicate) return { success: true, duplicate: true };
+
+      const order = await Order.findOne({
+        where: { orderNumber },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!order) throw new NotFoundException('Order not found');
+      if (amountMinor !== Math.round(Number(order.totalAmount || 0) * 100)) {
+        throw new ConflictException('Payment amount does not match the order total');
+      }
+
+      if (eventType === 'payment.succeeded') {
+        if (order.paymentStatus === 'Paid') {
+          throw new ConflictException('Order already has a confirmed payment');
+        }
+        if (order.orderStatus === 'Cancelled') {
+          throw new ConflictException('A cancelled order cannot be paid');
+        }
+        await order.update({
+          paymentStatus: 'Paid',
+          gatewayPaymentReference: transactionReference,
+          paymentConfirmedAt: new Date(),
+        }, { transaction });
+        const orderItems = await OrderItem.findAll({ where: { orderId: order.id }, transaction });
+        const fulfillmentById = new Map();
+        for (const item of orderItems) {
+          const fulfillmentStatus = Number(item.outstandingPreorderQuantity) > 0
+            ? 'Awaiting Stock'
+            : 'Awaiting Fulfillment';
+          await item.update({ fulfillmentStatus }, { transaction });
+          fulfillmentById.set(Number(item.id), fulfillmentStatus);
+        }
+        await order.update({
+          items: (Array.isArray(order.items) ? order.items : []).map((item) => ({
+            ...item,
+            fulfillmentStatus: fulfillmentById.get(Number(item.orderItemId)) || item.fulfillmentStatus,
+          })),
+        }, { transaction });
+      } else if (eventType === 'payment.failed') {
+        if (order.paymentStatus === 'Paid') {
+          throw new ConflictException('A confirmed payment cannot be marked failed');
+        }
+        await this.releaseOrderReservations(order, transaction);
+        await order.update({
+          paymentStatus: 'Failed',
+          orderStatus: 'Cancelled',
+          cancellationReason: 'Payment was declined or failed at the provider',
+          cancelledAt: new Date(),
+        }, { transaction });
+      } else {
+        if (order.refundStatus !== 'Pending') {
+          throw new ConflictException('Order has no pending refund');
+        }
+        await order.update({
+          refundStatus: 'Completed',
+          refundReference: transactionReference,
+          paymentStatus: 'Refunded',
+        }, { transaction });
+      }
+
+      await OrderPaymentEvent.create({
+        eventId,
+        orderId: order.id,
+        eventType,
+        receivedAt: new Date(),
+      }, { transaction });
+      return { success: true, order };
+    });
+  }
+
+  getPaymentReadiness() {
+    return {
+      available: process.env.NODE_ENV === 'test' && Boolean(process.env.ORDER_PAYMENT_WEBHOOK_SECRET),
+      reason: 'No payment initiation provider is configured',
+    };
+  }
+
+  async allocateReceivedStock(medicineId, batch, transaction) {
+    if (isBatchInactive(batch) || String(batch.expiryDate) < new Date().toISOString().slice(0, 10)) {
+      return 0;
+    }
+
+    const medicine = await Medicine.findByPk(medicineId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if (!medicine) throw new NotFoundException('Medicine not found for received stock');
+
+    const pendingItems = await OrderItem.findAll({
+      where: {
+        medicineId,
+        outstandingPreorderQuantity: { [Op.gt]: 0 },
+      },
+      include: [{
+        model: Order,
+        required: true,
+        where: { orderStatus: { [Op.ne]: 'Cancelled' } },
+      }],
+      order: [['createdAt', 'ASC'], ['id', 'ASC']],
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    let remainingStock = Math.max(
+      0,
+      Number(batch.quantity || 0) - Number(batch.reservedQuantity || 0)
+    );
+    let batchReserved = Number(batch.reservedQuantity || 0);
+    let medicineReserved = Number(medicine.reservedQuantity || 0);
+    let totalAllocated = 0;
+    const affectedOrderIds = new Set();
+
+    for (const item of pendingItems) {
+      if (remainingStock <= 0) break;
+      const outstanding = Number(item.outstandingPreorderQuantity || 0);
+      const allocation = Math.min(outstanding, remainingStock);
+      if (allocation <= 0) continue;
+
+      const nextOutstanding = outstanding - allocation;
+      const nextReserved = Number(item.reservedQuantity || 0) + allocation;
+      await OrderItemReservation.create({
+        orderItemId: item.id,
+        batchId: batch.id,
+        quantity: allocation,
+      }, { transaction });
+      await item.update({
+        reservedQuantity: nextReserved,
+        outstandingPreorderQuantity: nextOutstanding,
+        fulfillmentStatus: nextOutstanding > 0 ? 'Awaiting Stock' : 'Awaiting Fulfillment',
+        estimatedFulfillmentAt: nextOutstanding > 0 ? item.estimatedFulfillmentAt : null,
+      }, { transaction });
+
+      const task = await ReplenishmentTask.findOne({
+        where: { orderItemId: item.id },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (task) {
+        await task.update({
+          outstandingQuantity: nextOutstanding,
+          status: nextOutstanding > 0 ? task.status : 'Received',
+        }, { transaction });
+      }
+
+      const order = item.Order;
+      await order.update({
+        items: (Array.isArray(order.items) ? order.items : []).map((orderItem) => (
+          Number(orderItem.orderItemId) === Number(item.id)
+            ? {
+              ...orderItem,
+              reservedQuantity: nextReserved,
+              outstandingPreorderQuantity: nextOutstanding,
+              fulfillmentStatus: nextOutstanding > 0 ? 'Awaiting Stock' : 'Awaiting Fulfillment',
+              estimatedFulfillmentAt: nextOutstanding > 0
+                ? orderItem.estimatedFulfillmentAt
+                : null,
+            }
+            : orderItem
+        )),
+      }, { transaction });
+
+      affectedOrderIds.add(order.id);
+      remainingStock -= allocation;
+      batchReserved += allocation;
+      medicineReserved += allocation;
+      totalAllocated += allocation;
+    }
+
+    if (totalAllocated > 0) {
+      await batch.update({ reservedQuantity: batchReserved }, { transaction });
+      await medicine.update({ reservedQuantity: medicineReserved }, { transaction });
+    }
+
+    const notifyOrders = [];
+    for (const orderId of affectedOrderIds) {
+      const remainingItems = await OrderItem.count({
+        where: {
+          orderId,
+          outstandingPreorderQuantity: { [Op.gt]: 0 },
+        },
+        transaction,
+      });
+      if (remainingItems === 0) {
+        const order = await Order.findByPk(orderId, { transaction });
+        if (order?.customerEmail) notifyOrders.push(order);
+      }
+    }
+
+    if (notifyOrders.length > 0) {
+      transaction.afterCommit(async () => {
+        const apiKey = process.env.RESEND_API_KEY;
+        const from = process.env.RECEIPT_FROM_EMAIL;
+        if (!apiKey || !from) {
+          console.warn(JSON.stringify({
+            event: 'order_preorder_availability_notification_skipped',
+            reason: 'email_provider_not_configured',
+            orderCount: notifyOrders.length,
+          }));
+          return;
+        }
+        for (const order of notifyOrders) {
+          try {
+            await sendReceiptEmail('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from,
+                to: [order.customerEmail],
+                subject: `MediQuick order ${order.orderNumber}: products available`,
+                text: `The products for your MediQuick order ${order.orderNumber} are now available. Our team will prepare your order and notify you when it is ready.`,
+              }),
+              signal: AbortSignal.timeout(10000),
+            });
+          } catch (error) {
+            console.error(JSON.stringify({
+              event: 'order_preorder_availability_notification_failed',
+              orderId: order.id,
+              errorName: error?.name || 'UnknownError',
+            }));
+          }
+        }
+      });
+    }
+
+    return totalAllocated;
+  }
+
+  async releaseOrderReservations(order, transaction) {
+    const items = await OrderItem.findAll({
+      where: { orderId: order.id },
+      include: [{ model: OrderItemReservation, as: 'Reservations' }],
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    for (const item of items) {
+      for (const reservation of item.Reservations || []) {
+        const quantity = Number(reservation.quantity);
+        const medicine = await Medicine.findByPk(item.medicineId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!medicine || Number(medicine.reservedQuantity || 0) < quantity) {
+          throw new ConflictException('Order reservation is inconsistent; inventory was not changed');
+        }
+        if (reservation.batchId !== null) {
+          const batch = await Batch.findByPk(reservation.batchId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          if (!batch || Number(batch.reservedQuantity || 0) < quantity) {
+            throw new ConflictException('Reserved batch is missing or inconsistent');
+          }
+          await batch.update({ reservedQuantity: Number(batch.reservedQuantity) - quantity }, { transaction });
+        }
+        await medicine.update({
+          reservedQuantity: Number(medicine.reservedQuantity || 0) - quantity,
+        }, { transaction });
+      }
+      await item.update({
+        fulfillmentStatus: 'Cancelled',
+        reservedQuantity: 0,
+        outstandingPreorderQuantity: 0,
+      }, { transaction });
+      const task = await ReplenishmentTask.findOne({ where: { orderItemId: item.id }, transaction });
+      if (task && task.status !== 'Received') {
+        await task.update({ status: 'Cancelled', outstandingQuantity: 0 }, { transaction });
+      }
+    }
+    const cancelledItemIds = new Set(items.map((item) => Number(item.id)));
+    await order.update({
+      items: (Array.isArray(order.items) ? order.items : []).map((item) => (
+        cancelledItemIds.has(Number(item.orderItemId))
+          ? {
+            ...item,
+            fulfillmentStatus: 'Cancelled',
+            reservedQuantity: 0,
+            outstandingPreorderQuantity: 0,
+          }
+          : item
+      )),
+    }, { transaction });
+  }
+
+  async consumeOrderReservations(order, transaction) {
+    const items = await OrderItem.findAll({
+      where: { orderId: order.id },
+      include: [{ model: OrderItemReservation, as: 'Reservations' }],
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if (items.length === 0) throw new ConflictException('Order has no fulfillment items');
+    if (items.some((item) => Number(item.outstandingPreorderQuantity) > 0)) {
+      throw new ConflictException('This mixed order must wait until every preorder item is in stock');
+    }
+
+    for (const item of items) {
+      const reservations = item.Reservations || [];
+      const reserved = reservations.reduce((sum, reservation) => sum + Number(reservation.quantity), 0);
+      if (reserved !== Number(item.quantity)) {
+        throw new ConflictException(`Reserved stock is incomplete for ${item.productName}`);
+      }
+      let totalCost = 0;
+      const allocatedBatches = [];
+      for (const reservation of reservations) {
+        const quantity = Number(reservation.quantity);
+        const medicine = await Medicine.findByPk(item.medicineId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!medicine || Number(medicine.reservedQuantity || 0) < quantity) {
+          throw new ConflictException(`Reserved stock is inconsistent for ${item.productName}`);
+        }
+        if (reservation.batchId !== null) {
+          const batch = await Batch.findByPk(reservation.batchId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          if (!batch || Number(batch.quantity || 0) < quantity
+            || Number(batch.reservedQuantity || 0) < quantity) {
+            throw new ConflictException(`Reserved batch is unavailable for ${item.productName}`);
+          }
+          const nextQuantity = Number(batch.quantity) - quantity;
+          await batch.update({
+            quantity: nextQuantity,
+            reservedQuantity: Number(batch.reservedQuantity) - quantity,
+            status: resolveBatchStatus(nextQuantity, batch.status),
+          }, { transaction });
+          totalCost += Number(batch.costPrice || 0) * quantity;
+          allocatedBatches.push(batch.id);
+          await InventoryMovement.create({
+            medicineId: medicine.id,
+            batchId: batch.id,
+            movementType: 'SALE',
+            quantityChange: -quantity,
+            referenceType: 'ONLINE_ORDER',
+            referenceId: order.id,
+            reason: `Order ${order.orderNumber}`,
+          }, { transaction });
+        } else {
+          if (Number(medicine.totalQuantity || 0) < quantity) {
+            throw new ConflictException(`Reserved stock is unavailable for ${item.productName}`);
+          }
+          await InventoryMovement.create({
+            medicineId: medicine.id,
+            batchId: null,
+            movementType: 'SALE',
+            quantityChange: -quantity,
+            referenceType: 'ONLINE_ORDER',
+            referenceId: order.id,
+            reason: `Order ${order.orderNumber}`,
+          }, { transaction });
+        }
+        await medicine.update({
+          reservedQuantity: Number(medicine.reservedQuantity || 0) - quantity,
+        }, { transaction });
+      }
+
+      const medicine = await Medicine.findByPk(item.medicineId, { transaction });
+      const batches = await Batch.findAll({
+        where: activeBatchWhere({ medicineId: item.medicineId }),
+        transaction,
+      });
+      if (batches.length > 0) {
+        await medicine.update({
+          totalQuantity: batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0),
+        }, { transaction });
+      } else {
+        await medicine.update({
+          totalQuantity: Math.max(0, Number(medicine.totalQuantity || 0) - Number(item.quantity)),
+        }, { transaction });
+      }
+
+      const existingSale = await Sales.findOne({
+        where: { receiptNumber: order.orderNumber, medicineId: item.medicineId },
+        transaction,
+      });
+      if (!existingSale) {
+        await Sales.create({
+          name: item.productName,
+          medicineId: item.medicineId,
+          customerId: order.customerId,
+          batchId: allocatedBatches.length === 1 ? allocatedBatches[0] : null,
+          quantity: item.quantity,
+          pricePerUnit: item.unitPrice,
+          totalPrice: item.totalPrice,
+          totalPriceMinor: Math.round(Number(item.totalPrice) * 100),
+          totalCost,
+          totalCostMinor: batches.length > 0 ? Math.round(totalCost * 100) : null,
+          paymentMethod: order.paymentMethod,
+          receiptNumber: order.orderNumber,
+          date: new Date(),
+        }, { transaction });
+      }
+      await item.update({
+        fulfillmentStatus: 'Processing',
+        reservedQuantity: 0,
+      }, { transaction });
+    }
+
+    await order.update({
+      items: (Array.isArray(order.items) ? order.items : []).map((orderItem) => ({
+        ...orderItem,
+        reservedQuantity: 0,
+        fulfillmentStatus: 'Processing',
+      })),
+    }, { transaction });
   }
 
   async listOrders(query = {}, user = null) {
@@ -787,6 +1263,34 @@ class StoreService {
     if (query.status) {
       where.orderStatus = query.status;
     }
+    if (query.paymentStatus) where.paymentStatus = query.paymentStatus;
+    if (isStaff && query.filter) {
+      const filters = {
+        new: { orderStatus: 'Order Placed', paymentStatus: 'Pending' },
+        paid: { paymentStatus: 'Paid' },
+        processing: { orderStatus: { [Op.in]: ['Confirmed', 'Preparing'] } },
+        'ready-pickup': { orderStatus: 'Ready', deliveryMethod: 'pickup' },
+        'ready-dispatch': { orderStatus: 'Ready', deliveryMethod: 'delivery' },
+        'out-for-delivery': { orderStatus: 'Out for Delivery' },
+        delivered: { orderStatus: 'Delivered' },
+        cancelled: { orderStatus: 'Cancelled' },
+      };
+      if (filters[query.filter]) Object.assign(where, filters[query.filter]);
+      else if (['preorders', 'awaiting-stock'].includes(query.filter)) {
+        const matchingItems = await OrderItem.findAll({
+          where: query.filter === 'preorders'
+            ? { preorderQuantity: { [Op.gt]: 0 } }
+            : { outstandingPreorderQuantity: { [Op.gt]: 0 } },
+          attributes: ['orderId'],
+        });
+        where.id = { [Op.in]: [...new Set(matchingItems.map((item) => item.orderId))] };
+        if (!query.status) {
+          where.orderStatus = { [Op.ne]: 'Cancelled' };
+        }
+      } else {
+        throw new BadRequestException('Invalid order queue filter');
+      }
+    }
 
     const { count, rows } = await Order.findAndCountAll({
       where,
@@ -799,9 +1303,22 @@ class StoreService {
       return paginatedResponse(rows.map((order) => ({
         orderNumber: order.orderNumber,
         orderStatus: order.orderStatus,
+        paymentStatus: order.paymentStatus,
         date: order.date,
         totalAmount: order.totalAmount,
         deliveryMethod: order.deliveryMethod,
+        pickupReference: order.deliveryMethod === 'pickup' && order.orderStatus === 'Ready'
+          ? order.pickupReference
+          : null,
+        trackingLink: order.trackingLink,
+        items: (Array.isArray(order.items) ? order.items : []).map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          preorderQuantity: item.preorderQuantity || 0,
+          outstandingPreorderQuantity: item.outstandingPreorderQuantity || 0,
+          fulfillmentStatus: item.fulfillmentStatus,
+          estimatedFulfillmentAt: item.estimatedFulfillmentAt || null,
+        })),
         itemCount: Array.isArray(order.items) ? order.items.length : 0,
       })), count, pagination);
     }
@@ -817,7 +1334,7 @@ class StoreService {
     return order;
   }
 
-  async updateOrderStatus(id, status, reason = '', user = null) {
+  async updateOrderStatus(id, status, reason = '', user = null, metadata = {}) {
     const validStatuses = ['Order Placed', 'Confirmed', 'Preparing', 'Ready', 'Out for Delivery', 'Delivered', 'Cancelled'];
     if (!validStatuses.includes(status)) {
       throw new BadRequestException('Invalid order status');
@@ -843,9 +1360,61 @@ class StoreService {
       ) {
         throw new OrderStateException('Confirm the order before continuing fulfillment');
       }
-
+      const allowedNextStatuses = {
+        'Order Placed': ['Confirmed', 'Cancelled'],
+        Confirmed: ['Preparing', 'Cancelled'],
+        Preparing: ['Ready', 'Cancelled'],
+        Ready: ['Out for Delivery', 'Cancelled'],
+        'Out for Delivery': ['Delivered'],
+      };
+      if (!(allowedNextStatuses[order.orderStatus] || []).includes(status)) {
+        throw new OrderStateException(`Cannot move an order from ${order.orderStatus} to ${status}`);
+      }
       const updates = { orderStatus: status };
+      if (status === 'Out for Delivery') {
+        if (order.deliveryMethod !== 'delivery') {
+          throw new OrderStateException('Only home-delivery orders can be dispatched');
+        }
+        const yangoReference = typeof metadata.yangoReference === 'string'
+          ? metadata.yangoReference.trim()
+          : '';
+        const yangoFee = Number(metadata.yangoFee);
+        const trackingLink = typeof metadata.trackingLink === 'string'
+          ? metadata.trackingLink.trim()
+          : '';
+        if (!yangoReference || yangoReference.length > 120
+          || !Number.isFinite(yangoFee) || yangoFee < 0) {
+          throw new BadRequestException('A Yango reference and actual non-negative delivery fee are required');
+        }
+        if (trackingLink && !/^https?:\/\/\S+$/i.test(trackingLink)) {
+          throw new BadRequestException('Tracking link must be an HTTP(S) URL');
+        }
+        updates.deliveryProvider = 'Yango';
+        updates.yangoReference = yangoReference;
+        updates.yangoRiderDetails = typeof metadata.yangoRiderDetails === 'string'
+          ? metadata.yangoRiderDetails.trim().slice(0, 1000)
+          : null;
+        updates.yangoFee = yangoFee;
+        updates.trackingLink = trackingLink || null;
+      }
+      if (status === 'Delivered') updates.deliveredAt = new Date();
       if (status === 'Confirmed') {
+        if (order.paymentStatus !== 'Paid' && await OrderItem.count({
+          where: { orderId: order.id },
+          transaction,
+        })) {
+          throw new ConflictException('Payment must be verified before an order can be confirmed');
+        }
+        const structuredItemCount = await OrderItem.count({
+          where: { orderId: order.id },
+          transaction,
+        });
+        if (structuredItemCount > 0) {
+          if (order.paymentStatus !== 'Paid') {
+            throw new ConflictException('Payment must be verified before an order can be confirmed');
+          }
+          await this.consumeOrderReservations(order, transaction);
+        } else {
         const orderItems = Array.isArray(order.items) ? order.items : [];
         if (orderItems.length === 0) {
           throw new ConflictException('This order has no items to confirm');
@@ -953,11 +1522,26 @@ class StoreService {
             }, { transaction });
           }
         }
+        }
       }
       if (status === 'Cancelled') {
         if (!user || !['admin', 'manager', 'user'].includes(user.role)) {
           throw new ForbiddenException('Staff authorization is required to cancel an order');
         }
+        const structuredItemCount = await OrderItem.count({
+          where: { orderId: order.id },
+          transaction,
+        });
+        if (structuredItemCount > 0) {
+          if (order.orderStatus !== 'Order Placed') {
+            throw new ConflictException('Only an order not yet in fulfillment can be cancelled');
+          }
+          await this.releaseOrderReservations(order, transaction);
+          if (order.paymentStatus === 'Paid') updates.refundStatus = 'Pending';
+          updates.cancellationReason = cancellationReason;
+          updates.cancelledByUserId = user.id;
+          updates.cancelledAt = new Date();
+        } else {
         const orderMovements = await InventoryMovement.findAll({
           where: {
             referenceType: 'ONLINE_ORDER',
@@ -1050,11 +1634,203 @@ class StoreService {
         updates.cancellationReason = cancellationReason;
         updates.cancelledByUserId = user.id;
         updates.cancelledAt = new Date();
+        }
+      }
+
+      if (status === 'Ready' && order.deliveryMethod === 'pickup') {
+        updates.pickupReference = randomBytes(8).toString('hex').toUpperCase();
+        updates.pickupReadyAt = new Date();
+      }
+      if (['Preparing', 'Ready', 'Out for Delivery', 'Delivered'].includes(status)) {
+        const structuredItems = await OrderItem.findAll({
+          where: { orderId: order.id },
+          transaction,
+        });
+        const nextFulfillmentStatus = status === 'Preparing'
+          ? 'Processing'
+          : status === 'Ready'
+            ? 'Ready'
+            : status === 'Out for Delivery'
+              ? 'Out for Delivery'
+              : 'Delivered';
+        for (const item of structuredItems) {
+          await item.update({ fulfillmentStatus: nextFulfillmentStatus }, { transaction });
+        }
+        if (structuredItems.length > 0) {
+          const itemStatusById = new Map(
+            structuredItems.map((item) => [Number(item.id), nextFulfillmentStatus])
+          );
+          await order.update({
+            items: (Array.isArray(order.items) ? order.items : []).map((item) => ({
+              ...item,
+              fulfillmentStatus: itemStatusById.get(Number(item.orderItemId)) || item.fulfillmentStatus,
+            })),
+          }, { transaction });
+        }
       }
 
       await order.update(updates, { transaction });
       return order;
     });
+  }
+
+  async recordPickupHandover(id, pickupReference, user) {
+    if (!user || !['admin', 'manager', 'user'].includes(user.role)) {
+      throw new ForbiddenException('Staff authorization is required to hand over an order');
+    }
+    const reference = typeof pickupReference === 'string' ? pickupReference.trim() : '';
+    if (!reference) throw new BadRequestException('Pickup reference is required');
+    return sequelize.transaction(async (transaction) => {
+      const order = await Order.findByPk(id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!order) throw new NotFoundException('Order not found');
+      if (order.deliveryMethod !== 'pickup' || order.orderStatus !== 'Ready') {
+        throw new ConflictException('Only a ready store-pickup order can be handed over');
+      }
+      if (order.paymentStatus !== 'Paid') {
+        throw new ConflictException('Payment must be verified before pickup handover');
+      }
+      if (!order.pickupReference || order.pickupReference !== reference) {
+        throw new ConflictException('Pickup reference does not match');
+      }
+      const handedOverAt = new Date();
+      await order.update({
+        orderStatus: 'Delivered',
+        handedOverAt,
+        handedOverByUserId: user.id,
+        deliveredAt: handedOverAt,
+      }, { transaction });
+      await OrderItem.update(
+        { fulfillmentStatus: 'Delivered' },
+        { where: { orderId: order.id }, transaction }
+      );
+      await order.update({
+        items: (Array.isArray(order.items) ? order.items : []).map((item) => ({
+          ...item,
+          fulfillmentStatus: 'Delivered',
+        })),
+      }, { transaction });
+      return order;
+    });
+  }
+
+  async listReplenishmentTasks(query = {}) {
+    const where = {};
+    if (query.status) where.status = query.status;
+    const tasks = await ReplenishmentTask.findAll({
+      where,
+      include: [{
+        model: OrderItem,
+        include: [
+          { model: Order, attributes: ['id', 'orderNumber', 'orderStatus', 'paymentStatus'] },
+          { model: Medicine, attributes: ['id', 'name'] },
+        ],
+      }],
+      order: [['createdAt', 'ASC'], ['id', 'ASC']],
+      limit: 200,
+    });
+    return tasks.map((task) => {
+      const row = task.get({ plain: true });
+      return {
+        id: row.id,
+        outstandingQuantity: row.outstandingQuantity,
+        status: row.status,
+        supplierConfirmedAt: row.supplierConfirmedAt,
+        estimatedFulfillmentAt: row.estimatedFulfillmentAt,
+        orderNumber: row.OrderItem?.Order?.orderNumber || null,
+        orderStatus: row.OrderItem?.Order?.orderStatus || null,
+        paymentStatus: row.OrderItem?.Order?.paymentStatus || null,
+        medicineId: row.OrderItem?.medicineId || null,
+        productName: row.OrderItem?.productName || null,
+      };
+    });
+  }
+
+  async updateReplenishmentEstimate(id, payload, user) {
+    if (!user || !['admin', 'manager', 'user'].includes(user.role)) {
+      throw new ForbiddenException('Staff authorization is required to update replenishment estimates');
+    }
+    const supplierConfirmedAt = new Date(payload.supplierConfirmedAt);
+    const estimatedFulfillmentAt = new Date(payload.estimatedFulfillmentAt);
+    if (Number.isNaN(supplierConfirmedAt.getTime()) || Number.isNaN(estimatedFulfillmentAt.getTime())
+      || supplierConfirmedAt > new Date() || estimatedFulfillmentAt <= new Date()
+      || estimatedFulfillmentAt <= supplierConfirmedAt) {
+      throw new BadRequestException('Provide a supplier-confirmed date and a later estimated fulfillment date');
+    }
+    return sequelize.transaction(async (transaction) => {
+      const task = await ReplenishmentTask.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!task || task.status === 'Cancelled' || task.status === 'Received') {
+        throw new NotFoundException('Open replenishment task not found');
+      }
+      const item = await OrderItem.findByPk(task.orderItemId, { transaction });
+      const order = await Order.findByPk(item.orderId, { transaction });
+      await task.update({
+        status: 'Ordered',
+        supplierConfirmedAt,
+        estimatedFulfillmentAt,
+        updatedByUserId: user.id,
+      }, { transaction });
+      await item.update({ estimatedFulfillmentAt }, { transaction });
+      await order.update({
+        items: (Array.isArray(order.items) ? order.items : []).map((orderItem) => (
+          Number(orderItem.orderItemId) === Number(item.id)
+            ? { ...orderItem, estimatedFulfillmentAt: estimatedFulfillmentAt.toISOString() }
+            : orderItem
+        )),
+      }, { transaction });
+      return task;
+    });
+  }
+
+  async getOrderFulfillmentReport(query = {}) {
+    const where = {};
+    if (query.from || query.to) {
+      const from = new Date(query.from);
+      const to = new Date(query.to);
+      if (!query.from || !query.to || Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from >= to) {
+        throw new BadRequestException('Provide a valid from/to date range');
+      }
+      where.date = { [Op.gte]: from, [Op.lt]: to };
+    }
+    const orders = await Order.findAll({ where, order: [['date', 'ASC']] });
+    const orderIds = orders.map((order) => order.id);
+    const itemRows = orderIds.length
+      ? await OrderItem.findAll({ where: { orderId: { [Op.in]: orderIds } } })
+      : [];
+    const tasks = orderIds.length
+      ? await ReplenishmentTask.findAll({
+        include: [{ model: OrderItem, where: { orderId: { [Op.in]: orderIds } } }],
+      })
+      : [];
+    const paidOrders = orders.filter((order) => order.paymentStatus === 'Paid');
+    const paidOrderIds = new Set(paidOrders.map((order) => Number(order.id)));
+    const paidItems = itemRows.filter((item) => paidOrderIds.has(Number(item.orderId)));
+    const outstandingTasks = tasks.filter((task) => !['Received', 'Cancelled'].includes(task.status));
+    const delivered = orders.filter((order) => order.deliveredAt && order.date);
+    const fulfillmentHours = delivered.map((order) => (
+      Math.max(0, new Date(order.deliveredAt).getTime() - new Date(order.date).getTime()) / 3600000
+    ));
+    return {
+      onlineSales: paidOrders.reduce((sum, order) => sum + Number(order.subtotal || 0), 0),
+      preorderSales: paidItems.reduce((sum, item) => (
+        sum + Number(item.unitPrice || 0) * Number(item.preorderQuantity || 0)
+      ), 0),
+      outstandingPreorderValue: outstandingTasks.reduce((sum, task) => (
+        sum + Number(task.outstandingQuantity || 0) * Number(task.OrderItem?.unitPrice || 0)
+      ), 0),
+      stockAwaitingReplenishment: outstandingTasks.reduce(
+        (sum, task) => sum + Number(task.outstandingQuantity || 0),
+        0
+      ),
+      pickupOrders: orders.filter((order) => order.deliveryMethod === 'pickup').length,
+      yangoDeliveryOrders: orders.filter((order) => order.deliveryProvider === 'Yango').length,
+      deliveryCosts: orders.reduce((sum, order) => sum + Number(order.yangoFee || 0), 0),
+      averageFulfillmentHours: fulfillmentHours.length
+        ? fulfillmentHours.reduce((sum, value) => sum + value, 0) / fulfillmentHours.length
+        : null,
+    };
   }
 
   async uploadPrescription(payload, user = null) {

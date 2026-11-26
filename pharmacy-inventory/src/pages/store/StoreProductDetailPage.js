@@ -111,6 +111,9 @@ export default function StoreProductDetailPage() {
                 ? <span className="store-product-detail__tag" style={{ borderColor: "var(--red)", color: "var(--red)" }}>⚕️ Prescription Required</span>
                 : <span className="store-product-detail__tag" style={{ borderColor: "var(--green)", color: "var(--green)" }}>✓ Over the Counter</span>
               }
+              {!product.prescriptionRequired && product.availabilityStatus === "preorder" && (
+                <span className="store-product-detail__tag" style={{ borderColor: "#b45309", color: "#b45309" }}>Preorder · awaiting stock</span>
+              )}
               {product.dosage && <span className="store-product-detail__tag">{product.dosage}</span>}
               {product.strength && <span className="store-product-detail__tag">{product.strength}</span>}
             </div>
@@ -121,6 +124,11 @@ export default function StoreProductDetailPage() {
 
             {!product.prescriptionRequired && (
               <>
+                {product.availabilityStatus === "preorder" && (
+                  <p role="note" style={{ color: "var(--text-secondary)", marginBottom: "1rem" }}>
+                    Replenishment timing is not confirmed yet. We will show an estimate only after the supplier confirms it.
+                  </p>
+                )}
                 <div className="store-product-detail__qty-control">
                   <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-secondary)" }}>Qty:</span>
                   <button className="store-product-detail__qty-btn" onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
@@ -129,7 +137,7 @@ export default function StoreProductDetailPage() {
                 </div>
                 <div className="store-product-detail__actions">
                   <button className="store-product-detail__add" onClick={handleAdd}>
-                    <ShoppingCart size={18} /> Add to Cart
+                    <ShoppingCart size={18} /> {product.availabilityStatus === "preorder" ? "Add preorder" : "Add to Cart"}
                   </button>
                   <button
                     className={`store-product-detail__wish-btn ${wished ? "active" : ""}`}

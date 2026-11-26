@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { MapPin, User, CreditCard, Smartphone, Banknote, Shield } from "lucide-react";
+import { MapPin, User, CreditCard, Shield } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import { showToast } from "../../components/store/StoreToast";
 
@@ -11,6 +11,7 @@ export default function StoreCheckoutPage() {
   const { cart, cartTotal, clearCart, apiFetch, storeUser } = useStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [paymentAvailable, setPaymentAvailable] = useState(false);
   const [form, setForm] = useState({
     customerName: storeUser?.username || "",
     customerPhone: "",
@@ -19,11 +20,17 @@ export default function StoreCheckoutPage() {
     deliveryAddress: "",
     deliveryCity: "Lusaka",
     deliveryProvince: "Lusaka",
-    paymentMethod: "Mobile Money",
+    paymentMethod: "Online Gateway",
     notes: "",
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    apiFetch("/api/orders/payment-readiness")
+      .then((result) => setPaymentAvailable(result.available === true))
+      .catch(() => setPaymentAvailable(false));
+  }, [apiFetch]);
 
   if (cart.length === 0) {
     return (
@@ -60,8 +67,6 @@ export default function StoreCheckoutPage() {
       const payload = {
         ...form,
         items: cart.map(i => ({ id: i.id, medicineId: i.id, name: i.name, quantity: i.quantity, price: i.price })),
-        deliveryFee,
-        totalAmount: total,
       };
       const result = await apiFetch("/api/orders", { method: "POST", body: JSON.stringify(payload) });
       clearCart();
@@ -117,7 +122,7 @@ export default function StoreCheckoutPage() {
                 <h3><MapPin size={18} /> Delivery Method</h3>
                 <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem" }}>
                   {[
-                    { value: "delivery", label: "Home Delivery", sub: `ZMW ${DELIVERY_FEE}` },
+                    { value: "delivery", label: "Yango Home Delivery", sub: `ZMW ${DELIVERY_FEE} estimated charge` },
                     { value: "pickup", label: "Store Pickup", sub: "Free" },
                   ].map(opt => (
                     <label key={opt.value} style={{
@@ -159,7 +164,7 @@ export default function StoreCheckoutPage() {
                 {form.deliveryMethod === "pickup" && (
                   <div style={{ background: "var(--bg)", borderRadius: "var(--radius-sm)", padding: "1rem", fontSize: "0.88rem", color: "var(--text-secondary)" }}>
                     📍 <strong style={{ color: "var(--text-primary)" }}>MediQuick Pharmacy</strong><br />
-                    Nationalist Road, 25147 | Mon–Sat 8 AM – 8 PM | Sun 9 AM – 5 PM
+                    25147 Nationalist Road, Lusaka
                   </div>
                 )}
               </div>
@@ -167,25 +172,14 @@ export default function StoreCheckoutPage() {
               {/* Payment */}
               <div className="store-checkout-card">
                 <h3><CreditCard size={18} /> Payment Method</h3>
-                <p role="status" style={{ color: "var(--text-secondary)", fontSize: "0.82rem", marginBottom: "0.85rem" }}>
-                  Payment processing is not connected yet. Your order will remain pending until the pharmacy confirms payment.
+                <p role="status" style={{ color: "var(--text-secondary)", fontSize: "0.82rem" }}>
+                  Payment is confirmed only by the payment provider's verified callback. A provider is not configured for this environment.
                 </p>
-                <div className="store-payment-options">
-                  {[
-                    { value: "Mobile Money", label: "Mobile Money", sub: "MTN, Airtel, Zamtel", icon: <Smartphone size={18} /> },
-                    { value: "Cash on Delivery", label: "Cash on Delivery", sub: "Pay when you receive", icon: <Banknote size={18} /> },
-                    { value: "Bank Transfer", label: "Bank Transfer", sub: "Direct bank deposit", icon: <CreditCard size={18} /> },
-                  ].map(opt => (
-                    <label key={opt.value} className={`store-payment-option ${form.paymentMethod === opt.value ? "selected" : ""}`}>
-                      <input type="radio" name="paymentMethod" value={opt.value} checked={form.paymentMethod === opt.value} onChange={e => set("paymentMethod", e.target.value)} style={{ accentColor: "var(--brand-blue)" }} />
-                      <span style={{ color: "var(--brand-blue)" }}>{opt.icon}</span>
-                      <div>
-                        <strong style={{ fontSize: "0.9rem" }}>{opt.label}</strong>
-                        <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-secondary)" }}>{opt.sub}</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                {!paymentAvailable && (
+                  <p className="store-error" role="alert" style={{ marginTop: "0.75rem" }}>
+                    Online checkout is temporarily unavailable. Your cart is saved; please try again later.
+                  </p>
+                )}
               </div>
 
               {/* Notes */}
@@ -203,7 +197,10 @@ export default function StoreCheckoutPage() {
                 <h3>Order Summary</h3>
                 {cart.map(item => (
                   <div key={item.id} className="store-order-item">
-                    <span style={{ fontWeight: 600 }}>{item.name} <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>×{item.quantity}</span></span>
+                    <span style={{ fontWeight: 600 }}>
+                      {item.name} <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>×{item.quantity}</span>
+                      {item.availabilityStatus === "preorder" && <small style={{ display: "block", color: "#9a3412" }}>Preorder · supplier estimate not confirmed</small>}
+                    </span>
                     <span style={{ fontWeight: 700 }}>ZMW {((item.price || 0) * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
@@ -213,7 +210,7 @@ export default function StoreCheckoutPage() {
                     <span>ZMW {cartTotal.toFixed(2)}</span>
                   </div>
                   <div className="store-order-total-row">
-                    <span>Delivery</span>
+                    <span>Yango delivery charge</span>
                     <span>{deliveryFee === 0 ? "Free" : `ZMW ${deliveryFee.toFixed(2)}`}</span>
                   </div>
                   <div className="store-order-total-row total">
@@ -221,8 +218,8 @@ export default function StoreCheckoutPage() {
                     <span>ZMW {total.toFixed(2)}</span>
                   </div>
                 </div>
-                <button type="submit" className="store-order-submit" disabled={loading}>
-                  {loading ? "Placing Order..." : `Place Order · ZMW ${total.toFixed(2)}`}
+                <button type="submit" className="store-order-submit" disabled={loading || !paymentAvailable}>
+                  {loading ? "Placing Order..." : `Continue to Payment · ZMW ${total.toFixed(2)}`}
                 </button>
                 <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", textAlign: "center", marginTop: "0.75rem" }}>
                   <Shield size={12} style={{ verticalAlign: "middle" }} /> Secure checkout. Your data is protected.

@@ -40,12 +40,38 @@ test('taxonomy migration maps recognized legacy records and preserves unclassifi
       dosage: 'Syrup',
       strength: '125 mg/5 mL',
       totalQuantity: 9,
+    }, {
+      fields: [
+        'name',
+        'genericName',
+        'category',
+        'strength',
+        'dosage',
+        'prescriptionRequired',
+        'lowStockThreshold',
+        'totalQuantity',
+        'basePrice',
+        'createdAt',
+        'updatedAt',
+      ],
     });
     const unclassifiedProduct = await Medicine.create({
       name: 'Legacy Tablet Label',
       category: 'Tablets',
       dosage: '500 mg',
       totalQuantity: 5,
+    }, {
+      fields: [
+        'name',
+        'category',
+        'dosage',
+        'prescriptionRequired',
+        'lowStockThreshold',
+        'totalQuantity',
+        'basePrice',
+        'createdAt',
+        'updatedAt',
+      ],
     });
     const preservedBatch = await Batch.create({
       medicineId: unclassifiedProduct.id,
@@ -60,8 +86,16 @@ test('taxonomy migration maps recognized legacy records and preserves unclassifi
 
     await taxonomyMigration.up({ queryInterface, sequelize, DataTypes });
 
-    const mapped = await Medicine.findByPk(recognizedProduct.id);
-    const retained = await Medicine.findByPk(unclassifiedProduct.id);
+    const taxonomyAttributes = [
+      'id',
+      'category',
+      'dosage',
+      'mainCategoryId',
+      'subcategoryId',
+      'productFormId',
+    ];
+    const mapped = await Medicine.findByPk(recognizedProduct.id, { attributes: taxonomyAttributes });
+    const retained = await Medicine.findByPk(unclassifiedProduct.id, { attributes: taxonomyAttributes });
     const retainedBatch = await Batch.findByPk(preservedBatch.id, {
       attributes: ['id', 'medicineId', 'batchNumber', 'quantity', 'expiryDate', 'costPrice', 'sellingPrice'],
     });

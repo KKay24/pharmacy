@@ -74,6 +74,115 @@
   margin-top: 0.1rem;
 }
 
+.order-management__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.65rem;
+}
+
+.order-management__summary > div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: white;
+}
+
+.order-management__summary span {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.order-management__summary strong {
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.order-management__replenishment {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff7ed;
+}
+
+.order-management__replenishment-heading,
+.order-management__task-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.order-management__replenishment-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.order-management__replenishment-heading h3,
+.order-management__replenishment-heading p {
+  margin: 0;
+}
+
+.order-management__replenishment-heading p,
+.order-management__task-summary span {
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.order-management__replenishment-heading button,
+.order-management__task button {
+  min-height: 2.4rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: white;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.order-management__task-list {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.order-management__task {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: white;
+}
+
+.order-management__task-summary {
+  display: grid;
+  gap: 0.2rem;
+  margin-bottom: 0.25rem;
+}
+
+.order-management__task label {
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.order-management__task input {
+  min-height: 2.45rem;
+  padding: 0.45rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #1e293b;
+  font: inherit;
+}
+
+.order-management__task button:disabled,
+.order-management__replenishment-heading button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .order-management__filters {
   align-items: flex-end;
   justify-content: flex-start;
@@ -278,6 +387,58 @@
   line-height: 1.5;
 }
 
+.order-management__pickup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.order-management__pickup p,
+.order-management__pickup label {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.order-management__pickup label {
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.order-management__pickup input,
+.order-management__cancel-dialog input {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #1e293b;
+  font: inherit;
+}
+
+.order-management__pickup button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.8rem;
+  border: 0;
+  border-radius: 7px;
+  background: var(--primary);
+  color: white;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.order-management__pickup button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .order-management__modal-backdrop {
   position: fixed;
   z-index: 1000;
@@ -386,6 +547,10 @@
 @media (max-width: 600px) {
   .order-management__header {
     align-items: flex-start;
+  }
+
+  .order-management__replenishment-heading {
+    grid-template-columns: 1fr;
   }
 
   .order-management__header p:last-child {

@@ -72,6 +72,63 @@ const Order = sequelize.define('Order', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  pickupReference: {
+    type: DataTypes.STRING(32),
+    allowNull: true,
+    unique: true,
+  },
+  pickupReadyAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  handedOverAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  deliveredAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  handedOverByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  deliveryProvider: {
+    type: DataTypes.STRING(32),
+    allowNull: true,
+  },
+  yangoReference: {
+    type: DataTypes.STRING(120),
+    allowNull: true,
+  },
+  yangoRiderDetails: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  yangoFee: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
+  trackingLink: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  gatewayPaymentReference: {
+    type: DataTypes.STRING(120),
+    allowNull: true,
+  },
+  paymentConfirmedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  refundStatus: {
+    type: DataTypes.STRING(24),
+    allowNull: true,
+  },
+  refundReference: {
+    type: DataTypes.STRING(120),
+    allowNull: true,
+  },
   cancelledByUserId: {
     type: DataTypes.INTEGER,
     allowNull: true

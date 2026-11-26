@@ -125,11 +125,19 @@ The authenticated `GET /api/inventory/categories` endpoint returns the seeded hi
 
 The web POS builds sale data and submits it to `/api/sales`. The backend validates positive whole-number quantities, non-negative sale totals, product identity and stock. It locks/updates batches in expiry-date order, writes sales and negative stock movements in a database transaction, and updates medicine aggregate quantity. A supplied `clientTransactionId` provides retry/idempotency support. The mobile POS currently creates online sales with a cash payment label.
 
-Storefront `POST /api/orders` and `POST /api/prescriptions/upload` accept guests and use optional bearer authentication to associate signed-in customer activity with the account. Online orders lock saleable stock, reject insufficient quantities with `409 INSUFFICIENT_STOCK`, and persist the order, sales rows and movements atomically. Prescription uploads are limited to 5 MB per file.
+Storefront `POST /api/orders` and `POST /api/prescriptions/upload` accept guests and use optional bearer authentication to associate signed-in customer activity with the account. An order reserves available batch quantities without reducing physical stock; eligible overage becomes an item-level preorder with a replenishment task. Payment callbacks are HMAC-verified and idempotent. Only verified-paid orders can enter fulfillment, and an order with any outstanding preorder cannot be confirmed. At confirmation, reserved quantities are deducted and canonical sale/movement records are written in one transaction. POS and offline stock adjustments cannot consume reserved quantities.
+
+### Hybrid online ordering and fulfillment
+
+The canonical API stores one `Order` with normalized `OrderItems`, batch-level reservations and any associated `ReplenishmentTasks`. `available stock = physical batch quantity - reserved quantity`; received stock is allocated FIFO to outstanding preorder quantities, and the customer order status/tracking data is updated. A Yango delivery has a separately stored actual fee and is manually booked/updated by staff; no Yango API integration is currently documented/verified. Pickup uses the configured MediQuick address and an order-specific handover reference.
+
+Customers may order visible non-prescription products that are out of stock. Prescription-required products are rejected from online checkout pending pharmacist review; the pickup/delivery workflow does not send prescription data to a rider. Mixed orders remain one order and can be prepared/dispatched only after all item quantities are available. Estimates are shown only after a staff member records both supplier confirmation and a later estimated fulfillment date. Availability emails are sent after stock allocation only when the existing Resend email configuration is present; without it, customers can see status changes through order tracking and the backend logs that notification delivery was skipped.
+
+No payment gateway or provider-specific payment initiation adapter is present in the repository. Online checkout therefore reports unavailable outside test mode. The backend includes a provider-neutral callback contract using `ORDER_PAYMENT_WEBHOOK_SECRET` for signed `payment.succeeded`, `payment.failed` and `refund.completed` events; this callback seam is not itself a gateway integration and should not be enabled as a production payment flow until a provider adapter is configured and reviewed. Paid cancellation marks a refund pending; the provider must execute it and return a signed refund callback.
 
 The web PWA can store supported pending `SALE` operations locally and replay them at `/api/sync`. Sync requires a client transaction ID and checks operation permissions, idempotency and server stock; conflicts/failures are returned per operation. Local optimistic data is not authoritative.
 
-## 8.1 Customer support workflow
+## 8.2 Customer support workflow
 
 Customers can submit a support inquiry through the storefront using `POST /api/support/inquiries`. The staff Support Center reads inquiries through the authenticated, staff-role-restricted `GET /api/support/inquiries` endpoint, which supports pagination, status filtering and search. Staff can update an inquiry to `New`, `Contacted` or `Resolved` through `PUT /api/support/inquiries/:id/status`. The web client provides phone and email links for contacting the customer; message delivery and conversation history are not handled by this workflow.
 
@@ -218,6 +226,12 @@ All API paths below are rooted at the same host. Except `POST /api/auth/login`, 
 | `GET` | `/api/analytics/risks` | Stockout/expiry/dead-stock data | Admin/manager role plus analytics read permission |
 | `POST` | `/api/sync` | Reconcile offline operations | Authenticated; per-operation permissions checked by sync service |
 | `GET`, `POST` | `/api/orders` | Customer order history/tracking and online checkout | Optional bearer auth associates signed-in customer orders; guest tracking requires order number and at least 7 phone digits |
+| `GET` | `/api/orders/payment-readiness` | Checkout readiness | Public; reports unavailable until a payment initiation provider is configured |
+| `POST` | `/api/orders/payments/callback` | Verify payment/refund provider events | Public callback route; requires an HMAC-SHA256 signature over the raw body and configured secret |
+| `GET` | `/api/orders/replenishment-tasks` | List preorder stock tasks | Authenticated `admin`, `manager` or `user` |
+| `PUT` | `/api/orders/replenishment-tasks/:id/estimate` | Record supplier-confirmed ETA | Authenticated staff role |
+| `PUT`, `POST` | `/api/orders/:id/status`, `/api/orders/:id/pickup/handover` | Update fulfillment and record pickup handover | Authenticated staff role; handover requires a paid, ready pickup order and matching reference |
+| `GET` | `/api/orders/reports/fulfillment` | Online order/preorder/fulfillment metrics | Authenticated `admin` or `manager` |
 | `POST` | `/api/prescriptions/upload` | Customer prescription submission | Optional bearer auth associates signed-in submissions; maximum 5 MB file |
 | `GET` | `/api/prescriptions/my` | Current customer's prescription history | Authenticated |
 

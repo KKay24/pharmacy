@@ -30,7 +30,21 @@ const Batch = sequelize.define('Batch', {
   quantity: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    defaultValue: 0
+    defaultValue: 0,
+    validate: { min: 0 },
+  },
+  reservedQuantity: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    validate: {
+      min: 0,
+      notAbovePhysicalStock(value) {
+        if (Number(value) > Number(this.quantity || 0)) {
+          throw new Error('Reserved batch quantity cannot exceed physical quantity');
+        }
+      },
+    },
   },
   expiryDate: {
     type: DataTypes.DATEONLY,

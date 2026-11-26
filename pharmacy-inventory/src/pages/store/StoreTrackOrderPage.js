@@ -126,9 +126,39 @@ export default function StoreTrackOrderPage() {
               </div>
             )}
 
+            {Array.isArray(result.items) && result.items.map((item, index) => (
+              <div key={`${item.name}-${index}`} style={{ padding: "0.75rem 0", borderTop: "1px solid var(--border)" }}>
+                <strong>{item.name} × {item.quantity}</strong>
+                <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.82rem" }}>
+                  {item.fulfillmentStatus}
+                  {item.outstandingPreorderQuantity > 0
+                    ? ` · ${item.outstandingPreorderQuantity} awaiting replenishment`
+                    : ""}
+                  {item.estimatedFulfillmentAt
+                    ? ` · Estimated ${new Date(item.estimatedFulfillmentAt).toLocaleDateString()}`
+                    : ""}
+                </span>
+              </div>
+            ))}
+
+            {result.paymentStatus && (
+              <p style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+                <strong>Payment:</strong> {result.paymentStatus}
+              </p>
+            )}
+            {result.pickupReference && (
+              <div role="status" style={{ marginTop: "1rem", padding: "1rem", background: "var(--brand-blue-light)", borderRadius: "var(--radius-sm)" }}>
+                <strong>Pickup reference: {result.pickupReference}</strong>
+                <span style={{ display: "block", marginTop: "0.35rem" }}>Show this reference to authorized pharmacy staff at MediQuick Pharmacy, 25147 Nationalist Road, Lusaka.</span>
+              </div>
+            )}
+
             {result.deliveryMethod && (
               <div style={{ marginTop: "1rem", padding: "0.85rem", background: "var(--bg)", borderRadius: "var(--radius-sm)", fontSize: "0.85rem" }}>
-                <strong>Fulfilment:</strong> {result.deliveryMethod}
+                <strong>Fulfilment:</strong> {result.deliveryMethod === "pickup" ? "MediQuick Store Pickup" : "Yango Home Delivery"}
+                {result.trackingLink && (
+                  <a href={result.trackingLink} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: "0.5rem" }}>Track Yango delivery</a>
+                )}
               </div>
             )}
           </div>

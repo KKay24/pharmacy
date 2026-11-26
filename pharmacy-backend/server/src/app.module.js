@@ -121,7 +121,14 @@ function mountLegacyApi(expressApp, { deferFallback = false } = {}) {
     code: 'PRESCRIPTION_UPLOAD_BUSY',
     message: 'Prescription uploads are busy. Please retry shortly.',
   }));
-  const defaultJsonParser = express.json({ limit: '2mb' });
+  const defaultJsonParser = express.json({
+    limit: '2mb',
+    verify: (req, res, buffer) => {
+      if (req.path === '/api/orders/payments/callback') {
+        req.rawBody = Buffer.from(buffer);
+      }
+    },
+  });
   const prescriptionJsonParser = express.json({ limit: '8mb' });
   expressApp.use((req, res, next) => {
     const parser = req.method === 'POST' && req.path === '/api/prescriptions/upload'

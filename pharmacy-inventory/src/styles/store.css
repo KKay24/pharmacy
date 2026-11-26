@@ -1039,6 +1039,11 @@ ul {
   color: #c2410c;
 }
 
+.store-product-card__badge--preorder {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
 .store-product-card__wish {
   position: absolute;
   top: 0.75rem;

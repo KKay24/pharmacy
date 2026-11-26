@@ -1,5 +1,6 @@
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const { createHmac } = require('node:crypto');
 const { mkdtempSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
@@ -15,6 +16,7 @@ process.env.POSTGRES_URL = '';
 process.env.SQLITE_STORAGE_PATH = join(tempDirectory, 'store.sqlite');
 process.env.ENABLE_DEMO_SEEDING = 'true';
 process.env.JWT_SECRET = 'store-test-secret-value-12345';
+process.env.ORDER_PAYMENT_WEBHOOK_SECRET = 'store-test-webhook-secret-value-12345';
 
 const StoreService = require('../src/store/store.service');
 
@@ -31,13 +33,25 @@ async function request(path, options = {}) {
   return { status: res.status, ok: res.ok, data };
 }
 
+async function signedPaymentCallback(payload) {
+  const rawBody = JSON.stringify(payload);
+  const signature = createHmac('sha256', process.env.ORDER_PAYMENT_WEBHOOK_SECRET)
+    .update(rawBody)
+    .digest('hex');
+  return request('/api/orders/payments/callback', {
+    method: 'POST',
+    headers: { 'x-mediquick-signature': signature },
+    body: rawBody,
+  });
+}
+
 describe('Store E-Commerce Endpoints', () => {
   before(async () => {
     const { AppModule, ensureApplicationReady } = require('../src/app.module');
     const { NestFactory } = require('@nestjs/core');
 
     await ensureApplicationReady();
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     server = app.getHttpAdapter().getInstance();
     await app.listen(0);
     const address = app.getHttpServer().address();
@@ -94,6 +108,18 @@ describe('Store E-Commerce Endpoints', () => {
     }
   });
 
+  test('hybrid order migration is safe to rerun', async () => {
+    const { runMigrations } = require('../lib/migrations');
+    const { sequelize } = require('../models');
+    await runMigrations();
+    await runMigrations();
+    const columns = await sequelize.getQueryInterface().describeTable('Orders');
+    const indexes = await sequelize.getQueryInterface().showIndex('Orders');
+    assert.ok(columns.pickupReference);
+    assert.ok(columns.gatewayPaymentReference);
+    assert.ok(indexes.some((index) => index.name === 'orders_pickup_reference_unique'));
+  });
+
   test('price-sorted product filters scan compact chunks and return only the requested page', async () => {
     const { Medicine } = require('../models');
     const originalFindAll = Medicine.findAll;
@@ -147,10 +173,19 @@ describe('Store E-Commerce Endpoints', () => {
     assert.equal(res.data.batches, undefined);
   });
 
-  test('POST /api/orders creates order and deducts inventory', async () => {
+  test('POST /api/orders reserves available stock and accepts preorder quantities', async () => {
     const listRes = await request('/api/products?limit=1');
     const sample = listRes.data.data[0];
-    const { Batch, InventoryMovement, Medicine, Order, Sales } = require('../models');
+    const {
+      Batch,
+      InventoryMovement,
+      Medicine,
+      Order,
+      OrderItem,
+      ReplenishmentTask,
+      Sales,
+      User,
+    } = require('../models');
     const medicine = await Medicine.findByPk(sample.id);
     const batches = await Batch.findAll({ where: { medicineId: sample.id } });
     const today = new Date().toISOString().slice(0, 10);
@@ -174,19 +209,19 @@ describe('Store E-Commerce Endpoints', () => {
         items: [{ id: sample.id, quantity: initialStock + 1 }],
       }),
     });
-    assert.equal(overstockOrder.status, 409);
-    assert.equal(overstockOrder.data.code, 'INSUFFICIENT_STOCK');
+    assert.equal(overstockOrder.status, 201);
+    assert.equal(overstockOrder.data.order.items[0].reservedQuantity, initialStock);
+    assert.equal(overstockOrder.data.order.items[0].preorderQuantity, 1);
     assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), Number(medicine.totalQuantity));
     assert.equal(await InventoryMovement.count({
       where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
     }), initialMovementCount);
     assert.equal(await Sales.count({ where: { medicineId: sample.id } }), initialSalesCount);
-    assert.equal(await Order.count(), initialOrderCount);
+    assert.equal(await Order.count(), initialOrderCount + 1);
 
     const orderPayload = {
       customerName: 'Test Customer',
       customerPhone: '+260971239999',
-      customerEmail: 'test@example.com',
       deliveryMethod: 'delivery',
       deliveryAddress: '100 Independence Ave',
       deliveryCity: 'Lusaka',
@@ -211,6 +246,8 @@ describe('Store E-Commerce Endpoints', () => {
     assert.ok(res.data.success);
     assert.ok(res.data.order);
     assert.ok(res.data.order.orderNumber);
+    assert.equal(res.data.order.items[0].reservedQuantity, 0);
+    assert.equal(res.data.order.items[0].preorderQuantity, 1);
     assert.equal(res.data.order.customerPhone, '+260971239999');
     assert.equal(Number(res.data.order.subtotal), sample.price);
     assert.equal(Number(res.data.order.totalAmount), sample.price + Number(res.data.order.deliveryFee));
@@ -226,10 +263,116 @@ describe('Store E-Commerce Endpoints', () => {
     );
     assert.equal(shortPhoneTrack.status, 400);
 
-    for (const batch of batches) {
-      await batch.update({ quantity: 0 });
-    }
-    await medicine.update({ totalQuantity: 0 });
+    const StoreService = require('../src/store/store.service');
+    const storeService = new StoreService();
+    const pickupStaff = await User.create({
+      username: `store-test-staff-${Date.now()}`,
+      password: 'store-test-staff-password',
+      role: 'admin',
+    });
+    const preorderQueue = await storeService.listOrders(
+      { filter: 'preorders' },
+      { role: 'admin' }
+    );
+    assert.equal(preorderQueue.data.length, 2);
+    const paidPreorderPayment = await signedPaymentCallback({
+      eventId: `mixed-payment-${Date.now()}`,
+      orderNumber: overstockOrder.data.order.orderNumber,
+      amountMinor: Math.round(Number(overstockOrder.data.order.totalAmount) * 100),
+      currency: 'ZMW',
+      transactionReference: 'gateway-mixed-order-test',
+      eventType: 'payment.succeeded',
+    });
+    assert.equal(paidPreorderPayment.status, 201);
+    await assert.rejects(
+      storeService.updateOrderStatus(overstockOrder.data.order.id, 'Confirmed'),
+      (error) => error.getStatus() === 409 && error.message.includes('mixed order')
+    );
+    const InventoryService = require('../src/inventory/inventory.service');
+    const inventoryService = new InventoryService();
+    await inventoryService.addBatchToMedicine(sample.id, {
+      batchNumber: `PREORDER-RECEIPT-${Date.now()}`,
+      quantity: 1,
+      expiryDate: '2099-12-31',
+      costPrice: 1,
+      sellingPrice: sample.price,
+    });
+    const allocatedItems = await OrderItem.findAll({
+      where: {
+        orderId: [overstockOrder.data.order.id, res.data.order.id],
+      },
+      order: [['createdAt', 'ASC']],
+    });
+    assert.equal(allocatedItems.length, 2);
+    assert.equal(Number(allocatedItems[0].outstandingPreorderQuantity), 0);
+    assert.equal(Number(allocatedItems[1].outstandingPreorderQuantity), 1);
+    assert.equal(allocatedItems[0].fulfillmentStatus, 'Awaiting Fulfillment');
+    assert.equal(allocatedItems[1].fulfillmentStatus, 'Awaiting Stock');
+    const allocatedTasks = await ReplenishmentTask.findAll({
+      where: { orderItemId: allocatedItems.map((item) => item.id) },
+    });
+    assert.equal(allocatedTasks.filter((task) => task.status === 'Received').length, 1);
+    assert.equal(allocatedTasks.filter((task) => task.status === 'Open').length, 1);
+    const awaitingStockQueue = await storeService.listOrders(
+      { filter: 'awaiting-stock' },
+      { role: 'admin' }
+    );
+    assert.equal(awaitingStockQueue.data.length, 1);
+    assert.equal(Number((await Medicine.findByPk(sample.id)).reservedQuantity), initialStock + 1);
+    const supplierConfirmedAt = new Date(Date.now() - 60_000);
+    const estimatedFulfillmentAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const estimateTask = await storeService.updateReplenishmentEstimate(
+      allocatedTasks.find((task) => task.status === 'Open').id,
+      {
+        supplierConfirmedAt: supplierConfirmedAt.toISOString(),
+        estimatedFulfillmentAt: estimatedFulfillmentAt.toISOString(),
+      },
+      { id: pickupStaff.id, role: 'admin' }
+    );
+    assert.equal(estimateTask.status, 'Ordered');
+    const estimatedOrder = await Order.findByPk(res.data.order.id);
+    assert.equal(
+      new Date(estimatedOrder.items[0].estimatedFulfillmentAt).toISOString(),
+      estimatedFulfillmentAt.toISOString()
+    );
+
+    await inventoryService.addBatchToMedicine(sample.id, {
+      batchNumber: `PREORDER-RECEIPT-CONTINUED-${Date.now()}`,
+      quantity: 1,
+      expiryDate: '2099-12-31',
+      costPrice: 1,
+      sellingPrice: sample.price,
+    });
+    const fullyAllocatedTasks = await ReplenishmentTask.findAll({
+      where: { orderItemId: allocatedItems.map((item) => item.id) },
+    });
+    assert.ok(fullyAllocatedTasks.every((task) => task.status === 'Received'));
+    assert.equal(Number((await Medicine.findByPk(sample.id)).reservedQuantity), initialStock + 2);
+    const updatedTracking = await request(
+      `/api/orders?orderNumber=${res.data.order.orderNumber}&phone=0971239999`
+    );
+    const trackedPreorder = updatedTracking.data.data
+      .find((trackedOrder) => trackedOrder.orderNumber === res.data.order.orderNumber);
+    assert.equal(trackedPreorder.items[0].outstandingPreorderQuantity, 0);
+    assert.equal(trackedPreorder.items[0].fulfillmentStatus, 'Awaiting Fulfillment');
+    assert.equal(trackedPreorder.items[0].estimatedFulfillmentAt, null);
+
+    const confirmedMixedOrder = await storeService.updateOrderStatus(
+      overstockOrder.data.order.id,
+      'Confirmed'
+    );
+    assert.equal(confirmedMixedOrder.orderStatus, 'Confirmed');
+    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 1);
+    await storeService.updateOrderStatus(
+      res.data.order.id,
+      'Cancelled',
+      'Test preorder cancellation',
+      { id: 1, role: 'admin' }
+    );
+    assert.equal(Number((await Medicine.findByPk(sample.id)).reservedQuantity), 0);
+
+    await Batch.update({ quantity: 0, reservedQuantity: 0 }, { where: { medicineId: sample.id } });
+    await medicine.update({ totalQuantity: 0, reservedQuantity: 0 });
     const movementCount = await InventoryMovement.count({
       where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
     });
@@ -242,21 +385,26 @@ describe('Store E-Commerce Endpoints', () => {
         items: [{ id: sample.id, quantity: 2 }],
       }),
     });
-    assert.equal(outOfStockOrder.status, 409);
-    assert.equal(outOfStockOrder.data.code, 'INSUFFICIENT_STOCK');
+    assert.equal(outOfStockOrder.status, 201);
+    assert.equal(outOfStockOrder.data.order.items[0].preorderQuantity, 2);
     assert.equal(await InventoryMovement.count({
       where: { medicineId: sample.id, referenceType: 'ONLINE_ORDER' },
     }), movementCount);
     assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 0);
 
-    const StoreService = require('../src/store/store.service');
-    const storeService = new StoreService();
+    await storeService.updateOrderStatus(
+      outOfStockOrder.data.order.id,
+      'Cancelled',
+      'Test preorder cancellation',
+      { id: 1, role: 'admin' }
+    );
     const unallocatedOrder = await Order.create({
       orderNumber: `ORD-TEST-${Date.now()}`,
       customerName: 'Backorder Customer',
       customerPhone: '+260971230000',
       deliveryMethod: 'pickup',
       paymentMethod: 'Cash on Delivery',
+      paymentStatus: 'Paid',
       orderStatus: 'Order Placed',
       items: [{ id: sample.id, name: sample.name, quantity: 2 }],
     });
@@ -312,6 +460,102 @@ describe('Store E-Commerce Endpoints', () => {
       (error) => error.getStatus() === 409
     );
     assert.equal(Number((await Batch.findByPk(batches[0].id)).quantity), 2);
+
+    const paidPickupResponse = await request('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        customerName: 'Pickup Customer',
+        customerPhone: '+260971230001',
+        deliveryMethod: 'pickup',
+        paymentMethod: 'Online Gateway',
+        items: [{ id: sample.id, quantity: 1 }],
+      }),
+    });
+    assert.equal(paidPickupResponse.status, 201);
+    const paidPickup = paidPickupResponse.data.order;
+    const paymentEvent = {
+      eventId: `payment-${Date.now()}`,
+      orderNumber: paidPickup.orderNumber,
+      amountMinor: Math.round(Number(paidPickup.totalAmount) * 100),
+      currency: 'ZMW',
+      transactionReference: 'gateway-payment-test-001',
+      eventType: 'payment.succeeded',
+    };
+    const invalidSignature = await request('/api/orders/payments/callback', {
+      method: 'POST',
+      headers: { 'x-mediquick-signature': '0'.repeat(64) },
+      body: JSON.stringify(paymentEvent),
+    });
+    assert.equal(invalidSignature.status, 400);
+    const paymentResponse = await signedPaymentCallback(paymentEvent);
+    assert.equal(paymentResponse.status, 201, JSON.stringify(paymentResponse.data));
+    assert.equal(paymentResponse.data.order.paymentStatus, 'Paid');
+    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 2);
+    const duplicatePaymentResponse = await signedPaymentCallback(paymentEvent);
+    assert.equal(duplicatePaymentResponse.data.duplicate, true);
+
+    const paidOrder = await storeService.updateOrderStatus(paidPickup.id, 'Confirmed');
+    assert.equal(paidOrder.orderStatus, 'Confirmed');
+    assert.equal(Number((await Medicine.findByPk(sample.id)).totalQuantity), 1);
+    await storeService.updateOrderStatus(paidPickup.id, 'Preparing');
+    const readyPickup = await storeService.updateOrderStatus(paidPickup.id, 'Ready');
+    assert.ok(readyPickup.pickupReference);
+    await assert.rejects(
+      storeService.recordPickupHandover(
+        paidPickup.id,
+        'WRONG-REFERENCE',
+        { id: pickupStaff.id, role: pickupStaff.role }
+      ),
+      (error) => error.getStatus() === 409
+    );
+    const handedOver = await storeService.recordPickupHandover(
+      paidPickup.id,
+      readyPickup.pickupReference,
+      { id: pickupStaff.id, role: pickupStaff.role }
+    );
+    assert.equal(handedOver.orderStatus, 'Delivered');
+    assert.ok(handedOver.handedOverAt);
+    assert.equal(handedOver.handedOverByUserId, pickupStaff.id);
+
+    const refundOrderResponse = await request('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        customerName: 'Refund Customer',
+        customerPhone: '+260971230002',
+        deliveryMethod: 'pickup',
+        paymentMethod: 'Online Gateway',
+        items: [{ id: sample.id, quantity: 1 }],
+      }),
+    });
+    assert.equal(refundOrderResponse.status, 201);
+    const refundOrder = refundOrderResponse.data.order;
+    const refundPayment = await signedPaymentCallback({
+      eventId: `payment-refund-${Date.now()}`,
+      orderNumber: refundOrder.orderNumber,
+      amountMinor: Math.round(Number(refundOrder.totalAmount) * 100),
+      currency: 'ZMW',
+      transactionReference: 'gateway-payment-test-002',
+      eventType: 'payment.succeeded',
+    });
+    assert.equal(refundPayment.status, 201);
+    const refundPending = await storeService.updateOrderStatus(
+      refundOrder.id,
+      'Cancelled',
+      'Customer requested cancellation',
+      { id: 1, role: 'admin' }
+    );
+    assert.equal(refundPending.refundStatus, 'Pending');
+    const refundCompleted = await signedPaymentCallback({
+      eventId: `refund-${Date.now()}`,
+      orderNumber: refundOrder.orderNumber,
+      amountMinor: Math.round(Number(refundOrder.totalAmount) * 100),
+      currency: 'ZMW',
+      transactionReference: 'gateway-refund-test-001',
+      eventType: 'refund.completed',
+    });
+    assert.equal(refundCompleted.status, 201);
+    assert.equal(refundCompleted.data.order.refundStatus, 'Completed');
+    assert.equal(refundCompleted.data.order.paymentStatus, 'Refunded');
   });
 
   test('POST /api/prescriptions/upload and GET /api/prescriptions/track/:ref', async () => {

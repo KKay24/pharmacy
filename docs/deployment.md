@@ -47,6 +47,8 @@ Configure these values through the deployment provider's environment/secret mana
 | `AI_RATE_LIMIT_MAX` | Optional max AI chat messages per client per window (default `15`). |
 | `AI_RATE_LIMIT_WINDOW_MS` | Optional AI rate-limit window in milliseconds (default `60000`). |
 | `PRESCRIPTION_UPLOAD_CONCURRENCY` | Optional concurrent JSON prescription-upload limit (default `2`, clamped to `1`–`4`). |
+| `ORDER_PAYMENT_WEBHOOK_SECRET` | Optional HMAC-SHA256 callback verification secret. Do not configure production checkout with this alone; no provider-specific payment initiation adapter is currently implemented. |
+| `RESEND_API_KEY`, `RECEIPT_FROM_EMAIL` | Optional existing Resend email configuration used for receipts and preorder availability notifications. |
 | `MEMORY_MONITOR_ENABLED` | Set to `false` to disable periodic process-memory logging; enabled by default. |
 | `MEMORY_LOG_INTERVAL_MS` | Optional memory sample interval in milliseconds (default `30000`, clamped to `5000`–`300000`). |
 | `MEMORY_WARNING_RSS_MB` | Optional RSS warning threshold in MiB (default `400`, clamped to `128`–`4096`). |
@@ -67,7 +69,9 @@ The checked-in Render blueprint links the backend to the database named `pharmac
 
 ### Migrations and initial administrator
 
-Production migrations are invoked by the Render build command. Review migration source and back up the production database before schema changes. Migrations are versioned, but this is not a substitute for testing an upgrade and recovery procedure.
+Production migrations are invoked by the Render build command. Migration `023` adds order reservation counters, item-level order fulfillment, batch reservations, replenishment tasks, pickup/Yango metadata and payment callback event records. Review migration source and back up the production database before schema changes. Migrations are versioned, but this is not a substitute for testing an upgrade and recovery procedure.
+
+The storefront checkout remains unavailable outside test mode because this repository does not contain a payment-provider initiation adapter. The signed callback endpoint is only a provider-neutral verification seam; configuring `ORDER_PAYMENT_WEBHOOK_SECRET` does not activate a gateway, payment redirect or refund execution. Add and verify a provider adapter before enabling production checkout. When stock completes outstanding preorder quantities, the backend sends an availability email only when both Resend variables are configured; otherwise it logs that delivery was skipped.
 
 Create the initial admin only through the controlled backend seed command, with `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` supplied securely. The password must be at least 12 characters. The seed script does not reveal default credentials and does not create a second admin if one already exists. Do not put seed credentials into deployment manifests or documentation.
 
@@ -107,13 +111,13 @@ These files are present but are not the topology described by the root Render/Ve
 
 1. Confirm the intended target and review the checked-in configuration for that target.
 2. Verify API build/syntax check and backend tests; build the web client and typecheck mobile if it is in scope.
-3. Review schema/data migrations (including `011` taxonomy references and safe legacy mapping), run them against a disposable PostgreSQL environment, and prepare a tested backup/restore path.
+3. Review schema/data migrations (including `011` taxonomy references and `023` order reservations/fulfillment), run them against a disposable PostgreSQL environment, and prepare a tested backup/restore path.
 4. Configure `DATABASE_URL`, `JWT_SECRET`, allowed frontend origins and client backend URLs in provider-managed settings.
 5. Keep demo seeding and legacy development auth disabled in production.
 6. Deploy backend and database, then verify `GET /health`.
 7. Deploy the web app and verify `/api/auth/login`, protected API calls, CORS and SPA navigation.
 8. Verify mobile connectivity separately if a mobile release is intended.
-9. Test one receiving workflow, one sale, movement history, expiry/low-stock analytics and report output with controlled test data.
+9. Test one receiving workflow, one POS sale, reserved-stock protection, preorder allocation, movement history, expiry/low-stock analytics and report output with controlled test data.
 10. Confirm logs do not expose credentials or customer/patient information.
 
 ## Backup and recovery

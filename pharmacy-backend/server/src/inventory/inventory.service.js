@@ -65,6 +65,17 @@ function parsePositiveQuantity(value) {
   return quantity;
 }
 
+function addAvailableStock(row) {
+  const plain = typeof row?.get === 'function' ? row.get({ plain: true }) : row;
+  const batches = Array.isArray(plain.Batches) ? plain.Batches : [];
+  const availableQuantity = batches.length > 0
+    ? batches.reduce((sum, batch) => (
+      sum + Math.max(0, Number(batch.quantity || 0) - Number(batch.reservedQuantity || 0))
+    ), 0)
+    : Math.max(0, Number(plain.totalQuantity || 0) - Number(plain.reservedQuantity || 0));
+  return { ...plain, availableQuantity };
+}
+
 function parseNonNegativeNumber(value, fieldName) {
   const number = Number(value);
   if (!Number.isFinite(number) || number < 0) {
@@ -354,7 +365,10 @@ class InventoryService {
       filterIds = new Set(candidates.map((medicine) => Number(medicine.id)));
       if (query.stockStatus) {
         const quantities = await Batch.findAll({
-          attributes: ['medicineId', [sequelize.fn('SUM', sequelize.col('quantity')), 'quantity']],
+          attributes: [
+            'medicineId',
+            [sequelize.literal('SUM("quantity" - "reservedQuantity")'), 'quantity'],
+          ],
           where: activeBatchWhere({ medicineId: [...filterIds] }),
           group: ['medicineId'],
           raw: true,
@@ -426,7 +440,7 @@ class InventoryService {
           };
         })
       : result.rows;
-    return paginatedResponse(rows, result.count, pagination);
+    return paginatedResponse(rows.map(addAvailableStock), result.count, pagination);
   }
 
   async lowStock() {
@@ -447,7 +461,10 @@ class InventoryService {
 
       const quantities = await Batch.findAll({
         where: activeBatchWhere({ medicineId: candidates.map((medicine) => medicine.id) }),
-        attributes: ['medicineId', [sequelize.fn('SUM', sequelize.col('quantity')), 'quantity']],
+        attributes: [
+          'medicineId',
+          [sequelize.literal('SUM("quantity" - "reservedQuantity")'), 'quantity'],
+        ],
         group: ['medicineId'],
         raw: true,
       });
@@ -466,7 +483,7 @@ class InventoryService {
           include: [{ model: Batch, where: activeBatchWhere(), required: false }],
           order: [['id', 'ASC']],
         });
-        lowStockMedicines.push(...rows);
+        lowStockMedicines.push(...rows.map(addAvailableStock));
       }
     }
 
@@ -687,6 +704,8 @@ class InventoryService {
       createdByUsername: actor?.username || null,
     }, { transaction });
 
+    const StoreService = require('../store/store.service');
+    await new StoreService().allocateReceivedStock(medicine.id, batch, transaction);
     await this.recalculateMedicineTotal(medicine, transaction);
     await InventoryMovement.create({
       medicineId: medicine.id,
@@ -793,6 +812,9 @@ class InventoryService {
       if (isBatchInactive(batch)) {
         throw new ConflictException('This batch has already been deleted or archived.');
       }
+      if (Number(batch.reservedQuantity || 0) > 0) {
+        throw new ConflictException('This batch has stock reserved for online orders and cannot be removed.');
+      }
 
       const hasCompletedSales = await this.hasCompletedSalesForBatch(batch.id, transaction);
       if (hasCompletedSales) {
@@ -853,6 +875,9 @@ class InventoryService {
       if (!batch) throw new NotFoundException('Batch not found for this medicine');
       if (isBatchInactive(batch)) {
         throw new ConflictException('This batch has already been archived or deleted.');
+      }
+      if (Number(batch.reservedQuantity || 0) > 0) {
+        throw new ConflictException('This batch has stock reserved for online orders and cannot be archived.');
       }
 
       const previousQuantity = Number(batch.quantity || 0);

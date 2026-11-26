@@ -355,6 +355,8 @@ class SyncService {
           createdByUsername: user?.username || null,
         }, { transaction });
 
+        const StoreService = require('../store/store.service');
+        await new StoreService().allocateReceivedStock(medicine.id, batch, transaction);
         await InventoryMovement.create({
           medicineId,
           batchId: batch.id,
@@ -366,10 +368,24 @@ class SyncService {
           clientTransactionId,
         }, { transaction });
       } else {
+        const availableQuantity = batches.reduce(
+          (sum, batch) => sum + Math.max(
+            0,
+            Number(batch.quantity || 0) - Number(batch.reservedQuantity || 0)
+          ),
+          0
+        );
+        if (Math.abs(quantityChange) > availableQuantity) {
+          throw new BadRequestException('Adjustment cannot reduce stock reserved for online orders');
+        }
         let remaining = Math.abs(quantityChange);
         for (const batch of batches) {
           if (remaining <= 0) break;
-          const deduction = Math.min(Number(batch.quantity || 0), remaining);
+          const freeQuantity = Math.max(
+            0,
+            Number(batch.quantity || 0) - Number(batch.reservedQuantity || 0)
+          );
+          const deduction = Math.min(freeQuantity, remaining);
           if (deduction === 0) continue;
           const nextQty = Number(batch.quantity) - deduction;
           await batch.update({

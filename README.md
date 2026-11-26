@@ -12,6 +12,7 @@ The system centralizes pharmacy product and batch inventory, stock movements, po
 |---|---|---|
 | Web inventory, batch receiving, POS, customers, expenses, suppliers and staff access | **Implemented** | React routes call the canonical API. |
 | Batch quantities, expiry dates and movement history | **Implemented** | Batches are attached to medicines; sales deduct batches in expiry-date order and create movement records. |
+| Hybrid online orders, reservations and preorders | **Partially implemented** | Orders reserve batch stock, create item-level replenishment tasks, allocate received stock FIFO, and support pickup and manual Yango fulfillment. A payment gateway adapter is not configured, so online checkout is disabled outside test mode. |
 | Authentication and role/permission checks | **Implemented** | The API issues bearer tokens and checks active accounts, roles and permissions. |
 | Web PWA offline cache and sync queue | **Implemented** | The web client caches selected data in IndexedDB and submits queued sales, restocks and adjustments to `/api/sync`. |
 | Prescription records/status workflow | **Partially implemented** | The API stores and lists prescription records and updates status. A complete prescription fulfillment/e-prescribing workflow is not verified. |
@@ -30,6 +31,7 @@ This status describes repository code and configuration, not production availabi
 - Batch-level stock receiving with quantity, cost/selling prices, supplier reference, warehouse, invoice number, received date and expiry date.
 - Inventory movement history and low-stock queries.
 - Web POS with customer lookup/association, receipts, confirmed payment allocations and offline queueing in the PWA.
+- Storefront order reservations, eligible OTC preorders, supplier-confirmed estimates, pickup handover references, manual Yango booking details and fulfillment reporting.
 - Customer records, including optional contact and health-related fields.
 - Staff support center for customer inquiries submitted through the pharmacy store.
 - Prescription records with patient/prescriber, medication text, due date, optional image path and status.
@@ -63,6 +65,12 @@ Medicines are catalog records classified by main category, optional subcategory 
 ### Sales/POS
 
 The POS client submits sale line items to `POST /api/sales`. The web POS filters products through dependent main-category, subcategory and product-form controls sourced from the shared taxonomy. The API validates stock, deducts it across available batches in ascending expiry-date order, writes sale and movement records transactionally, and records confirmed payment allocations in minor currency units. The mobile POS currently submits online sales with `Cash` as its payment method. The web PWA can queue supported operations while offline for later reconciliation.
+
+### Online orders and fulfillment
+
+The canonical API stores one order with per-item fulfillment state, reserves available batch quantities without reducing physical stock, creates replenishment tasks for eligible out-of-stock OTC quantities and allocates received batches to outstanding preorders. Mixed orders wait until every requested quantity is available. Pickup requires staff handover with a unique reference; Yango is manually booked and tracked by staff. Supplier estimates are shown only after a supplier-confirmed date is recorded.
+
+No payment gateway or provider-specific initiation adapter is configured in the repository. Checkout remains unavailable outside test mode. The backend has a provider-neutral HMAC-signed callback seam (`ORDER_PAYMENT_WEBHOOK_SECRET`) for verified payment/refund event handling; this is not a gateway integration. Do not enable production checkout until a provider adapter and refund workflow are configured. When stock completes a preorder, an availability email is sent only if the existing Resend email configuration is present; otherwise the order tracking state is updated and the skipped notification is logged.
 
 ### Expiry and reporting
 
@@ -170,6 +178,8 @@ Set variables in the relevant app's local `.env` file or deployment secret store
 | `ALLOW_LEGACY_DEV_AUTH` | Backend | Optional legacy username-header authentication toggle; disabled in production. |
 | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | Backend | Inputs for the controlled `npm run seed` operation. |
 | `FRONTEND_URL`, `FRONTEND_URLS` | Backend | Exact browser origins allowed by production CORS; the two MediQuick production domains are built-in defaults. |
+| `ORDER_PAYMENT_WEBHOOK_SECRET` | Backend | Secret used to verify provider-neutral HMAC-SHA256 payment and refund callbacks. A secret alone does not configure payment initiation or enable production checkout. |
+| `RESEND_API_KEY`, `RECEIPT_FROM_EMAIL` | Backend | Existing Resend email configuration; used for preorder availability notifications when both values are present. |
 | `REACT_APP_API_BASE_URL` | Web | Optional API base URL; local default resolves to `http://localhost:5001`, production can use the same-origin proxy. |
 | `BACKEND_API_URL` | Web/Vercel | Destination backend base URL for the Vercel API proxy. |
 | `EXPO_PUBLIC_API_URL` | Mobile | Backend base URL required by the mobile app outside development. |
@@ -180,7 +190,7 @@ The repository contains environment examples in each application directory; revi
 
 The backend defines Sequelize models and versioned migrations. Production must use PostgreSQL through `DATABASE_URL`; SQLite is intended for development and tests only. Production deployment runs `npm run migrate` as part of the checked-in Render build command. Local non-production API initialization also invokes migrations.
 
-Key entities are `Users`, `Medicines`, `Batches`, `InventoryMovements`, `Sales`, `Customers`, `Prescriptions`, `Suppliers`, `Expenses` and `AuditLogs`. See [Database ERD](docs/database-erd.md) for the confirmed relationships.
+Key entities include `Users`, `Medicines`, `Batches`, `InventoryMovements`, `Sales`, `Orders`, `OrderItems`, `OrderItemReservations`, `ReplenishmentTasks`, `OrderPaymentEvents`, `Customers`, `Prescriptions`, `Suppliers`, `Expenses` and `AuditLogs`. See [Database ERD](docs/database-erd.md) for the confirmed relationships.
 
 ## Running and checking the project
 

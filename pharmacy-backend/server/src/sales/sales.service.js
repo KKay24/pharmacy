@@ -552,7 +552,9 @@ class SalesService {
           transaction,
           lock: transaction.LOCK.UPDATE,
         });
-        const available = batches.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+        const available = batches.reduce((sum, batch) => (
+          sum + Math.max(0, Number(batch.quantity || 0) - Number(batch.reservedQuantity || 0))
+        ), 0);
         if (available < quantity) throw new InsufficientStockException(`Not enough stock for ${medicine.name}`);
 
         let remaining = quantity;
@@ -560,7 +562,11 @@ class SalesService {
         const deductions = [];
         for (const batch of batches) {
           if (remaining <= 0) break;
-          const deduction = Math.min(Number(batch.quantity || 0), remaining);
+          const freeQuantity = Math.max(
+            0,
+            Number(batch.quantity || 0) - Number(batch.reservedQuantity || 0)
+          );
+          const deduction = Math.min(freeQuantity, remaining);
           if (deduction === 0) continue;
           deductions.push({ batch, deduction });
           totalCost += Number(batch.costPrice || 0) * deduction;
@@ -610,7 +616,11 @@ class SalesService {
             clientTransactionId: item.clientTransactionId || null,
           }, { transaction });
         }
-        await medicine.update({ totalQuantity: available - quantity }, { transaction });
+        const physicalQuantityRemaining = batches.reduce(
+          (sum, batch) => sum + Number(batch.quantity || 0),
+          0
+        );
+        await medicine.update({ totalQuantity: physicalQuantityRemaining }, { transaction });
         if (customerId) {
           customerSpendTotals.set(
             customerId,

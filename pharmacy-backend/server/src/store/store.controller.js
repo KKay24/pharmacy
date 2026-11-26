@@ -69,6 +69,18 @@ class StoreController {
     return this.service.createOrder(body, req?.user || null);
   }
 
+  paymentCallback(body, req) {
+    return this.service.handlePaymentCallback(
+      body,
+      req?.headers?.['x-mediquick-signature'],
+      req?.rawBody
+    );
+  }
+
+  paymentReadiness() {
+    return this.service.getPaymentReadiness();
+  }
+
   listOrders(query, req) {
     return this.service.listOrders(query, req?.user || null);
   }
@@ -78,7 +90,33 @@ class StoreController {
   }
 
   updateOrderStatus(params, body, req) {
-    return this.service.updateOrderStatus(params.id, body?.status, body?.reason, req?.user || null);
+    return this.service.updateOrderStatus(
+      params.id,
+      body?.status,
+      body?.reason,
+      req?.user || null,
+      body || {}
+    );
+  }
+
+  recordPickupHandover(params, body, req) {
+    return this.service.recordPickupHandover(
+      params.id,
+      body?.pickupReference,
+      req?.user || null
+    );
+  }
+
+  listReplenishmentTasks(query) {
+    return this.service.listReplenishmentTasks(query);
+  }
+
+  updateReplenishmentEstimate(params, body, req) {
+    return this.service.updateReplenishmentEstimate(params.id, body || {}, req?.user || null);
+  }
+
+  orderFulfillmentReport(query) {
+    return this.service.getOrderFulfillmentReport(query);
   }
 
   // Prescriptions
@@ -152,10 +190,21 @@ applyParameterDecorator(Body, StoreController.prototype, 'createOrder', 0);
 applyParameterDecorator(Req, StoreController.prototype, 'createOrder', 1);
 applyMethodDecorator(UseGuards, StoreController.prototype, 'createOrder', OptionalAuthGuard);
 
+applyMethodDecorator(Post, StoreController.prototype, 'paymentCallback', 'orders/payments/callback');
+applyParameterDecorator(Body, StoreController.prototype, 'paymentCallback', 0);
+applyParameterDecorator(Req, StoreController.prototype, 'paymentCallback', 1);
+
+applyMethodDecorator(Get, StoreController.prototype, 'paymentReadiness', 'orders/payment-readiness');
+
 applyMethodDecorator(Get, StoreController.prototype, 'listOrders', 'orders');
 applyParameterDecorator(Query, StoreController.prototype, 'listOrders', 0);
 applyParameterDecorator(Req, StoreController.prototype, 'listOrders', 1);
 applyMethodDecorator(UseGuards, StoreController.prototype, 'listOrders', OptionalAuthGuard);
+
+applyMethodDecorator(Get, StoreController.prototype, 'listReplenishmentTasks', 'orders/replenishment-tasks');
+applyParameterDecorator(Query, StoreController.prototype, 'listReplenishmentTasks', 0);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'listReplenishmentTasks', AuthGuard, RolesGuard);
+Roles('admin', 'manager', 'user')(StoreController.prototype, 'listReplenishmentTasks');
 
 applyMethodDecorator(Get, StoreController.prototype, 'getOrder', 'orders/:id');
 applyParameterDecorator(Param, StoreController.prototype, 'getOrder', 0);
@@ -168,6 +217,25 @@ applyParameterDecorator(Body, StoreController.prototype, 'updateOrderStatus', 1)
 applyParameterDecorator(Req, StoreController.prototype, 'updateOrderStatus', 2);
 applyMethodDecorator(UseGuards, StoreController.prototype, 'updateOrderStatus', AuthGuard, RolesGuard);
 Roles('admin', 'manager', 'user')(StoreController.prototype, 'updateOrderStatus');
+
+applyMethodDecorator(Post, StoreController.prototype, 'recordPickupHandover', 'orders/:id/pickup/handover');
+applyParameterDecorator(Param, StoreController.prototype, 'recordPickupHandover', 0);
+applyParameterDecorator(Body, StoreController.prototype, 'recordPickupHandover', 1);
+applyParameterDecorator(Req, StoreController.prototype, 'recordPickupHandover', 2);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'recordPickupHandover', AuthGuard, RolesGuard);
+Roles('admin', 'manager', 'user')(StoreController.prototype, 'recordPickupHandover');
+
+applyMethodDecorator(Put, StoreController.prototype, 'updateReplenishmentEstimate', 'orders/replenishment-tasks/:id/estimate');
+applyParameterDecorator(Param, StoreController.prototype, 'updateReplenishmentEstimate', 0);
+applyParameterDecorator(Body, StoreController.prototype, 'updateReplenishmentEstimate', 1);
+applyParameterDecorator(Req, StoreController.prototype, 'updateReplenishmentEstimate', 2);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'updateReplenishmentEstimate', AuthGuard, RolesGuard);
+Roles('admin', 'manager', 'user')(StoreController.prototype, 'updateReplenishmentEstimate');
+
+applyMethodDecorator(Get, StoreController.prototype, 'orderFulfillmentReport', 'orders/reports/fulfillment');
+applyParameterDecorator(Query, StoreController.prototype, 'orderFulfillmentReport', 0);
+applyMethodDecorator(UseGuards, StoreController.prototype, 'orderFulfillmentReport', AuthGuard, RolesGuard);
+Roles('admin', 'manager')(StoreController.prototype, 'orderFulfillmentReport');
 
 // Prescription customer routes
 applyMethodDecorator(Post, StoreController.prototype, 'uploadPrescription', 'prescriptions/upload');

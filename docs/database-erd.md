@@ -19,6 +19,14 @@ erDiagram
     MEDICINES o|--o{ SALES : sold_as
     BATCHES o|--o{ SALES : single_batch_reference
     CUSTOMERS o|--o{ SALES : purchases
+    CUSTOMERS o|--o{ ORDERS : places
+    USERS o|--o{ ORDERS : creates
+    ORDERS ||--|{ ORDER_ITEMS : contains
+    MEDICINES o|--o{ ORDER_ITEMS : ordered_as
+    ORDER_ITEMS ||--o{ ORDER_ITEM_RESERVATIONS : reserves
+    BATCHES o|--o{ ORDER_ITEM_RESERVATIONS : held_from
+    ORDER_ITEMS ||--o| REPLENISHMENT_TASKS : replenishes
+    ORDERS ||--o{ ORDER_PAYMENT_EVENTS : records
     SALES ||--o{ SALE_PAYMENTS : allocated_to
     SALES ||--o{ SALE_REFUNDS : refunded_by
     CUSTOMERS ||--o{ PRESCRIPTIONS : has
@@ -58,6 +66,7 @@ erDiagram
         int lowStockThreshold
         text imageUrl
         int totalQuantity
+        int reservedQuantity
     }
 
     INVENTORY_CATEGORIES {
@@ -75,6 +84,7 @@ erDiagram
         int supplierId FK
         string batchNumber
         int quantity
+        int reservedQuantity
         date expiryDate
         float costPrice
         float sellingPrice
@@ -112,6 +122,72 @@ erDiagram
         string receiptNumber
         datetime date
         string clientTransactionId UK
+    }
+
+    ORDERS {
+        int id PK
+        string orderNumber UK
+        int customerId FK
+        int userId FK
+        string customerName
+        string customerPhone
+        string deliveryMethod
+        string deliveryProvider
+        string paymentStatus
+        string orderStatus
+        float subtotal
+        float deliveryFee
+        float totalAmount
+        string pickupReference UK
+        datetime pickupReadyAt
+        datetime handedOverAt
+        int handedOverByUserId FK
+        string yangoReference
+        float yangoFee
+        text trackingLink
+        string gatewayPaymentReference
+        string refundStatus
+        json items
+    }
+
+    ORDER_ITEMS {
+        int id PK
+        int orderId FK
+        int medicineId FK
+        string productName
+        int quantity
+        int reservedQuantity
+        int preorderQuantity
+        int outstandingPreorderQuantity
+        float unitPrice
+        float totalPrice
+        string fulfillmentStatus
+        datetime estimatedFulfillmentAt
+    }
+
+    ORDER_ITEM_RESERVATIONS {
+        int id PK
+        int orderItemId FK
+        int batchId FK
+        int quantity
+    }
+
+    REPLENISHMENT_TASKS {
+        int id PK
+        int orderItemId FK UK
+        int outstandingQuantity
+        string status
+        datetime supplierConfirmedAt
+        datetime estimatedFulfillmentAt
+        int updatedByUserId FK
+    }
+
+    ORDER_PAYMENT_EVENTS {
+        int id PK
+        string eventId UK
+        int orderId FK
+        string eventType
+        datetime receivedAt
     }
 
     CUSTOMERS {
