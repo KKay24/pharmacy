@@ -4,8 +4,6 @@ import { MapPin, User, CreditCard, Shield } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import { showToast } from "../../components/store/StoreToast";
 
-const DELIVERY_FEE = 25;
-
 export default function StoreCheckoutPage() {
   const navigate = useNavigate();
   const { cart, cartTotal, clearCart, apiFetch, storeUser } = useStore();
@@ -49,8 +47,7 @@ export default function StoreCheckoutPage() {
     );
   }
 
-  const deliveryFee = form.deliveryMethod === "delivery" ? DELIVERY_FEE : 0;
-  const total = cartTotal + deliveryFee;
+  const total = cartTotal;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -122,7 +119,7 @@ export default function StoreCheckoutPage() {
                 <h3><MapPin size={18} /> Delivery Method</h3>
                 <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem" }}>
                   {[
-                    { value: "delivery", label: "Yango Home Delivery", sub: `ZMW ${DELIVERY_FEE} estimated charge` },
+                    { value: "delivery", label: "Yango Home Delivery", sub: "Price confirmed when booked with Yango" },
                     { value: "pickup", label: "Store Pickup", sub: "Free" },
                   ].map(opt => (
                     <label key={opt.value} style={{
@@ -210,15 +207,15 @@ export default function StoreCheckoutPage() {
                   </div>
                   <div className="store-order-total-row">
                     <span>Yango delivery charge</span>
-                    <span>{deliveryFee === 0 ? "Free" : `ZMW ${deliveryFee.toFixed(2)}`}</span>
+                    <span>{form.deliveryMethod === "delivery" ? "Confirmed when booked" : "Free"}</span>
                   </div>
                   <div className="store-order-total-row total">
-                    <span>Total</span>
+                    <span>Items total</span>
                     <span>ZMW {total.toFixed(2)}</span>
                   </div>
                 </div>
                 <button type="submit" className="store-order-submit" disabled={loading || !paymentAvailable}>
-                  {loading ? "Placing Order..." : `Continue to Payment · ZMW ${total.toFixed(2)}`}
+                  {loading ? "Placing Order..." : `Continue to Payment · Items ZMW ${total.toFixed(2)}`}
                 </button>
                 <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", textAlign: "center", marginTop: "0.75rem" }}>
                   <Shield size={12} style={{ verticalAlign: "middle" }} /> Secure checkout. Your data is protected.

@@ -707,7 +707,7 @@ class StoreService {
         customerId = existingCustomer.id;
       }
 
-      const deliveryFee = deliveryMethod === 'pickup' ? 0 : 25;
+      const deliveryFee = 0;
       const order = await Order.create({
         orderNumber,
         customerId,

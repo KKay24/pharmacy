@@ -250,7 +250,8 @@ describe('Store E-Commerce Endpoints', () => {
     assert.equal(res.data.order.items[0].preorderQuantity, 1);
     assert.equal(res.data.order.customerPhone, '+260971239999');
     assert.equal(Number(res.data.order.subtotal), sample.price);
-    assert.equal(Number(res.data.order.totalAmount), sample.price + Number(res.data.order.deliveryFee));
+    assert.equal(Number(res.data.order.deliveryFee), 0);
+    assert.equal(Number(res.data.order.totalAmount), sample.price);
 
     // Test tracking the newly created order
     const trackRes = await request(
